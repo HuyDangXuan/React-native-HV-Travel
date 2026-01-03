@@ -2,6 +2,10 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useState } from "react";
 
+import { MessageBoxProvider } from "./screens/MessageBox/MessageBoxContext";
+import MessageBoxBridge from "./screens/MessageBox/MessageBoxBridge";
+
+
 import SplashScreen from "./screens/Splash/SplashScreen";
 import OnboardingScreen from "./screens/Onboarding/OnboardingScreen";
 import LoginScreen from "./screens/Login/LoginScreen";
@@ -21,16 +25,20 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="SignUp" component={SignUpScreen} />
-        <Stack.Screen name="ForgetPassword" component={ForgetPasswordScreen} />
-        <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
-        <Stack.Screen name="CreateNewPassword" component={CreateNewPasswordScreen} />
-        <Stack.Screen name="HomeScreen" component={HomeScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <MessageBoxProvider>
+      <MessageBoxBridge />
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="ForgetPassword" component={ForgetPasswordScreen} />
+          <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
+          <Stack.Screen name="CreateNewPassword" component={CreateNewPasswordScreen} />
+          <Stack.Screen name="HomeScreen" component={HomeScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </MessageBoxProvider>
+    
   );
 }

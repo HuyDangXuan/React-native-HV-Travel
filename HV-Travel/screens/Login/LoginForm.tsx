@@ -3,6 +3,16 @@ import { useState } from "react"
 import AppInput from "../../components/TextInput"
 import AppButton from "../../components/Button"
 import { useNavigation } from "@react-navigation/native"
+import { MessageBoxProvider, useMessageBox } from "../MessageBox/MessageBoxContext"
+import { MessageBoxService } from "../MessageBox/MessageBoxService"
+
+function MessageBoxBridge() {
+  const { show } = useMessageBox();
+
+  MessageBoxService.register(show);
+
+  return null;
+}
 
 export default function LoginForm(){
     const [email, setEmail] = useState("")
@@ -25,8 +35,9 @@ export default function LoginForm(){
                 title="Đăng nhập"
                 onPress={() => {
                     console.log("Email:", email);
-                    console.log("Password:", password)
-                    navigation.replace("HomeScreen");
+                    console.log("Password:", password);
+                    MessageBoxService.success("Đăng nhập thành công!", "Chào mừng bạn đến với HV Travel.");
+                    navigation.navigate("HomeScreen");
                 }}
             />
             
