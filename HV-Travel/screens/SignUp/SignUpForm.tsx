@@ -24,12 +24,13 @@ export default function SignUpForm(){
                 placeholder="Mật khẩu"
                 value={password}
                 onChangeText={setPassword}
+                isPassword={true}
             />
             <AppInput
                 placeholder="Nhập lại mật khẩu"
                 value={repassword}
                 onChangeText={setRepassword}
-                secureTextEntry
+                isPassword={true}
             />
             <AppButton
                 title="Đăng ký"
