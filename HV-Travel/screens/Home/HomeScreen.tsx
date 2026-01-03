@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Alert } from "react-native";
 export default function HomeScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>HV Travel</Text>
+      <Text style={styles.title}>HV Travel Test</Text>
       <Text style={styles.subtitle}>Screen mẫu đầu tiên ✅</Text>
 
       <Pressable
