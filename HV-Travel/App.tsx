@@ -24,21 +24,6 @@ export default function App() {
   }
 
   return (
-<<<<<<< Updated upstream
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="SignUp" component={SignUpScreen} />
-        <Stack.Screen name="ForgetPassword" component={ForgetPasswordScreen} />
-        <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
-        <Stack.Screen name="CreateNewPassword" component={CreateNewPasswordScreen} />
-        <Stack.Screen name="HomeScreen" component={HomeScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
-=======
-    <MessageBoxProvider>
-      <MessageBoxBridge />
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
@@ -53,8 +38,5 @@ export default function App() {
           <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
         </Stack.Navigator>
       </NavigationContainer>
-    </MessageBoxProvider>
-    
->>>>>>> Stashed changes
   );
 }
