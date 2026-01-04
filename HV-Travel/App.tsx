@@ -2,6 +2,10 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useState } from "react";
 
+import { MessageBoxProvider } from "./screens/MessageBox/MessageBoxContext";
+import MessageBoxBridge from "./screens/MessageBox/MessageBoxBridge";
+
+
 import SplashScreen from "./screens/Splash/SplashScreen";
 import OnboardingScreen from "./screens/Onboarding/OnboardingScreen";
 import LoginScreen from "./screens/Login/LoginScreen";
@@ -24,6 +28,8 @@ export default function App() {
   }
 
   return (
+    <MessageBoxProvider>
+      <MessageBoxBridge />
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
@@ -38,5 +44,7 @@ export default function App() {
           <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
         </Stack.Navigator>
       </NavigationContainer>
+    </MessageBoxProvider>
+    
   );
 }
