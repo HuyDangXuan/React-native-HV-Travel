@@ -22,28 +22,32 @@ export const MessageBoxService = {
     showFn?.(options);
   },
 
-  success(title: string, content?: string, onConfirm?: () => void) {
+  success(title: string, content?: string, confirmText?: string, onConfirm?: () => void) {
     showFn?.({
       type: 'success',
       title,
       content,
+      confirmText,
       onConfirm,
     });
   },
 
-  error(title: string, content?: string) {
+  error(title: string, content?: string, confirmText?: string, onConfirm?: () => void) {
     showFn?.({
       type: 'error',
       title,
       content,
+      confirmText,
+      onConfirm,
     });
   },
 
-  warning(title: string, content?: string, onConfirm?: () => void) {
+  warning(title: string, content?: string, confirmText?: string, onConfirm?: () => void) {
     showFn?.({
       type: 'warning',
       title,
       content,
+      confirmText,
       showCancel: true,
       onConfirm,
     });
@@ -65,7 +69,7 @@ export const MessageBoxService = {
     onCancel?: () => void;
   }) => {
     showFn?.({
-      type: "warning",
+      type: "question",
       title,
       content,
       showCancel: true,
