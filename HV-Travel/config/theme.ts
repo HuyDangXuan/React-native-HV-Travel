@@ -33,23 +33,6 @@ const theme = {
     xl: 22,
     title: 28,
   },
-
-  animation: {
-    success: require('../assets/animations/success.json'),
-    error: require('../assets/animations/error.json'),
-    warning: require('../assets/animations/warning.json'),
-    question: require('../assets/animations/question.json'),
-    info: require('../assets/animations/warning.json'),
-    loading: require('../assets/animations/loading.json'),
-  },
-
-  animationColor: {
-    success: '#007AFF',
-    error: '#007AFF',
-    warning: '#007AFF',
-    info: '#3085d6',
-    question: '#007AFF',
-  }
 };
 
 export default theme;

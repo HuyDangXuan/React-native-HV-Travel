@@ -2,10 +2,6 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useState } from "react";
 
-import { MessageBoxProvider } from "./screens/MessageBox/MessageBoxContext";
-import MessageBoxBridge from "./screens/MessageBox/MessageBoxBridge";
-
-
 import SplashScreen from "./screens/Splash/SplashScreen";
 import OnboardingScreen from "./screens/Onboarding/OnboardingScreen";
 import LoginScreen from "./screens/Login/LoginScreen";
@@ -14,6 +10,9 @@ import ForgetPasswordScreen from "./screens/ForgetPassword/ForgetPasswordScreen"
 import CodeVerificationScreen from "./screens/ForgetPassword/CodeVerificationScreen";
 import CreateNewPasswordScreen from "./screens/ForgetPassword/CreateNewPasswordScreen";
 import HomeScreen from "./screens/Main/Home/HomeScreen";
+import TourDetailScreen from "./screens/Main/Home/Details/TourDetail";
+import BookingScreen from "./screens/Main/Home/Booking/BookingScreen";
+import PaymentMethodScreen from "./screens/Main/Home/Payment/PaymentMethodScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -25,8 +24,6 @@ export default function App() {
   }
 
   return (
-    <MessageBoxProvider>
-      <MessageBoxBridge />
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
@@ -36,9 +33,10 @@ export default function App() {
           <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
           <Stack.Screen name="CreateNewPassword" component={CreateNewPasswordScreen} />
           <Stack.Screen name="HomeScreen" component={HomeScreen} />
+          <Stack.Screen name="TourDetailScreen" component={TourDetailScreen} />
+          <Stack.Screen name="BookingScreen" component={BookingScreen} />
+          <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
         </Stack.Navigator>
       </NavigationContainer>
-    </MessageBoxProvider>
-    
   );
 }
