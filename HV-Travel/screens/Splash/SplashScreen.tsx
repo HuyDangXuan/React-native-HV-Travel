@@ -1,6 +1,7 @@
 // screens/SplashScreen.tsx
 import { View, Text, StyleSheet, Image } from "react-native";
 import { useEffect } from "react";
+import theme from "../../config/theme";
 
 type Props = {
   onFinish: () => void;
@@ -30,10 +31,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: theme.colors.white,
   },
   logo: {
     maxWidth: 500,
     maxHeight: 300,
-    marginBottom: 16,
+    marginBottom: theme.spacing.md,
   },
 });
