@@ -38,14 +38,17 @@ const theme = {
     success: require('../assets/animations/success.json'),
     error: require('../assets/animations/error.json'),
     warning: require('../assets/animations/warning.json'),
-    info: require('../assets/animations/question.json'),
+    question: require('../assets/animations/question.json'),
+    info: require('../assets/animations/warning.json'),
+    loading: require('../assets/animations/loading.json'),
   },
 
   animationColor: {
-    success: '#2ecc71',
-    error: '#e74c3c',
-    warning: '#f39c12',
+    success: '#007AFF',
+    error: '#007AFF',
+    warning: '#007AFF',
     info: '#3085d6',
+    question: '#007AFF',
   }
 };
 
