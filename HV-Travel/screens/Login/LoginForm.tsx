@@ -32,7 +32,7 @@ export default function LoginForm() {
       "Chào mừng bạn đến với HV Travel.",
       "Oke đi thôi",
       () => {
-        navigation.navigate("HomeScreen");
+        navigation.replace("HomeScreen");
         console.log("Navigated to HomeScreen");
       },
     );
