@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import theme from "../../../config/theme";
+import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
@@ -340,8 +341,11 @@ function SectionHeader({ title }: { title: string }) {
 
 function ExclusiveCard({ item }: { item: PackageItem }) {
   const cardW = Math.min(290, width * 0.72);
+  const navigation = useNavigation<any>();
   return (
-    <Pressable style={[styles.exCard, { width: cardW }]} onPress={() => {}}>
+    <Pressable style={[styles.exCard, { width: cardW }]} onPress={() => {
+      navigation.navigate("TourDetailScreen");
+    }}>
       <View style={styles.exImgWrap}>
         <Image source={{ uri: item.image }} style={styles.exImg} />
         <Pressable style={styles.bookmark} onPress={() => {}}>

@@ -14,6 +14,9 @@ import ForgetPasswordScreen from "./screens/ForgetPassword/ForgetPasswordScreen"
 import CodeVerificationScreen from "./screens/ForgetPassword/CodeVerificationScreen";
 import CreateNewPasswordScreen from "./screens/ForgetPassword/CreateNewPasswordScreen";
 import HomeScreen from "./screens/Main/Home/HomeScreen";
+import TourDetailScreen from "./screens/Main/Home/Details/TourDetail";
+import BookingScreen from "./screens/Main/Home/Booking/BookingScreen";
+import PaymentMethodScreen from "./screens/Main/Home/Payment/PaymentMethodScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -36,6 +39,9 @@ export default function App() {
           <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
           <Stack.Screen name="CreateNewPassword" component={CreateNewPasswordScreen} />
           <Stack.Screen name="HomeScreen" component={HomeScreen} />
+          <Stack.Screen name="TourDetailScreen" component={TourDetailScreen} />
+          <Stack.Screen name="BookingScreen" component={BookingScreen} />
+          <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </MessageBoxProvider>
