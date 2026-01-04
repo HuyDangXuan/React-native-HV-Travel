@@ -9,7 +9,7 @@ import {
 import LottieView from 'lottie-react-native';
 import theme from '../../config/theme';
 
-export type MessageBoxType = 'success' | 'error' | 'warning' | 'info';
+export type MessageBoxType = 'success' | 'error' | 'question' | 'warning' | 'info';
 
 interface MessageBoxProps {
   visible: boolean;
@@ -31,16 +31,11 @@ interface MessageBoxProps {
 const animationMap: Record<MessageBoxType, any> = {
   success: theme.animation.success,
   error: theme.animation.error,
+  question: theme.animation.question,
   warning: theme.animation.warning,
   info: theme.animation.info,
 };
 
-const colorMap: Record<MessageBoxType, string> = {
-  success: theme.colors.primary,
-  error: theme.animationColor.error,
-  warning: theme.animationColor.warning,
-  info: theme.animationColor.info,
-};
 
 const MessageBox: React.FC<MessageBoxProps> = ({
   visible,
@@ -97,7 +92,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
 
             <TouchableOpacity
               onPress={onConfirm}
-              style={[styles.btn, { backgroundColor: colorMap[type] }]}
+              style={[styles.btn, { backgroundColor: theme.colors.primary }]}
               activeOpacity={0.85}
             >
               <Text style={[styles.txt, styles.txtConfirm]}>{confirmText}</Text>
@@ -136,11 +131,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 6,
-    color: '#111',
+    color: theme.colors.text,
   },
   content: {
     fontSize: 14,
-    color: '#555',
+    color: theme.colors.text,
     textAlign: 'center',
     marginBottom: theme.spacing.lg,
   },

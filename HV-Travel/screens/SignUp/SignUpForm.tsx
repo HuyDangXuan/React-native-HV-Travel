@@ -45,12 +45,12 @@ export default function SignUpForm(){
                         content: `Bạn có chắc chắn muốn đăng ký tài khoản với email ${email}?`,
                         onConfirm: () => {
                             setTimeout(() => {
-                                MessageBoxService.success("Đăng ký thành công!", "Chào mừng bạn đến với HV Travel.");
+                                MessageBoxService.success("Đăng ký thành công!", "Chào mừng bạn đến với HV Travel.", "OK");
                             }, 20);
                         },
                         onCancel: () => {
                             setTimeout(() => {
-                                MessageBoxService.error("Đăng ký thất bại!", "Vui lòng kiểm tra lại thông tin.");
+                                MessageBoxService.error("Đăng ký thất bại!", "Vui lòng kiểm tra lại thông tin.", "OK");
                             }, 20);
                         },
                     });
