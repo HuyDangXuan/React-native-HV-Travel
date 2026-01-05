@@ -24,7 +24,13 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
 
   if (!isReady) {
-    return <SplashScreen onFinish={() => setIsReady(true)} />;
+    return (
+      <MessageBoxProvider>
+        <MessageBoxBridge />
+        <SplashScreen onFinish={() => setIsReady(true)} />
+      </MessageBoxProvider>
+      
+    );
   }
 
   return (
