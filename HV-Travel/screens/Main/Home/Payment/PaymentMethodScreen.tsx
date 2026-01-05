@@ -1,37 +1,83 @@
-import React from "react";
-import { View, Text, StyleSheet, SafeAreaView, Pressable } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, SafeAreaView, Pressable, Modal, ScrollView, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { SvgUri } from "react-native-svg";
 import theme from "../../../../config/theme";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
 type Method = {
   id: string;
   name: string;
-  logo: string;
+  logo?: string;
+  icon?: string;
+  description?: string;
 };
 
 const METHODS: Method[] = [
   {
-    id: "mc",
-    name: "MasterCard",
-    logo: "https://cdn.simpleicons.org/mastercard",
+    id: "zalopay",
+    name: "ZaloPay",
+    logo: "https://cdn.brandfetch.io/id_T-oXJkN/w/820/h/184/theme/dark/logo.png?c=1dxbfHSJFAPEGdCLU4o5B",
+    description: "Thanh toán nhanh qua ví ZaloPay",
   },
   {
-    id: "visa",
-    name: "Visa",
-    logo: "https://cdn.simpleicons.org/visa",
+    id: "vnpay",
+    name: "VNPay",
+    logo: "https://cdn.brandfetch.io/idV02t6WJs/w/820/h/249/theme/dark/logo.png?c=1dxbfHSJFAPEGdCLU4o5B",
+    description: "Thanh toán qua VNPay QR",
   },
   {
-    id: "paypal",
-    name: "Paypal",
-    logo: "https://cdn.simpleicons.org/paypal",
+    id: "momo",
+    name: "MoMo",
+    logo: "https://cdn.brandfetch.io/idn4xaCzTm/w/180/h/180/theme/dark/logo.png?c=1dxbfHSJFAPEGdCLU4o5B",
+    description: "Thanh toán qua ví MoMo",
+  },
+  {
+    id: "bank",
+    name: "Chuyển khoản ngân hàng",
+    icon: "card-outline",
+    description: "Chuyển khoản vào tài khoản công ty",
+  },
+  {
+    id: "cash",
+    name: "Tiền mặt",
+    icon: "cash-outline",
+    description: "Thanh toán tiền mặt tại văn phòng",
   },
 ];
 
-
 export default function PaymentMethodScreen({}: any) {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const [showBankModal, setShowBankModal] = useState(false);
+
+  // Lấy thông tin từ route params
+  const amount = route.params?.amount || "40.500.000đ";
+  const orderId = route.params?.orderId || "DL" + Date.now();
+
+  const handleMethodPress = (method: Method) => {
+    const paymentParams = { amount, orderId };
+
+    switch (method.id) {
+      case "zalopay":
+        navigation.navigate("ZaloPayScreen", paymentParams);
+        break;
+      case "vnpay":
+        navigation.navigate("VNPayScreen", paymentParams);
+        break;
+      case "momo":
+        navigation.navigate("MoMoScreen", paymentParams);
+        break;
+      case "bank":
+        setShowBankModal(true);
+        break;
+      // case "cash":
+      //   navigation.navigate("CashPaymentScreen", paymentParams);
+      //   break;
+      default:
+        console.log("Unknown payment method:", method.id);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
@@ -46,31 +92,140 @@ export default function PaymentMethodScreen({}: any) {
         <View style={styles.headerIcon} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.sectionTitle}>Chọn phương thức thanh toán</Text>
+
+        {/* Amount Display */}
+        <View style={styles.amountCard}>
+          <Text style={styles.amountLabel}>Tổng thanh toán</Text>
+          <Text style={styles.amountValue}>{amount}</Text>
+        </View>
+
         {METHODS.map((m) => (
           <Pressable
             key={m.id}
             style={styles.methodCard}
-            onPress={() => {}}
+            onPress={() => handleMethodPress(m)}
             android_ripple={{ color: "rgba(0,0,0,0.06)" }}
           >
             <View style={styles.methodLeft}>
               <View style={styles.logoBox}>
-                <SvgUri
-                  uri={m.logo}
-                  width="100%"
-                  height="100%"
-                  onError={(error) => console.log('SVG load error:', m.name, error)}
-                />
+                {m.logo ? (
+                  <Image
+                    source={{ uri: m.logo }}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Ionicons name={m.icon as any} size={28} color={theme.colors.primary} />
+                )}
               </View>
-              <Text style={styles.methodText}>{m.name}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.methodText}>{m.name}</Text>
+                {m.description && <Text style={styles.methodDesc}>{m.description}</Text>}
+              </View>
             </View>
 
             <Ionicons name="chevron-forward" size={22} color={theme.colors.gray} />
           </Pressable>
         ))}
-      </View>
+
+        <View style={styles.note}>
+          <Ionicons name="information-circle-outline" size={20} color={theme.colors.primary} />
+          <Text style={styles.noteText}>
+            Vui lòng hoàn tất thanh toán trong vòng 24h để giữ chỗ. Sau thời gian này, đơn hàng sẽ tự động hủy.
+          </Text>
+        </View>
+      </ScrollView>
+
+      {/* Bank Transfer Modal */}
+      <Modal visible={showBankModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowBankModal(false)} />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Thông tin chuyển khoản</Text>
+              <Pressable onPress={() => setShowBankModal(false)} hitSlop={10}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.bankInfo}>
+                <InfoRow label="Ngân hàng" value="Vietcombank - Chi nhánh Hà Nội" />
+                <InfoRow label="Số tài khoản" value="1234567890" copyable />
+                <InfoRow label="Chủ tài khoản" value="CÔNG TY DU LỊCH HV TRAVEL" />
+                <InfoRow label="Số tiền" value={amount} highlight />
+                <InfoRow label="Nội dung" value={`${orderId} DAT VE`} copyable />
+              </View>
+
+              <View style={styles.warningBox}>
+                <Ionicons name="warning-outline" size={20} color="#F59E0B" />
+                <Text style={styles.warningText}>
+                  Vui lòng ghi đúng nội dung chuyển khoản để chúng tôi xác nhận thanh toán nhanh nhất.
+                </Text>
+              </View>
+
+              <View style={styles.instructionBox}>
+                <Text style={styles.instructionTitle}>Hướng dẫn:</Text>
+                <Text style={styles.instructionText}>
+                  1. Mở ứng dụng ngân hàng{"\n"}
+                  2. Chuyển khoản đến số tài khoản trên{"\n"}
+                  3. Nhập đúng số tiền và nội dung{"\n"}
+                  4. Chụp ảnh hoặc lưu lại biên lai{"\n"}
+                  5. Chờ xác nhận từ hệ thống (1-2 giờ)
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <Pressable
+                style={styles.modalBtn}
+                onPress={() => {
+                  setShowBankModal(false);
+                  navigation.navigate("BankTransferScreen", { amount, orderId });
+                }}
+              >
+                <Text style={styles.modalBtnText}>Tiếp tục</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  copyable,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  copyable?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <View style={styles.infoValueWrap}>
+        <Text style={[styles.infoValue, highlight && styles.infoValueHighlight]}>{value}</Text>
+        {copyable && (
+          <Pressable
+            style={styles.copyBtn}
+            onPress={() => {
+              // Copy to clipboard logic
+              // Clipboard.setString(value);
+              console.log("Copied:", value);
+            }}
+          >
+            <Ionicons name="copy-outline" size={16} color={theme.colors.primary} />
+          </Pressable>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -84,26 +239,58 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: theme.colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   headerIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   headerTitle: { fontSize: theme.fontSize.lg, fontWeight: "800", color: theme.colors.text },
 
   content: {
     padding: theme.spacing.md,
-    gap: theme.spacing.md,
+  },
+
+  sectionTitle: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "700",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+  },
+
+  // Amount Card
+  amountCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    alignItems: "center",
+    marginBottom: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  amountLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    fontWeight: "600",
+    marginBottom: theme.spacing.xs,
+  },
+  amountValue: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: theme.colors.primary,
   },
 
   methodCard: {
-    height: 72,
+    minHeight: 80,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.white,
     paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     overflow: "hidden",
+    marginBottom: theme.spacing.md,
   },
 
   methodLeft: {
@@ -115,17 +302,174 @@ const styles = StyleSheet.create({
 
   logoBox: {
     width: 54,
-    height: 40,
+    height: 54,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: theme.spacing.sm,
+    padding: theme.spacing.xs,
+  },
+
+  logoImage: {
+    width: "100%",
+    height: "100%",
   },
 
   methodText: {
     fontSize: theme.fontSize.md,
     color: theme.colors.text,
     fontWeight: "700",
+  },
+
+  methodDesc: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    marginTop: 2,
+  },
+
+  note: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    marginTop: theme.spacing.md,
+  },
+
+  noteText: {
+    flex: 1,
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    lineHeight: 20,
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    backgroundColor: theme.colors.white,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
+    maxHeight: "90%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  modalTitle: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: "700",
+    color: theme.colors.text,
+  },
+  modalBody: {
+    padding: theme.spacing.lg,
+  },
+  modalFooter: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingBottom: 34,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  modalBtn: {
+    height: 54,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalBtnText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.md,
+    fontWeight: "700",
+  },
+
+  // Bank Info
+  bankInfo: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+
+  infoRow: {
+    gap: 4,
+  },
+
+  infoLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    fontWeight: "600",
+  },
+
+  infoValueWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+  },
+
+  infoValue: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.text,
+    fontWeight: "700",
+    flex: 1,
+  },
+
+  infoValueHighlight: {
+    color: theme.colors.primary,
+    fontSize: theme.fontSize.lg,
+  },
+
+  copyBtn: {
+    padding: theme.spacing.xs,
+  },
+
+  warningBox: {
+    flexDirection: "row",
+    gap: theme.spacing.sm,
+    padding: theme.spacing.md,
+    backgroundColor: "#FEF3C7",
+    borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing.lg,
+  },
+
+  warningText: {
+    flex: 1,
+    fontSize: theme.fontSize.sm,
+    color: "#92400E",
+    lineHeight: 20,
+  },
+
+  instructionBox: {
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+
+  instructionTitle: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "700",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+  },
+
+  instructionText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    lineHeight: 22,
   },
 });
