@@ -18,7 +18,7 @@ export default function VNPayScreen() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigation.replace("PaymentFailed", { reason: "timeout" });
+          navigation.replace("PaymentFailedScreen", { reason: "timeout" });
           return 0;
         }
         return prev - 1;
@@ -43,7 +43,7 @@ export default function VNPayScreen() {
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
-      navigation.replace("PaymentSuccess", { method: "VNPay", orderId });
+      navigation.replace("PaymentFailedScreen", { method: "VNPay", orderId });
     }, 2000);
   };
 
@@ -91,11 +91,17 @@ export default function VNPayScreen() {
           <Text style={styles.orText}>HOẶC</Text>
           <View style={styles.line} />
         </View>
-
-        {/* Open App Button */}
-        <Pressable style={styles.openAppBtn} onPress={handleOpenVNPayApp}>
-          <Ionicons name="phone-portrait-outline" size={24} color={theme.colors.white} />
-          <Text style={styles.openAppText}>Mở ứng dụng VNPay</Text>
+        
+        {/* Quick Action */}
+        <Pressable style={styles.quickActionBtn} onPress={handleOpenVNPayApp}>
+          <View style={styles.quickActionIcon}>
+            <Ionicons name="phone-portrait-outline" size={32} color="#DC2626" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quickActionTitle}>Mở ứng dụng VNPay</Text>
+            <Text style={styles.quickActionDesc}>Thanh toán nhanh chóng và bảo mật</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={theme.colors.gray} />
         </Pressable>
 
         {/* Order Info */}
@@ -260,6 +266,55 @@ const styles = StyleSheet.create({
     color: "#DC2626",
   },
 
+  // Quick Action
+  quickActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: theme.spacing.md,
+    backgroundColor: "#FDF2F8",
+    borderRadius: theme.radius.lg,
+    borderWidth: 2,
+    borderColor: "#DC2626",
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  quickActionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionTitle: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
+  quickActionDesc: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    marginTop: 2,
+  },
+
+  // Or Divider
+  orDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: theme.spacing.lg,
+    gap: theme.spacing.md,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
+  },
+  orText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    fontWeight: "600",
+  },
+
   // QR
   qrSection: {
     marginBottom: theme.spacing.lg,
@@ -292,24 +347,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     color: theme.colors.gray,
     textAlign: "center",
-  },
-
-  // Or Divider
-  orDivider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: theme.spacing.lg,
-    gap: theme.spacing.md,
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: theme.colors.border,
-  },
-  orText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
   },
 
   // Open App Button
