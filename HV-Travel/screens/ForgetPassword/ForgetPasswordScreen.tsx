@@ -12,8 +12,7 @@ export default function ForgetPasswordScreen(){
     return(
         <View style={styles.container}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                <Image source={require("../../assets/back.png")} 
-                style={styles.backIcon}/>
+                <Image source={theme.icon.back} style={styles.backIcon} />
             </TouchableOpacity>
             <Text style={styles.title}>Đặt lại mật khẩu</Text>
             <Text style={styles.desc}>Một mã xác nhận sẽ được gửi đến Email của bạn để đặt lại mật khẩu</Text>
@@ -26,7 +25,7 @@ export default function ForgetPasswordScreen(){
                 title="Gửi Email"
                 onPress={() => {
                     console.log("Email:", email);
-                    navigation.navigate("CodeVerification");
+                    navigation.navigate("CodeVerificationScreen");
                 }}
             />
             
