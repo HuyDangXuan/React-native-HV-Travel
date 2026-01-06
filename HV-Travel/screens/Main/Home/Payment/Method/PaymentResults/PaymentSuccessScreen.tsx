@@ -16,15 +16,31 @@ export default function PaymentSuccessScreen() {
   // Animation
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Success icon animation
+    Animated.sequence([
     Animated.spring(scaleAnim, {
       toValue: 1,
       tension: 50,
       friction: 7,
       useNativeDriver: true,
-    }).start();
+    }),
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 20, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -20, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 16, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -16, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 12, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -12, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 8, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 4, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -4, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
+    ]),
+  ]).start();
 
     // Fade in content
     Animated.timing(fadeAnim, {
@@ -79,7 +95,10 @@ export default function PaymentSuccessScreen() {
           style={[
             styles.iconContainer,
             {
-              transform: [{ scale: scaleAnim }],
+              transform: [
+                { scale: scaleAnim },
+                { translateY: shakeAnim },
+              ],
             },
           ]}
         >
@@ -204,7 +223,7 @@ export default function PaymentSuccessScreen() {
           style={[styles.primaryBtn, { backgroundColor: getMethodColor() }]}
           onPress={() => {
             // Navigate to home
-            navigation.replace("HomeScreen");
+            navigation.replace("MainTabs");
           }}
         >
           <Text style={styles.primaryBtnText}>Về trang chủ</Text>

@@ -5,7 +5,6 @@ import { useState } from "react";
 import { MessageBoxProvider } from "./screens/MessageBox/MessageBoxContext";
 import MessageBoxBridge from "./screens/MessageBox/MessageBoxBridge";
 
-
 import SplashScreen from "./screens/Splash/SplashScreen";
 import OnboardingScreen from "./screens/Onboarding/OnboardingScreen";
 import LoginScreen from "./screens/Login/LoginScreen";
@@ -13,7 +12,9 @@ import SignUpScreen from "./screens/SignUp/SignUpScreen";
 import ForgetPasswordScreen from "./screens/ForgetPassword/ForgetPasswordScreen";
 import CodeVerificationScreen from "./screens/ForgetPassword/CodeVerificationScreen";
 import CreateNewPasswordScreen from "./screens/ForgetPassword/CreateNewPasswordScreen";
-import HomeScreen from "./screens/Main/Home/HomeScreen";
+
+import MainTabs from "./screens/Main/MainTab"; // ✅ NEW
+
 import TourDetailScreen from "./screens/Main/Home/Details/TourDetail";
 import BookingScreen from "./screens/Main/Home/Booking/BookingScreen";
 import PaymentMethodScreen from "./screens/Main/Home/Payment/PaymentMethodScreen";
@@ -22,6 +23,9 @@ import VNPayScreen from "./screens/Main/Home/Payment/Method/VNPayScreen";
 import MoMoScreen from "./screens/Main/Home/Payment/Method/MoMoScreen";
 import PaymentSuccessScreen from "./screens/Main/Home/Payment/Method/PaymentResults/PaymentSuccessScreen";
 import PaymentFailedScreen from "./screens/Main/Home/Payment/Method/PaymentResults/PaymentFailedScreen";
+import MyBookingScreen from "./screens/Main/Setting/MyBooking/MyBookingScreen";
+import ProfileScreen from "./screens/Main/Setting/Profile/ProfileScreen";
+import EditProfileScreen from "./screens/Main/Setting/Profile/EditProfile/EditProfileScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -34,7 +38,6 @@ export default function App() {
         <MessageBoxBridge />
         <SplashScreen onFinish={() => setIsReady(true)} />
       </MessageBoxProvider>
-      
     );
   }
 
@@ -49,7 +52,11 @@ export default function App() {
           <Stack.Screen name="ForgetPasswordScreen" component={ForgetPasswordScreen} />
           <Stack.Screen name="CodeVerificationScreen" component={CodeVerificationScreen} />
           <Stack.Screen name="CreateNewPasswordScreen" component={CreateNewPasswordScreen} />
-          <Stack.Screen name="HomeScreen" component={HomeScreen} />
+
+          {/* ✅ Main: bottom tabs */}
+          <Stack.Screen name="MainTabs" component={MainTabs} options={{gestureEnabled: false}} />
+
+          {/* ✅ Detail screens */}
           <Stack.Screen name="TourDetailScreen" component={TourDetailScreen} />
           <Stack.Screen name="BookingScreen" component={BookingScreen} />
           <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
@@ -58,9 +65,11 @@ export default function App() {
           <Stack.Screen name="MoMoScreen" component={MoMoScreen} />
           <Stack.Screen name="PaymentSuccessScreen" component={PaymentSuccessScreen} />
           <Stack.Screen name="PaymentFailedScreen" component={PaymentFailedScreen} />
+          <Stack.Screen name="MyBookingScreen" component={MyBookingScreen} />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </MessageBoxProvider>
-    
   );
 }
