@@ -18,7 +18,7 @@ export default function MoMoScreen() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigation.replace("PaymentFailed", { reason: "timeout" });
+          navigation.replace("PaymentFailedScreen", { reason: "timeout" });
           return 0;
         }
         return prev - 1;
@@ -43,7 +43,7 @@ export default function MoMoScreen() {
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
-      navigation.replace("PaymentSuccess", { method: "MoMo", orderId });
+      navigation.replace("PaymentSuccessScreen", { method: "MoMo", orderId });
     }, 2000);
   };
 
@@ -74,25 +74,6 @@ export default function MoMoScreen() {
           <Text style={styles.amountValue}>{amount}</Text>
         </View>
 
-        {/* Quick Action */}
-        <Pressable style={styles.quickActionBtn} onPress={handleOpenMoMoApp}>
-          <View style={styles.quickActionIcon}>
-            <Ionicons name="phone-portrait-outline" size={32} color="#A50064" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.quickActionTitle}>Mở ứng dụng MoMo</Text>
-            <Text style={styles.quickActionDesc}>Thanh toán nhanh chóng và bảo mật</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color={theme.colors.gray} />
-        </Pressable>
-
-        {/* Or Divider */}
-        <View style={styles.orDivider}>
-          <View style={styles.line} />
-          <Text style={styles.orText}>HOẶC</Text>
-          <View style={styles.line} />
-        </View>
-
         {/* QR Code */}
         <View style={styles.qrSection}>
           <Text style={styles.sectionTitle}>Quét mã QR để thanh toán</Text>
@@ -104,6 +85,25 @@ export default function MoMoScreen() {
           </View>
         </View>
 
+        {/* Or Divider */}
+        <View style={styles.orDivider}>
+          <View style={styles.line} />
+          <Text style={styles.orText}>HOẶC</Text>
+          <View style={styles.line} />
+        </View>
+
+        {/* Quick Action */}
+        <Pressable style={styles.quickActionBtn} onPress={handleOpenMoMoApp}>
+          <View style={styles.quickActionIcon}>
+            <Ionicons name="phone-portrait-outline" size={32} color="#A50064" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quickActionTitle}>Mở ứng dụng MoMo</Text>
+            <Text style={styles.quickActionDesc}>Thanh toán nhanh chóng và bảo mật</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={theme.colors.gray} />
+        </Pressable>
+        
         {/* Order Info */}
         <View style={styles.infoBox}>
           <InfoRow icon="document-text-outline" label="Mã đơn hàng" value={orderId} />

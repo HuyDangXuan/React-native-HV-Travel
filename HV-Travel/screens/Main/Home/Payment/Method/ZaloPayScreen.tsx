@@ -35,13 +35,18 @@ export default function ZaloPayScreen() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const handleOpenZaloPayApp = () => {
+    // Trong thực tế sẽ mở deep link MoMo
+    console.log("Opening MoMo app...");
+  };
+
   const handleCheckPayment = () => {
     setIsProcessing(true);
     // Giả lập kiểm tra thanh toán
     setTimeout(() => {
       setIsProcessing(false);
       // Giả sử thanh toán thành công
-      navigation.replace("PaymentSuccess", { method: "ZaloPay", orderId });
+      navigation.replace("PaymentSuccessScreen", { method: "ZaloPay", orderId });
     }, 2000);
   };
 
@@ -83,6 +88,25 @@ export default function ZaloPayScreen() {
             <Text style={styles.qrHint}>Mở ứng dụng ZaloPay và quét mã QR</Text>
           </View>
         </View>
+
+        {/* Or Divider */}
+        <View style={styles.orDivider}>
+          <View style={styles.line} />
+          <Text style={styles.orText}>HOẶC</Text>
+          <View style={styles.line} />
+        </View>
+        
+        {/* Quick Action */}
+        <Pressable style={styles.quickActionBtn} onPress={handleOpenZaloPayApp}>
+          <View style={styles.quickActionIcon}>
+            <Ionicons name="phone-portrait-outline" size={32} color={theme.colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quickActionTitle}>Mở ứng dụng ZaloPay</Text>
+            <Text style={styles.quickActionDesc}>Thanh toán nhanh chóng và bảo mật</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={theme.colors.gray} />
+        </Pressable>
 
         {/* Order Info */}
         <View style={styles.infoBox}>
@@ -240,6 +264,55 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "800",
     color: theme.colors.primary,
+  },
+
+// Quick Action
+  quickActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: theme.spacing.md,
+    backgroundColor: "#FDF2F8",
+    borderRadius: theme.radius.lg,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  quickActionIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionTitle: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "700",
+    color: theme.colors.primary,
+  },
+  quickActionDesc: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    marginTop: 2,
+  },
+
+  // Or Divider
+  orDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: theme.spacing.lg,
+    gap: theme.spacing.md,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.colors.border,
+  },
+  orText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray,
+    fontWeight: "600",
   },
 
   // QR

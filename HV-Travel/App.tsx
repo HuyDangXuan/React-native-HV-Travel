@@ -20,6 +20,8 @@ import PaymentMethodScreen from "./screens/Main/Home/Payment/PaymentMethodScreen
 import ZaloPayScreen from "./screens/Main/Home/Payment/Method/ZaloPayScreen";
 import VNPayScreen from "./screens/Main/Home/Payment/Method/VNPayScreen";
 import MoMoScreen from "./screens/Main/Home/Payment/Method/MoMoScreen";
+import PaymentSuccessScreen from "./screens/Main/Home/Payment/Method/PaymentResults/PaymentSuccessScreen";
+import PaymentFailedScreen from "./screens/Main/Home/Payment/Method/PaymentResults/PaymentFailedScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -54,6 +56,8 @@ export default function App() {
           <Stack.Screen name="ZaloPayScreen" component={ZaloPayScreen} />
           <Stack.Screen name="VNPayScreen" component={VNPayScreen} />
           <Stack.Screen name="MoMoScreen" component={MoMoScreen} />
+          <Stack.Screen name="PaymentSuccessScreen" component={PaymentSuccessScreen} />
+          <Stack.Screen name="PaymentFailedScreen" component={PaymentFailedScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </MessageBoxProvider>
