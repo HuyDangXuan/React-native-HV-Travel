@@ -12,8 +12,7 @@ export default function CodeVerificationScreen(){
     return(
         <View style={styles.container}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                <Image source={require("../../assets/back.png")} 
-                style={styles.backIcon}/>
+                <Image source={theme.icon.back} style={styles.backIcon} />
             </TouchableOpacity>
             <Text style={styles.title}>Xác nhận mã</Text>
             <Text style={styles.desc}>Chúng tôi đã gửi một mã xác nhận đến email của bạn. Vui lòng kiểm tra hộp thư đến và nhập mã để tiếp tục.</Text>
@@ -26,7 +25,7 @@ export default function CodeVerificationScreen(){
                 title="Xác nhận"
                 onPress={() => {
                     console.log("Code:", code);
-                    navigation.navigate("CreateNewPassword");
+                    navigation.navigate("CreateNewPasswordScreen");
                 }}
             />
             

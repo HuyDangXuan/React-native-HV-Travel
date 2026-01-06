@@ -13,8 +13,7 @@ export default function CreateNewPasswordScreen(){
     return(
         <View style={styles.container}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                <Image source={require("../../assets/back.png")} 
-                style={styles.backIcon}/>
+                <Image source={theme.icon.back} style={styles.backIcon} />
             </TouchableOpacity>
             <Text style={styles.title}>Tạo mật khẩu mới</Text>
             <Text style={styles.desc}>Mật khẩu mới của bạn phải có ít nhất 8 ký tự, khác mật khẩu cũ.</Text>
@@ -34,7 +33,7 @@ export default function CreateNewPasswordScreen(){
                 title="Đặt lại mật khẩu"
                 onPress={() => {
                     console.log("New Password:", newPassword);
-                    navigation.replace("Login");
+                    navigation.replace("LoginScreen");
                 }}
             />
             

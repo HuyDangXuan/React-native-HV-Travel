@@ -33,7 +33,10 @@ const theme = {
     xl: 22,
     title: 28,
   },
-
+  icon: {
+    favicon: require('../assets/favicon.png'),
+    back: require('../assets/back.png'),
+  },
   animation: {
     success: require('../assets/animations/success.json'),
     error: require('../assets/animations/error.json'),

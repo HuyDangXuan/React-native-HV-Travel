@@ -41,12 +41,12 @@ export default function App() {
       <MessageBoxBridge />
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="SignUp" component={SignUpScreen} />
-          <Stack.Screen name="ForgetPassword" component={ForgetPasswordScreen} />
-          <Stack.Screen name="CodeVerification" component={CodeVerificationScreen} />
-          <Stack.Screen name="CreateNewPassword" component={CreateNewPasswordScreen} />
+          <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />
+          <Stack.Screen name="LoginScreen" component={LoginScreen} />
+          <Stack.Screen name="SignUpScreen" component={SignUpScreen} />
+          <Stack.Screen name="ForgetPasswordScreen" component={ForgetPasswordScreen} />
+          <Stack.Screen name="CodeVerificationScreen" component={CodeVerificationScreen} />
+          <Stack.Screen name="CreateNewPasswordScreen" component={CreateNewPasswordScreen} />
           <Stack.Screen name="HomeScreen" component={HomeScreen} />
           <Stack.Screen name="TourDetailScreen" component={TourDetailScreen} />
           <Stack.Screen name="BookingScreen" component={BookingScreen} />

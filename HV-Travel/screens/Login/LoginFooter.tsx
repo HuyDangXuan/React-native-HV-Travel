@@ -7,10 +7,10 @@ export default function LoginFooter(){
 
     return(
         <View style={styles.container}>
-            <Text style={styles.text} onPress={()=> navigation.navigate("ForgetPassword")}>
+            <Text style={styles.text} onPress={()=> navigation.navigate("ForgetPasswordScreen")}>
                 Quên mật khẩu?</Text>
             <Text style={styles.text}>Chưa có tài khoản?{' '}
-                <Text style={styles.link} onPress={() => navigation.replace("SignUp")}>
+                <Text style={styles.link} onPress={() => navigation.replace("SignUpScreen")}>
                     Đăng ký</Text>
             </Text>
         </View>
@@ -21,16 +21,6 @@ const styles = StyleSheet.create({
     container: {
         marginTop: theme.spacing.lg,
         alignItems: "center",
-    },
-    backButton: {
-        position: "absolute",
-        top: 50,
-        left: 20,
-        zIndex: 10,
-    },
-    backIcon:{
-        width: 24,
-        height: 24,
     },
     text: {
         fontSize: theme.fontSize.md,

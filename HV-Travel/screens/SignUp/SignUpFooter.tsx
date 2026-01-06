@@ -7,7 +7,7 @@ export default function SignUpFooter(){
     return(
         <View style={styles.container}>
             <Text style={styles.text}>Đã có tài khoản?{' '}
-                <Text style={styles.link} onPress={() => navigation.replace("Login")}>
+                <Text style={styles.link} onPress={() => navigation.replace("LoginScreen")}>
                                     Đăng nhập</Text>
             </Text>
         </View>

@@ -19,7 +19,7 @@ export default function OnboardingScreen() {
       
       <TouchableOpacity
         style={styles.skip}
-        onPress={() => navigation.replace("Login")}
+        onPress={() => navigation.replace("LoginScreen")}
       >
         <Text style={styles.skipText}>Bỏ qua</Text>
       </TouchableOpacity>
@@ -43,7 +43,7 @@ export default function OnboardingScreen() {
         title={isLast ? "Bắt đầu" : "Tiếp theo"}
         onPress={() => {
           if (isLast) {
-            navigation.replace("Login");
+            navigation.replace("LoginScreen");
           } else {
             setIndex(index + 1);
           }
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   },
 
   skipText: {
-    color: "black",
+    color: theme.colors.text,
     fontWeight: "600",
   },
 
