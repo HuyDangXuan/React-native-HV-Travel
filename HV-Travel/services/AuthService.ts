@@ -34,4 +34,28 @@ export class AuthService {
       body: JSON.stringify({ userId, oldPass, newPass })
     });
   };
+
+  static forgotPassword = async (email: string) => {
+    return ApiService.fetchWithTimeout(`${api.forgot_password}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+  };
+
+  static verifyOTP = async (otpId: string, otp: string) => {
+    return ApiService.fetchWithTimeout(`${api.verify_otp}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ otpId, otp })
+    });
+  };
+
+  static resetPassword = async (otpId: string, newPassword: string) => {
+    return ApiService.fetchWithTimeout(`${api.reset_password}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ otpId, newPassword })
+    });
+  };
 }

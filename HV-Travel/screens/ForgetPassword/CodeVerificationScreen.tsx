@@ -2,12 +2,35 @@ import {View, Image, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import AppInput from '../../components/TextInput';
 import AppButton from '../../components/Button';
 import { useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { AuthService } from '../../services/AuthService';   
+import LoadingOverlay from '../Loading/LoadingOverlay';
 import theme from '../../config/theme';
 
 export default function CodeVerificationScreen(){
     const [code, setCode] = useState("")
     const navigation = useNavigation<any>();
+    const [loading, setLoading] = useState(false);
+    const route = useRoute();
+    const { otpId } = route.params as { otpId: string };
+
+    const handleVerifyCode = async() =>{
+        setLoading(true);
+        await new Promise((res) => setTimeout(res, 50));
+        try {
+            const res = await AuthService.verifyOTP(otpId, code);
+            if (res.status === true){
+                console.log("Verify OTP response: ", res);
+                navigation.navigate("CreateNewPasswordScreen", {otpId: otpId});
+            }
+        }
+        catch(error: any){
+            console.log("Verify OTP error: ", error);
+        }
+        finally{
+            setLoading(false);
+        }
+    }
 
     return(
         <View style={styles.container}>
@@ -24,8 +47,7 @@ export default function CodeVerificationScreen(){
             <AppButton
                 title="Xác nhận"
                 onPress={() => {
-                    console.log("Code:", code);
-                    navigation.navigate("CreateNewPasswordScreen");
+                    handleVerifyCode();
                 }}
             />
             
