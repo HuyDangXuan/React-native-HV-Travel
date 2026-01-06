@@ -2,13 +2,37 @@ import {View, Image, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import AppInput from '../../components/TextInput';
 import AppButton from '../../components/Button';
 import { useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import LoadingOverlay from '../Loading/LoadingOverlay';
+import { AuthService } from '../../services/AuthService';
 import theme from '../../config/theme';
 
 export default function CreateNewPasswordScreen(){
-    const [newPassword, setNewPassword] = useState("")
-    const [rePassword, setRePassword] = useState("")
+    const [newPassword, setNewPassword] = useState("");
+    const [rePassword, setRePassword] = useState("");
+    const [loading, setLoading] = useState(false);
     const navigation = useNavigation<any>();
+
+    const route = useRoute();
+    const { otpId } = route.params as { otpId: string };
+
+    const handleResetPassword = async() =>{
+        setLoading(true);
+        await new Promise((res) => setTimeout(res, 50));
+        try {
+            const res = await AuthService.resetPassword(otpId, newPassword);
+            if (res.status === true){
+                console.log("Reset password response: ", res);
+                navigation.replace("LoginScreen");
+            }
+        }
+        catch(error: any){
+            console.log("Reset password error: ", error);
+        }
+        finally{
+            setLoading(false);
+        }
+    }
 
     return(
         <View style={styles.container}>
@@ -32,8 +56,7 @@ export default function CreateNewPasswordScreen(){
             <AppButton
                 title="Đặt lại mật khẩu"
                 onPress={() => {
-                    console.log("New Password:", newPassword);
-                    navigation.replace("LoginScreen");
+                    handleResetPassword();
                 }}
             />
             

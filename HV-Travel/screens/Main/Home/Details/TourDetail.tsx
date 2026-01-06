@@ -75,7 +75,7 @@ export default function TourDetail() {
               <Ionicons
                 name="arrow-back"
                 size={32}
-                color={theme.colors.white}
+                color={theme.colors.text}
               />
             </Pressable>
 
