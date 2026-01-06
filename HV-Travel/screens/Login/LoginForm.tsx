@@ -41,7 +41,7 @@ export default function LoginForm() {
       const res = await AuthService.login(email, password);
       console.log("Login success: ", res);
       if (res.status === true){
-        navigation.replace("HomeScreen");
+        navigation.replace("MainTabs");
         console.log("Login Successfully!");
       }
     }

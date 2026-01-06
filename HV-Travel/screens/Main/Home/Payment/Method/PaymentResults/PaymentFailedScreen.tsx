@@ -29,17 +29,67 @@ export default function PaymentFailedScreen() {
       }),
       Animated.sequence([
         Animated.timing(shakeAnim, {
-          toValue: 10,
+          toValue: 30,
           duration: 100,
           useNativeDriver: true,
         }),
         Animated.timing(shakeAnim, {
-          toValue: -10,
+          toValue: -30,
           duration: 100,
           useNativeDriver: true,
         }),
         Animated.timing(shakeAnim, {
-          toValue: 10,
+          toValue: 30,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: -30,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: 30,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: -30,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: 30,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: -15,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: 15,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: -7,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: 7,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: -3,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnim, {
+          toValue: 3,
           duration: 100,
           useNativeDriver: true,
         }),
@@ -48,6 +98,7 @@ export default function PaymentFailedScreen() {
           duration: 100,
           useNativeDriver: true,
         }),
+        
       ]),
     ]).start();
 
@@ -237,7 +288,7 @@ export default function PaymentFailedScreen() {
           style={styles.secondaryBtn}
           onPress={() => {
             // Go back to home
-            navigation.replace("HomeScreen");
+            navigation.replace("MainTabs");
           }}
         >
           <Text style={styles.secondaryBtnText}>Về trang chủ</Text>
