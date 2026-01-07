@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -65,6 +65,22 @@ const FAVS: FavItem[] = [
 
 export default function FavouriteScreen() {
   const navigation = useNavigation<any>();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      // TODO: gọi API / reload favourites thật ở đây
+      // await fetchFavourites();
+
+      // Demo giả lập load
+      await new Promise((r) => setTimeout(r, 1200));
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
 
   const renderItem = ({ item }: { item: FavItem }) => (
     <Pressable style={styles.card} onPress={() => navigation.navigate("TourDetailScreen")}>
@@ -115,6 +131,8 @@ export default function FavouriteScreen() {
         columnWrapperStyle={{ gap: GAP }}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       />
     </SafeAreaView>
   );
