@@ -5,8 +5,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   SafeAreaView,
 } from "react-native";
@@ -28,7 +26,6 @@ export default function CreateNewPasswordScreen() {
   const { otpId } = route.params as { otpId: string };
 
   const handleResetPassword = useCallback(async () => {
-    // ✅ validate tối thiểu
     if (!newPassword.trim()) {
       MessageBoxService.error("Lỗi", "Vui lòng nhập mật khẩu mới!", "OK");
       return;
@@ -60,42 +57,42 @@ export default function CreateNewPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="automatic"
       >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Image source={theme.icon.back} style={styles.backIcon} />
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Image source={theme.icon.back} style={styles.backIcon} />
+        </TouchableOpacity>
 
-          <Text style={styles.title}>Tạo mật khẩu mới</Text>
-          <Text style={styles.desc}>Mật khẩu mới của bạn phải có ít nhất 6 ký tự, khác mật khẩu cũ.</Text>
+        <Text style={styles.title}>Tạo mật khẩu mới</Text>
+        <Text style={styles.desc}>Mật khẩu mới của bạn phải có ít nhất 6 ký tự, khác mật khẩu cũ.</Text>
 
-          <AppInput
-            placeholder="Mật khẩu mới"
-            value={newPassword}
-            onChangeText={setNewPassword}
-            isPassword
-          />
+        <AppInput
+          placeholder="Mật khẩu mới"
+          value={newPassword}
+          onChangeText={setNewPassword}
+          isPassword
+          autoComplete="password"
+          textContentType="newPassword"
+        />
 
-          <AppInput
-            placeholder="Nhập lại mật khẩu"
-            value={rePassword}
-            onChangeText={setRePassword}
-            isPassword
-          />
+        <AppInput
+          placeholder="Nhập lại mật khẩu"
+          value={rePassword}
+          onChangeText={setRePassword}
+          isPassword
+          autoComplete="password"
+          textContentType="password"
+        />
 
-          <AppButton title="Đặt lại mật khẩu" onPress={handleResetPassword} />
+        <AppButton title="Đặt lại mật khẩu" onPress={handleResetPassword} />
 
-          <LoadingOverlay visible={loading} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <LoadingOverlay visible={loading} />
+      </ScrollView>
     </SafeAreaView>
   );
 }

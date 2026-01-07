@@ -86,8 +86,24 @@ export default function LoginForm() {
 
   return (
     <View>
-      <AppInput placeholder="Email" value={email} onChangeText={setEmail} />
-      <AppInput placeholder="Password" value={password} onChangeText={setPassword} isPassword />
+      <AppInput
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoComplete="email"
+        textContentType="emailAddress"
+      />
+
+      <AppInput
+        placeholder="Password"
+        value={password}
+        onChangeText={setPassword}
+        isPassword
+        autoComplete="password"
+        textContentType="password"
+      />
+
 
       <AppButton title="Đăng nhập" onPress={handleLogin} />
 

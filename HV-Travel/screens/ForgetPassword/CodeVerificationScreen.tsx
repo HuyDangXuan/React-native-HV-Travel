@@ -5,8 +5,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   SafeAreaView,
 } from "react-native";
@@ -43,37 +41,33 @@ export default function CodeVerificationScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="automatic"
       >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Image source={theme.icon.back} style={styles.backIcon} />
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Image source={theme.icon.back} style={styles.backIcon} />
+        </TouchableOpacity>
 
-          <Text style={styles.title}>Xác nhận mã</Text>
-          <Text style={styles.desc}>
-            Chúng tôi đã gửi một mã xác nhận đến email của bạn. Vui lòng kiểm tra hộp thư đến và nhập
-            mã để tiếp tục.
-          </Text>
+        <Text style={styles.title}>Xác nhận mã</Text>
+        <Text style={styles.desc}>
+          Chúng tôi đã gửi một mã xác nhận đến email của bạn. Vui lòng kiểm tra hộp thư đến và nhập mã để tiếp tục.
+        </Text>
 
-          <AppInput
-            placeholder="Mã xác nhận"
-            value={code}
-            onChangeText={setCode}
-          />
+        <AppInput
+          placeholder="Mã xác nhận"
+          value={code}
+          onChangeText={setCode}
+          keyboardType="number-pad"
+        />
 
-          <AppButton title="Xác nhận" onPress={handleVerifyCode} />
+        <AppButton title="Xác nhận" onPress={handleVerifyCode} />
 
-          <LoadingOverlay visible={loading} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <LoadingOverlay visible={loading} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -105,7 +99,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: theme.spacing.md,
     textAlign: "center",
-    marginTop: 40, // chừa chỗ cho nút back
+    marginTop: 40,
   },
   desc: {
     fontSize: theme.fontSize.md,
