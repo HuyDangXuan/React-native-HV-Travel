@@ -5,8 +5,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   SafeAreaView,
 } from "react-native";
@@ -16,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import LoadingOverlay from "../Loading/LoadingOverlay";
 import { AuthService } from "../../services/AuthService";
 import theme from "../../config/theme";
+import { MessageBoxService } from "../MessageBox/MessageBoxService";
 
 export default function ForgetPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -23,6 +22,16 @@ export default function ForgetPasswordScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSendEmail = useCallback(async () => {
+    if (!email.trim()) {
+      MessageBoxService.error("Lỗi", "Vui lòng nhập email!", "OK");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      MessageBoxService.error("Lỗi", "Email không hợp lệ!", "OK");
+      return;
+    }
+
     setLoading(true);
     await new Promise((res) => setTimeout(res, 50));
 
@@ -34,6 +43,7 @@ export default function ForgetPasswordScreen() {
       }
     } catch (error: any) {
       console.log("Forgot password error: ", error);
+      MessageBoxService.error("Lỗi", "Không thể gửi email. Vui lòng thử lại.", "OK");
     } finally {
       setLoading(false);
     }
@@ -41,32 +51,37 @@ export default function ForgetPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="automatic"
       >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Image source={theme.icon.back} style={styles.backIcon} />
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Image source={theme.icon.back} style={styles.backIcon} />
+        </TouchableOpacity>
 
-          <Text style={styles.title}>Đặt lại mật khẩu</Text>
-          <Text style={styles.desc}>
-            Một mã xác nhận sẽ được gửi đến Email của bạn để đặt lại mật khẩu
-          </Text>
+        <Text style={styles.title}>Đặt lại mật khẩu</Text>
+        <Text style={styles.desc}>
+          Một mã xác nhận sẽ được gửi đến Email của bạn để đặt lại mật khẩu
+        </Text>
 
-          <AppInput placeholder="Email" value={email} onChangeText={setEmail} />
+        <AppInput
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
-          <AppButton title="Gửi Email" onPress={handleSendEmail} />
+        <AppButton title="Gửi Email" onPress={handleSendEmail} />
 
-          <LoadingOverlay visible={loading} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <LoadingOverlay visible={loading} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -77,7 +92,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: theme.spacing.lg,
-    paddingTop: theme.spacing.xl, // ✅ thay marginTop: 50
+    paddingTop: theme.spacing.xl,
     justifyContent: "flex-start",
   },
 
@@ -86,7 +101,7 @@ const styles = StyleSheet.create({
     top: 10,
     left: 10,
     zIndex: 10,
-    padding: 10, // dễ bấm hơn
+    padding: 10,
   },
   backIcon: {
     width: 24,
@@ -98,7 +113,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: theme.spacing.md,
     textAlign: "center",
-    marginTop: 40, // chừa chỗ cho nút back
+    marginTop: 40,
   },
   desc: {
     fontSize: theme.fontSize.md,
