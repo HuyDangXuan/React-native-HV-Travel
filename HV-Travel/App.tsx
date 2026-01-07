@@ -47,11 +47,11 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />
-          <Stack.Screen name="LoginScreen" component={LoginScreen} />
-          <Stack.Screen name="SignUpScreen" component={SignUpScreen} />
-          <Stack.Screen name="ForgetPasswordScreen" component={ForgetPasswordScreen} />
-          <Stack.Screen name="CodeVerificationScreen" component={CodeVerificationScreen} />
-          <Stack.Screen name="CreateNewPasswordScreen" component={CreateNewPasswordScreen} />
+          <Stack.Screen name="LoginScreen" component={LoginScreen} options={{gestureEnabled: false}}/>
+          <Stack.Screen name="SignUpScreen" component={SignUpScreen} options={{gestureEnabled: false}}/>
+          <Stack.Screen name="ForgetPasswordScreen" component={ForgetPasswordScreen} options={{gestureEnabled: false}}/>
+          <Stack.Screen name="CodeVerificationScreen" component={CodeVerificationScreen} options={{gestureEnabled: false}}/>
+          <Stack.Screen name="CreateNewPasswordScreen" component={CreateNewPasswordScreen} options={{gestureEnabled: false}}/>
 
           {/* ✅ Main: bottom tabs */}
           <Stack.Screen name="MainTabs" component={MainTabs} options={{gestureEnabled: false}} />

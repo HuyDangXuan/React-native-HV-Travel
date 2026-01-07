@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Image,
   FlatList,
   Dimensions,
+  RefreshControl,
 } from "react-native";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import theme from "../../../config/theme";
@@ -183,13 +184,41 @@ export default function HomeScreen() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<TabKey>("Tất cả");
   const [recSeg, setRecSeg] = useState<"đơn" | "gia đình">("đơn");
+  const [refreshing, setRefreshing] = useState(false);
 
   const exclusiveData = useMemo(() => EXCLUSIVE[activeTab], [activeTab]);
   const recommendedData = useMemo(() => (recSeg === "đơn" ? RECOMMENDED.solo : RECOMMENDED.family), [recSeg]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    try {
+      // TODO: Nếu sau này bạn fetch API tours thì gọi ở đây
+      // await fetchHomeData();
+
+      // Demo: giả lập load 1.2s
+      await new Promise((r) => setTimeout(r, 1200));
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+
+
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+        >
         {/* Header */}
         <View style={styles.headerRow}>
           <View>
