@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../../config/theme";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { TourService } from "../../../../services/TourService";
+import { MessageBoxService } from "../../../MessageBox/MessageBoxService";
+import LoadingOverlay from "../../../Loading/LoadingOverlay";
 
 import OverviewTab from "./TourDetailTabs/OverviewTab";
 import ItineraryTab from "./TourDetailTabs/ItineraryTab";
@@ -23,18 +26,92 @@ const HERO_HEIGHT = height * 0.35;
 export type TabKey = "Tổng quan" | "Lịch trình" | "Đánh giá & Xếp hạng";
 const TAB_LABELS: TabKey[] = ["Tổng quan", "Lịch trình", "Đánh giá & Xếp hạng"];
 
+// (Optional) type gợi ý để dễ code
+type Tour = {
+  _id: string;
+  name: string;
+  category: string;              // hiện là id
+  description: string;
+  time: string;
+  stock: { adult: number; children: number; baby: number };
+  vehicle: string;
+  gallery: { picture: string }[];
+  accomodations: { place: string }[];
+  startDate: string;             // ISO string
+  price: { adult: number; children: number; baby: number };
+  newPrice: { adult: number; children: number; baby: number };
+  thumbnail_url?: string;
+};
+
+
 export default function TourDetail() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const tourId: string | undefined = route?.params?.id;
+
   const [tab, setTab] = useState<TabKey>("Tổng quan");
   const [openInEx, setOpenInEx] = useState(false);
   const [openFAQ, setOpenFAQ] = useState(false);
 
-  const navigation = useNavigation<any>();
+  const [loading, setLoading] = useState(false);
+  const [tour, setTour] = useState<Tour | null>(null);
+
+  const fetchTourDetail = useCallback(async () => {
+    if (!tourId) {
+      MessageBoxService.error("Lỗi", "Thiếu id tour.", "OK");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await TourService.getTourDetail(tourId);
+      const detail: Tour = res?.data?.data ?? res?.data ?? res;
+
+      setTour(detail);
+    } catch (e: any) {
+      console.log("Fetch tour detail error:", e);
+      MessageBoxService.error("Lỗi", e?.message || "Không lấy được chi tiết tour.", "OK");
+    } finally {
+      setLoading(false);
+    }
+  }, [tourId]);
+
+  useEffect(() => {
+    fetchTourDetail();
+  }, [fetchTourDetail]);
+
+  const heroImage = useMemo(() => {
+    return (
+      tour?.thumbnail_url ||
+      tour?.gallery?.[0]?.picture ||
+      "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&q=80&auto=format&fit=crop"
+    );
+  }, [tour]);
+
+  const categoryText = useMemo(() => {
+  const c = tour?.category;
+  return c ? `Category: ${c}` : "Chưa rõ danh mục";
+}, [tour?.category]);
+
+  const priceAdult = useMemo(() => {
+    // ưu tiên theo schema mới -> fallback theo schema cũ bạn từng dùng
+    return (
+      tour?.newPrice?.adult ??
+      tour?.price?.adult ??
+      tour?.newPrice.adult ??
+      tour?.price.adult ??
+      0
+    );
+  }, [tour]);
+
+  const formatVND = (v: number) =>
+    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(v || 0);
 
   const tabContent = useMemo(() => {
     switch (tab) {
       case "Tổng quan":
         return (
           <OverviewTab
+            tour={tour}
             openInEx={openInEx}
             setOpenInEx={setOpenInEx}
             openFAQ={openFAQ}
@@ -42,53 +119,28 @@ export default function TourDetail() {
           />
         );
       case "Lịch trình":
-        return <ItineraryTab />;
+        return <ItineraryTab tour={tour} />;
       case "Đánh giá & Xếp hạng":
-        return <ReviewTab />;
+        return <ReviewTab tour={tour} />;
       default:
         return null;
     }
-  }, [tab, openInEx, openFAQ]);
+  }, [tab, openInEx, openFAQ, tour]);
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Hero */}
         <View style={styles.heroWrap}>
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&q=80&auto=format&fit=crop",
-            }}
-            style={styles.heroImg}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: heroImage }} style={styles.heroImg} resizeMode="cover" />
 
           <SafeAreaView style={styles.headerButtons}>
-            <Pressable
-              style={styles.iconBtn}
-              onPress={() => navigation.goBack()}
-              android_ripple={{ color: "rgba(255,255,255,0.25)" }}
-            >
-              <Ionicons
-                name="arrow-back"
-                size={32}
-                color={theme.colors.text}
-              />
+            <Pressable style={styles.iconBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
             </Pressable>
 
-            <Pressable
-              style={styles.iconBtn}
-              onPress={() => {}}
-              android_ripple={{ color: "rgba(255,255,255,0.25)" }}
-            >
-              <Ionicons
-                name="bookmark"
-                size={32}
-                color={theme.colors.white}
-              />
+            <Pressable style={styles.iconBtn} onPress={() => {}}>
+              <Ionicons name="bookmark" size={26} color={theme.colors.white} />
             </Pressable>
           </SafeAreaView>
         </View>
@@ -96,45 +148,47 @@ export default function TourDetail() {
         {/* Info Card */}
         <View style={styles.infoCard}>
           <View style={styles.locationRow}>
-            <Ionicons
-              name="location"
-              size={16}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.locationText}>Quốc gia ở Nam Á</Text>
+            <Ionicons name="pricetag" size={16} color={theme.colors.primary} />
+            <Text style={styles.locationText}>{categoryText}</Text>
           </View>
 
           <View style={styles.rowBetween}>
-            <Text style={styles.packageTitle}>Gói Tour Maldives</Text>
+            <Text style={styles.packageTitle} numberOfLines={2}>
+              {tour?.name || "Đang tải..."}
+            </Text>
 
             <View style={{ alignItems: "flex-end" }}>
-              <Text style={styles.priceText}>$2500</Text>
-              <Text style={styles.estimatedText}>Ước lượng</Text>
+              <Text style={styles.priceText}>{formatVND(priceAdult)}</Text>
+              <Text style={styles.estimatedText}>Giá người lớn</Text>
+            </View>
+          </View>
+
+          {/* Quick meta */}
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <Ionicons name="time-outline" size={16} color={theme.colors.gray} />
+              <Text style={styles.metaText}>{tour?.time || "N/A"}</Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Ionicons name="car-outline" size={16} color={theme.colors.gray} />
+              <Text style={styles.metaText}>{tour?.vehicle || "N/A"}</Text>
             </View>
           </View>
 
           {/* Tabs */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabRow}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
             {TAB_LABELS.map((label) => (
-              <TabButton
-                key={label}
-                label={label}
-                active={tab === label}
-                onPress={() => setTab(label)}
-              />
+              <TabButton key={label} label={label} active={tab === label} onPress={() => setTab(label)} />
             ))}
           </ScrollView>
         </View>
 
         {/* Content (tab-based) */}
         <View style={styles.contentWrap}>
-          {tabContent}
+          {/* Nếu muốn debug nhanh fields database */}
+          {/* <Text>{JSON.stringify(tour, null, 2)}</Text> */}
 
-          {/* spacing để tránh bị che bởi CTA */}
+          {tabContent}
           <View style={{ height: 90 }} />
         </View>
       </ScrollView>
@@ -143,11 +197,14 @@ export default function TourDetail() {
       <View style={styles.bottomBar}>
         <Pressable
           style={styles.bookBtn}
-          onPress={() => navigation.navigate("BookingScreen")}
+          onPress={() => navigation.navigate("BookingScreen", { id: tour?._id })}
+          disabled={!tour?._id}
         >
           <Text style={styles.bookBtnText}>Đặt vé ngay</Text>
         </Pressable>
       </View>
+
+      <LoadingOverlay visible={loading} />
     </View>
   );
 }
@@ -164,10 +221,7 @@ function TabButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.tabBtn, active && styles.tabBtnActive]}
-    >
+    <Pressable onPress={onPress} style={[styles.tabBtn, active && styles.tabBtnActive]}>
       <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
         {label}
       </Text>
@@ -178,25 +232,11 @@ function TabButton({
 /* ---------------- Styles ---------------- */
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
+  container: { flex: 1, backgroundColor: theme.colors.surface },
+  scrollContent: { paddingBottom: 20 },
 
-  heroWrap: {
-    width: "100%",
-    height: HERO_HEIGHT,
-    minHeight: 220,
-    maxHeight: 380,
-    position: "relative",
-  },
-  heroImg: {
-    width: "100%",
-    height: "100%",
-  },
+  heroWrap: { width: "100%", height: HERO_HEIGHT, minHeight: 220, maxHeight: 380, position: "relative" },
+  heroImg: { width: "100%", height: "100%" },
 
   headerButtons: {
     position: "absolute",
@@ -208,12 +248,7 @@ const styles = StyleSheet.create({
     marginHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
   },
-  iconBtn: {
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-  },
+  iconBtn: { borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "transparent" },
 
   infoCard: {
     marginHorizontal: theme.spacing.md,
@@ -228,72 +263,26 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.xs,
-    marginBottom: theme.spacing.sm,
-  },
-  locationText: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    fontWeight: "500",
-  },
+  locationRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.xs, marginBottom: theme.spacing.sm },
+  locationText: { fontSize: theme.fontSize.xs, color: theme.colors.gray, fontWeight: "500" },
 
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: theme.spacing.md,
-  },
+  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: theme.spacing.md },
+  packageTitle: { fontSize: theme.fontSize.xl, fontWeight: "700", color: theme.colors.text, flex: 1, paddingRight: theme.spacing.md },
 
-  packageTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: "700",
-    color: theme.colors.text,
-    flex: 1,
-    paddingRight: theme.spacing.md,
-  },
+  priceText: { fontSize: theme.fontSize.xl, fontWeight: "700", color: theme.colors.primary },
+  estimatedText: { marginTop: 2, fontSize: theme.fontSize.xs, color: theme.colors.gray, fontWeight: "500" },
 
-  priceText: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: "700",
-    color: theme.colors.primary,
-  },
-  estimatedText: {
-    marginTop: 2,
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    fontWeight: "500",
-  },
+  metaRow: { flexDirection: "row", gap: theme.spacing.md, marginBottom: theme.spacing.md },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  metaText: { fontSize: theme.fontSize.sm, color: theme.colors.gray, fontWeight: "600" },
 
-  tabRow: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    paddingVertical: 2,
-  },
-  tabBtn: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: 999,
-    backgroundColor: theme.colors.surface,
-  },
-  tabBtnActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  tabText: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: "600",
-    color: theme.colors.gray,
-    maxWidth: 180,
-  },
-  tabTextActive: {
-    color: theme.colors.white,
-  },
+  tabRow: { flexDirection: "row", gap: theme.spacing.sm, paddingVertical: 2 },
+  tabBtn: { paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm, borderRadius: 999, backgroundColor: theme.colors.surface },
+  tabBtnActive: { backgroundColor: theme.colors.primary },
+  tabText: { fontSize: theme.fontSize.sm, fontWeight: "600", color: theme.colors.gray, maxWidth: 180 },
+  tabTextActive: { color: theme.colors.white },
 
-  contentWrap: {
-    paddingHorizontal: theme.spacing.md,
-  },
+  contentWrap: { paddingHorizontal: theme.spacing.md },
 
   bottomBar: {
     position: "absolute",
@@ -310,16 +299,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -2 },
     elevation: 8,
   },
-  bookBtn: {
-    height: 54,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  bookBtnText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
+  bookBtn: { height: 54, borderRadius: theme.radius.lg, backgroundColor: theme.colors.primary, alignItems: "center", justifyContent: "center" },
+  bookBtnText: { color: theme.colors.white, fontSize: theme.fontSize.md, fontWeight: "700" },
 });

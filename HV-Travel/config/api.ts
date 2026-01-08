@@ -9,9 +9,10 @@ const api = {
     verify_otp: base_url + "/auth/verify-otp",
     reset_password: base_url + "/auth/reset-password",
     change_password: base_url + "/auth/change-password",
-    get_list_tours: base_url + "/tours",
+    get_list_tours: base_url + "/tours/list",
+    get_tour_detail: (id: string) => `${base_url}/tours/${id}`,
     get_list_cities: base_url + "/cities",
-    get_list_categories: base_url + "/categories",
+    get_list_categories: base_url + "/categories/list",
 }
 
 export default api;

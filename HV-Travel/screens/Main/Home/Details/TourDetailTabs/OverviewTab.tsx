@@ -12,88 +12,144 @@ import theme from "../../../../../config/theme";
 
 const { width } = Dimensions.get("window");
 
-export default function OverviewTab({
-  openInEx,
-  setOpenInEx,
-  openFAQ,
-  setOpenFAQ,
-}: {
+/** type đúng theo API bạn gửi */
+type Tour = {
+  _id: string;
+  name?: string;
+  category?: string;
+  description?: string;
+  information?: string;
+  time?: string;
+  vehicle?: string;
+  startDate?: string;
+  thumbnail_url?: string;
+  gallery?: { picture?: string }[];
+  accomodations?: { place?: string }[];
+  stock?: { adult?: number; children?: number; baby?: number };
+  price?: { adult?: number; children?: number; baby?: number };
+  newPrice?: { adult?: number; children?: number; baby?: number };
+  discount?: number;
+  rating?: number;
+};
+
+type Props = {
+  tour: Tour | null;
   openInEx: boolean;
   setOpenInEx: React.Dispatch<React.SetStateAction<boolean>>;
   openFAQ: boolean;
   setOpenFAQ: React.Dispatch<React.SetStateAction<boolean>>;
-}) {
+};
+
+export default function OverviewTab({
+  tour,
+  openInEx,
+  setOpenInEx,
+  openFAQ,
+  setOpenFAQ,
+}: Props) {
+  if (!tour) {
+    return (
+      <View style={{ paddingTop: theme.spacing.md }}>
+        <Text style={styles.paragraph}>Đang tải thông tin tour...</Text>
+      </View>
+    );
+  }
+
+  const formatVND = (v?: number) =>
+    new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(v ?? 0);
+
+  const startDateText = tour.startDate
+    ? new Date(tour.startDate).toLocaleDateString("vi-VN")
+    : "N/A";
+
+  const galleryPics =
+    tour.gallery?.map((g) => g?.picture).filter(Boolean) as string[];
+
+  const photoList =
+    galleryPics?.length > 0
+      ? galleryPics
+      : tour.thumbnail_url
+        ? [tour.thumbnail_url]
+        : [];
+
   return (
     <>
       {/* Description */}
       <Section title="Giới thiệu">
         <Text style={styles.paragraph}>
-          Khám phá vẻ đẹp tuyệt vời của vùng đất này với lịch trình được sắp xếp
-          chu đáo. Bạn sẽ được trải nghiệm những địa điểm nổi tiếng nhất, thưởng
-          thức ẩm thực đặc sắc và tham gia các hoạt động thú vị. Chúng tôi đảm bảo
-          mang đến cho bạn một chuyến đi đáng nhớ với sự kết hợp hoàn hảo giữa
-          nghỉ ngơi và khám phá.
+          {tour.description || "Chưa có mô tả cho tour này."}
         </Text>
       </Section>
 
-      {/* Trip Highlights */}
-      <Section title="Điểm nổi bật">
+      {/* Trip Highlights (lấy data thật) */}
+      <Section title="Thông tin nhanh">
         <View style={styles.highlightsGrid}>
           <HighlightCard
             icon="time-outline"
             title="Thời gian"
-            value="3 ngày 2 đêm"
-          />
-          <HighlightCard
-            icon="people-outline"
-            title="Nhóm"
-            value="2-15 người"
+            value={tour.time || "N/A"}
           />
           <HighlightCard
             icon="airplane-outline"
             title="Di chuyển"
-            value="Máy bay + Xe"
+            value={tour.vehicle || "N/A"}
           />
           <HighlightCard
-            icon="restaurant-outline"
-            title="Ăn uống"
-            value="Bao gồm"
+            icon="calendar-outline"
+            title="Khởi hành"
+            value={startDateText}
+          />
+          <HighlightCard
+            icon="pricetag-outline"
+            title="Giá NL"
+            value={formatVND(tour.newPrice?.adult ?? tour.price?.adult)}
           />
         </View>
-      </Section>
 
-      {/* Photo Gallery */}
-      <Section title="Bộ sưu tập ảnh">
-        <View style={styles.galleryGrid}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <View key={i} style={styles.galleryItem}>
-              <Image
-                source={{
-                  uri: `https://images.unsplash.com/photo-${
-                    [
-                      "1500375592092-40eb2168fd21",
-                      "1506905925346-21bda4d32df4",
-                      "1507525428034-b723cf961d3e",
-                      "1476514525390-8c2c3e8f8e8f",
-                      "1469854523086-cc02fe5d8800",
-                      "1519904981063-b0cf448d479e"
-                    ][i]
-                  }?w=400&q=80&auto=format&fit=crop`,
-                }}
-                style={styles.galleryImg}
-                resizeMode="cover"
-              />
-              {i === 5 && (
-                <View style={styles.galleryOverlay}>
-                  <Text style={styles.galleryMore}>+12</Text>
-                </View>
-              )}
-            </View>
-          ))}
+        {/* Stock */}
+        <View style={{ marginTop: theme.spacing.md }}>
+          <Text style={styles.subTitle}>Số chỗ còn</Text>
+          <Bullet text={`Người lớn: ${tour.stock?.adult ?? "N/A"}`} />
+          <Bullet text={`Trẻ em: ${tour.stock?.children ?? "N/A"}`} />
+          <Bullet text={`Em bé: ${tour.stock?.baby ?? "N/A"}`} />
         </View>
       </Section>
 
-      {/* Inclusion & Exclusion */}
+      {/* Photo Gallery (lấy từ tour.gallery.picture / thumbnail_url) */}
+      <Section title="Bộ sưu tập ảnh">
+        {photoList.length === 0 ? (
+          <Text style={styles.paragraph}>Chưa có ảnh cho tour này.</Text>
+        ) : (
+          <View style={styles.galleryGrid}>
+            {photoList.slice(0, 6).map((uri, i) => (
+              <View key={uri + i} style={styles.galleryItem}>
+                <Image source={{ uri }} style={styles.galleryImg} resizeMode="cover" />
+                {i === 5 && photoList.length > 6 && (
+                  <View style={styles.galleryOverlay}>
+                    <Text style={styles.galleryMore}>+{photoList.length - 6}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+      </Section>
+
+      {/* Accomodations */}
+      <Section title="Lưu trú">
+        {tour.accomodations?.length ? (
+          tour.accomodations.map((a, idx) => (
+            <Bullet key={a?.place || idx} text={a?.place || "N/A"} />
+          ))
+        ) : (
+          <Text style={styles.paragraph}>Chưa có thông tin lưu trú.</Text>
+        )}
+      </Section>
+
+      {/* Inclusion & Exclusion (tạm vẫn hardcode như bạn) */}
       <Accordion
         title="Bao gồm & Loại trừ"
         open={openInEx}
@@ -103,9 +159,6 @@ export default function OverviewTab({
         <Bullet text="Vé máy bay khứ hồi (hạng phổ thông)" />
         <Bullet text="Khách sạn 4 sao tiêu chuẩn (phòng đôi)" />
         <Bullet text="Các bữa ăn theo chương trình" />
-        <Bullet text="Vé tham quan các điểm trong chương trình" />
-        <Bullet text="Hướng dẫn viên tiếng Việt" />
-        <Bullet text="Bảo hiểm du lịch quốc tế" />
 
         <Text style={styles.subTitle}>Loại trừ</Text>
         <Bullet text="Chi phí cá nhân (giặt ủi, điện thoại...)" />
@@ -113,7 +166,7 @@ export default function OverviewTab({
         <Bullet text="Tiền tip cho hướng dẫn viên và tài xế" />
       </Accordion>
 
-      {/* FAQ */}
+      {/* FAQ (tạm vẫn hardcode) */}
       <Accordion
         title="Câu hỏi thường gặp"
         open={openFAQ}
@@ -127,29 +180,13 @@ export default function OverviewTab({
           q="Tour có phù hợp cho trẻ em không?"
           a="Tour rất phù hợp cho gia đình có trẻ em. Chúng tôi có giá ưu đãi cho trẻ em dưới 12 tuổi."
         />
-        <FAQItem
-          q="Có cần visa không?"
-          a="Tùy thuộc vào quốc tịch của bạn. Công dân Việt Nam không cần visa cho chuyến đi này."
-        />
       </Accordion>
 
       {/* Map */}
       <Section title="Vị trí trên bản đồ">
         <View style={styles.mapBox}>
           <Ionicons name="location-outline" size={48} color={theme.colors.gray} />
-          <Text style={styles.mapText}>
-            Xem vị trí điểm đến trên bản đồ
-          </Text>
-        </View>
-      </Section>
-
-      {/* Share */}
-      <Section title="Chia sẻ">
-        <View style={styles.socialRow}>
-          <Social icon="logo-facebook" color="#3b5998" />
-          <Social icon="logo-twitter" color="#1DA1F2" />
-          <Social icon="logo-linkedin" color="#0077b5" />
-          <Social icon="logo-whatsapp" color="#25D366" />
+          <Text style={styles.mapText}>Xem vị trí điểm đến trên bản đồ</Text>
         </View>
       </Section>
     </>
@@ -158,13 +195,7 @@ export default function OverviewTab({
 
 /* ---------------- Components ---------------- */
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -173,20 +204,14 @@ function Section({
   );
 }
 
-function HighlightCard({
-  icon,
-  title,
-  value,
-}: {
-  icon: any;
-  title: string;
-  value: string;
-}) {
+function HighlightCard({ icon, title, value }: { icon: any; title: string; value: string }) {
   return (
     <View style={styles.highlightCard}>
       <Ionicons name={icon} size={24} color={theme.colors.primary} />
       <Text style={styles.highlightTitle}>{title}</Text>
-      <Text style={styles.highlightValue}>{value}</Text>
+      <Text style={styles.highlightValue} numberOfLines={1}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -236,23 +261,10 @@ function FAQItem({ q, a }: { q: string; a: string }) {
   );
 }
 
-function Social({ icon, color }: { icon: any; color: string }) {
-  return (
-    <Pressable
-      style={[styles.socialIcon, { backgroundColor: color }]}
-      onPress={() => {}}
-    >
-      <Ionicons name={icon} size={24} color={theme.colors.white} />
-    </Pressable>
-  );
-}
-
 /* ---------------- Styles ---------------- */
 
 const styles = StyleSheet.create({
-  section: {
-    marginTop: theme.spacing.xl,
-  },
+  section: { marginTop: theme.spacing.xl },
   sectionTitle: {
     fontSize: theme.fontSize.lg,
     fontWeight: "700",
@@ -266,12 +278,7 @@ const styles = StyleSheet.create({
     fontWeight: "400",
   },
 
-  // Highlights
-  highlightsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.sm,
-  },
+  highlightsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
   highlightCard: {
     width: (width - theme.spacing.md * 2 - theme.spacing.sm) / 2,
     backgroundColor: theme.colors.surface,
@@ -281,24 +288,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  highlightTitle: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    marginTop: theme.spacing.xs,
-  },
-  highlightValue: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: "600",
-    color: theme.colors.text,
-    marginTop: 2,
-  },
+  highlightTitle: { fontSize: theme.fontSize.xs, color: theme.colors.gray, marginTop: theme.spacing.xs },
+  highlightValue: { fontSize: theme.fontSize.sm, fontWeight: "600", color: theme.colors.text, marginTop: 2, maxWidth: "100%" },
 
-  // Gallery
-  galleryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.sm,
-  },
+  galleryGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
   galleryItem: {
     width: (width - theme.spacing.md * 2 - theme.spacing.sm * 2) / 3,
     height: (width - theme.spacing.md * 2 - theme.spacing.sm * 2) / 3,
@@ -306,28 +299,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: theme.colors.surface,
   },
-  galleryImg: {
-    width: "100%",
-    height: "100%",
-  },
-  galleryOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  galleryMore: {
-    color: theme.colors.white,
-    fontWeight: "700",
-    fontSize: theme.fontSize.xl,
-  },
+  galleryImg: { width: "100%", height: "100%" },
+  galleryOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+  galleryMore: { color: theme.colors.white, fontWeight: "700", fontSize: theme.fontSize.xl },
 
-  // Accordion
-  accordionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  accordionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
 
   subTitle: {
     marginTop: theme.spacing.md,
@@ -337,44 +313,14 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
 
-  // Bullet
-  bulletRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginTop: theme.spacing.sm,
-  },
-  bulletDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: theme.colors.primary,
-    marginTop: 8,
-    marginRight: theme.spacing.sm,
-  },
-  bulletText: {
-    flex: 1,
-    color: theme.colors.gray,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 22,
-  },
+  bulletRow: { flexDirection: "row", alignItems: "flex-start", marginTop: theme.spacing.sm },
+  bulletDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: theme.colors.primary, marginTop: 8, marginRight: theme.spacing.sm },
+  bulletText: { flex: 1, color: theme.colors.gray, fontSize: theme.fontSize.sm, lineHeight: 22 },
 
-  // FAQ
-  faqItem: {
-    marginBottom: theme.spacing.md,
-  },
-  faqQ: {
-    fontWeight: "600",
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  faqA: {
-    color: theme.colors.gray,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 22,
-  },
+  faqItem: { marginBottom: theme.spacing.md },
+  faqQ: { fontWeight: "600", fontSize: theme.fontSize.sm, color: theme.colors.text, marginBottom: theme.spacing.xs },
+  faqA: { color: theme.colors.gray, fontSize: theme.fontSize.sm, lineHeight: 22 },
 
-  // Map
   mapBox: {
     height: 160,
     borderRadius: theme.radius.lg,
@@ -384,22 +330,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  mapText: {
-    color: theme.colors.gray,
-    fontSize: theme.fontSize.sm,
-    marginTop: theme.spacing.xs,
-  },
-
-  // Social
-  socialRow: {
-    flexDirection: "row",
-    gap: theme.spacing.md,
-  },
-  socialIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  mapText: { color: theme.colors.gray, fontSize: theme.fontSize.sm, marginTop: theme.spacing.xs },
 });
