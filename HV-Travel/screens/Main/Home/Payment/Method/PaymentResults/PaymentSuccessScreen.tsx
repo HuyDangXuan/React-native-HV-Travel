@@ -1,17 +1,52 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView, Animated } from "react-native";
+import React, { useEffect, useMemo, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  Pressable,
+  ScrollView,
+  Animated,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
+type RouteParams = {
+  id?: string;
+  total?: number;
+  amountText?: string; // string hiển thị (đúng flow mới)
+  amount?: string;     // fallback cũ
+  method?: string;
+  orderId?: string;
+  transactionId?: string;
+};
+
+const formatVND = (v: number) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+    Number.isFinite(v) ? v : 0
+  );
+
 export default function PaymentSuccessScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  
-  const method = route.params?.method || "Unknown";
-  const orderId = route.params?.orderId || "DL" + Date.now();
-  const amount = route.params?.amount || "40.500.000đ";
-  const transactionId = route.params?.transactionId || "TX" + Date.now();
+
+  const params: RouteParams = route?.params ?? {};
+
+  const method = params?.method || "Unknown";
+  const orderId = params?.orderId || "DL" + Date.now();
+  const transactionId = params?.transactionId || "TX" + Date.now();
+  const tourId = params?.id;
+
+  const total = typeof params?.total === "number" ? params.total : 0;
+
+  // Ưu tiên amountText (flow mới) -> nếu không có thì lấy total -> fallback amount cũ
+  const amountText = useMemo(() => {
+    if (typeof params?.amountText === "string" && params.amountText.trim()) return params.amountText;
+    if (total > 0) return formatVND(total);
+    if (typeof params?.amount === "string" && params.amount.trim()) return params.amount;
+    return formatVND(0);
+  }, [params?.amountText, params?.amount, total]);
 
   // Animation
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -19,40 +54,38 @@ export default function PaymentSuccessScreen() {
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Success icon animation
     Animated.sequence([
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true,
-    }),
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 20, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -20, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 16, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -16, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 12, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -12, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 4, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -4, duration: 80, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
-    ]),
-  ]).start();
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: 20, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -20, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 16, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -16, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 12, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -12, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 8, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -8, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 4, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -4, duration: 80, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
+      ]),
+    ]).start();
 
-    // Fade in content
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 800,
-      delay: 300,
+      delay: 250,
       useNativeDriver: true,
     }).start();
   }, []);
 
   const getMethodColor = () => {
-    switch (method.toLowerCase()) {
+    switch ((method || "").toLowerCase()) {
       case "zalopay":
         return "#3B82F6";
       case "vnpay":
@@ -71,7 +104,7 @@ export default function PaymentSuccessScreen() {
   };
 
   const getMethodIcon = () => {
-    switch (method.toLowerCase()) {
+    switch ((method || "").toLowerCase()) {
       case "zalopay":
       case "vnpay":
       case "momo":
@@ -87,6 +120,8 @@ export default function PaymentSuccessScreen() {
     }
   };
 
+  const color = getMethodColor();
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -95,21 +130,17 @@ export default function PaymentSuccessScreen() {
           style={[
             styles.iconContainer,
             {
-              transform: [
-                { scale: scaleAnim },
-                { translateY: shakeAnim },
-              ],
+              transform: [{ scale: scaleAnim }, { translateY: shakeAnim }],
             },
           ]}
         >
-          <View style={[styles.iconCircle, { backgroundColor: getMethodColor() }]}>
+          <View style={[styles.iconCircle, { backgroundColor: color }]}>
             <Ionicons name="checkmark" size={80} color={theme.colors.white} />
           </View>
-          <View style={[styles.iconRing, { borderColor: getMethodColor() }]} />
+          <View style={[styles.iconRing, { borderColor: color }]} />
         </Animated.View>
 
         <Animated.View style={[styles.contentWrapper, { opacity: fadeAnim }]}>
-          {/* Success Message */}
           <Text style={styles.title}>Thanh toán thành công!</Text>
           <Text style={styles.subtitle}>
             Đơn hàng của bạn đã được xác nhận và đang được xử lý
@@ -118,85 +149,70 @@ export default function PaymentSuccessScreen() {
           {/* Amount */}
           <View style={styles.amountBox}>
             <Text style={styles.amountLabel}>Số tiền đã thanh toán</Text>
-            <Text style={[styles.amountValue, { color: getMethodColor() }]}>{amount}</Text>
+            <Text style={[styles.amountValue, { color }]}>{amountText}</Text>
           </View>
 
           {/* Transaction Details */}
           <View style={styles.detailsCard}>
-            <DetailRow
-              icon="receipt-outline"
-              label="Mã đơn hàng"
-              value={orderId}
-              iconColor={getMethodColor()}
-            />
+            {!!tourId && (
+              <>
+                <DetailRow icon="pricetag-outline" label="Mã tour" value={tourId} iconColor={color} />
+                <Divider />
+              </>
+            )}
+
+            <DetailRow icon="receipt-outline" label="Mã đơn hàng" value={orderId} iconColor={color} />
             <Divider />
-            <DetailRow
-              icon="card-outline"
-              label="Mã giao dịch"
-              value={transactionId}
-              iconColor={getMethodColor()}
-            />
+            <DetailRow icon="card-outline" label="Mã giao dịch" value={transactionId} iconColor={color} />
             <Divider />
-            <DetailRow
-              icon={getMethodIcon()}
-              label="Phương thức"
-              value={method}
-              iconColor={getMethodColor()}
-            />
+            <DetailRow icon={getMethodIcon()} label="Phương thức" value={method} iconColor={color} />
             <Divider />
             <DetailRow
               icon="time-outline"
               label="Thời gian"
               value={new Date().toLocaleString("vi-VN")}
-              iconColor={getMethodColor()}
+              iconColor={color}
             />
             <Divider />
             <DetailRow
               icon="shield-checkmark-outline"
               label="Trạng thái"
               value="Đã xác nhận"
-              iconColor={getMethodColor()}
-              valueStyle={styles.successText}
+              iconColor={color}
+              valueStyle={[styles.successText, { color }]}
             />
           </View>
 
           {/* Next Steps */}
           <View style={styles.stepsCard}>
             <Text style={styles.stepsTitle}>Các bước tiếp theo</Text>
-            
+
             <View style={styles.stepItem}>
-              <View style={[styles.stepIcon, { backgroundColor: getMethodColor() }]}>
+              <View style={[styles.stepIcon, { backgroundColor: color }]}>
                 <Ionicons name="mail" size={20} color={theme.colors.white} />
               </View>
-              <Text style={styles.stepText}>
-                Email xác nhận đã được gửi đến hộp thư của bạn
-              </Text>
+              <Text style={styles.stepText}>Email xác nhận đã được gửi đến hộp thư của bạn</Text>
             </View>
 
             <View style={styles.stepItem}>
-              <View style={[styles.stepIcon, { backgroundColor: getMethodColor() }]}>
+              <View style={[styles.stepIcon, { backgroundColor: color }]}>
                 <Ionicons name="calendar" size={20} color={theme.colors.white} />
               </View>
-              <Text style={styles.stepText}>
-                Kiểm tra lịch trình chi tiết trong mục "Đơn hàng của tôi"
-              </Text>
+              <Text style={styles.stepText}>Kiểm tra lịch trình chi tiết trong mục "Đơn hàng của tôi"</Text>
             </View>
 
             <View style={styles.stepItem}>
-              <View style={[styles.stepIcon, { backgroundColor: getMethodColor() }]}>
+              <View style={[styles.stepIcon, { backgroundColor: color }]}>
                 <Ionicons name="headset" size={20} color={theme.colors.white} />
               </View>
-              <Text style={styles.stepText}>
-                Liên hệ hotline 1900-xxxx nếu cần hỗ trợ
-              </Text>
+              <Text style={styles.stepText}>Liên hệ hotline 1900-xxxx nếu cần hỗ trợ</Text>
             </View>
           </View>
 
-          {/* Info Box */}
-          <View style={[styles.infoBox, { backgroundColor: getMethodColor() + "15" }]}>
-            <Ionicons name="information-circle" size={20} color={getMethodColor()} />
-            <Text style={[styles.infoText, { color: getMethodColor() }]}>
-              Vui lòng lưu lại thông tin giao dịch để tra cứu sau này. Chúng tôi sẽ liên hệ với bạn trước 
+          <View style={[styles.infoBox, { backgroundColor: color + "15" }]}>
+            <Ionicons name="information-circle" size={20} color={color} />
+            <Text style={[styles.infoText, { color }]}>
+              Vui lòng lưu lại thông tin giao dịch để tra cứu sau này. Chúng tôi sẽ liên hệ với bạn trước
               ngày khởi hành để xác nhận lại lịch trình.
             </Text>
           </View>
@@ -208,23 +224,17 @@ export default function PaymentSuccessScreen() {
       {/* Bottom Actions */}
       <View style={styles.bottomBar}>
         <Pressable
-          style={[styles.secondaryBtn, { borderColor: getMethodColor() }]}
+          style={[styles.secondaryBtn, { borderColor: color }]}
           onPress={() => {
-            // Navigate to order details
-            // navigation.navigate("OrderDetails", { orderId });
+            navigation.navigate("BookingHistory")
           }}
         >
-          <Text style={[styles.secondaryBtnText, { color: getMethodColor() }]}>
-            Xem chi tiết
-          </Text>
+          <Text style={[styles.secondaryBtnText, { color }]}>Xem đơn hàng</Text>
         </Pressable>
 
         <Pressable
-          style={[styles.primaryBtn, { backgroundColor: getMethodColor() }]}
-          onPress={() => {
-            // Navigate to home
-            navigation.replace("MainTabs");
-          }}
+          style={[styles.primaryBtn, { backgroundColor: color }]}
+          onPress={() => navigation.replace("MainTabs")}
         >
           <Text style={styles.primaryBtnText}>Về trang chủ</Text>
         </Pressable>
@@ -263,13 +273,8 @@ function Divider() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.white },
+  content: { padding: theme.spacing.lg, alignItems: "center" },
 
-  content: {
-    padding: theme.spacing.lg,
-    alignItems: "center",
-  },
-
-  // Success Icon
   iconContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -297,11 +302,8 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
 
-  contentWrapper: {
-    width: "100%",
-  },
+  contentWrapper: { width: "100%" },
 
-  // Title
   title: {
     fontSize: 28,
     fontWeight: "800",
@@ -317,7 +319,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // Amount
   amountBox: {
     alignItems: "center",
     padding: theme.spacing.lg,
@@ -331,12 +332,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: theme.spacing.xs,
   },
-  amountValue: {
-    fontSize: 32,
-    fontWeight: "800",
-  },
+  amountValue: { fontSize: 32, fontWeight: "800" },
 
-  // Details Card
   detailsCard: {
     backgroundColor: theme.colors.white,
     borderRadius: theme.radius.lg,
@@ -362,16 +359,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 2,
   },
-  successText: {
-    color: "#059669",
-  },
+  successText: { fontWeight: "800" },
   divider: {
     height: 1,
     backgroundColor: theme.colors.border,
     marginVertical: theme.spacing.sm,
   },
 
-  // Steps
   stepsCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
@@ -405,7 +399,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
 
-  // Info Box
   infoBox: {
     flexDirection: "row",
     gap: theme.spacing.sm,
@@ -413,13 +406,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     alignItems: "flex-start",
   },
-  infoText: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 20,
-  },
+  infoText: { flex: 1, fontSize: theme.fontSize.sm, lineHeight: 20 },
 
-  // Bottom Bar
   bottomBar: {
     position: "absolute",
     left: 0,
@@ -453,8 +441,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryBtnText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
+  secondaryBtnText: { fontSize: theme.fontSize.md, fontWeight: "700" },
 });

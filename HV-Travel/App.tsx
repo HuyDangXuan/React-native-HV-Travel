@@ -26,6 +26,8 @@ import PaymentFailedScreen from "./screens/Main/Home/Payment/Method/PaymentResul
 import MyBookingScreen from "./screens/Main/Setting/MyBooking/MyBookingScreen";
 import ProfileScreen from "./screens/Main/Setting/Profile/ProfileScreen";
 import EditProfileScreen from "./screens/Main/Setting/Profile/EditProfile/EditProfileScreen";
+import BankTransferScreen from "./screens/Main/Home/Payment/Method/BankTransferScreen";
+import CashPaymentScreen from "./screens/Main/Home/Payment/Method/CashPaymentScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -68,6 +70,8 @@ export default function App() {
           <Stack.Screen name="MyBookingScreen" component={MyBookingScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
           <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
+          <Stack.Screen name="BankTransferScreen" component={BankTransferScreen} />
+          <Stack.Screen name="CashPaymentScreen" component={CashPaymentScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </MessageBoxProvider>

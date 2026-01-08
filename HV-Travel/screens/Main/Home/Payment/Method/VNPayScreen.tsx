@@ -1,24 +1,58 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
+type RouteParams = {
+  id?: string;          // tourId
+  total?: number;       // số tiền dạng number
+  amountText?: string;  // text hiển thị đã format sẵn (optional)
+  orderId?: string;
+};
+
+const formatVND = (v: number) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+    Number.isFinite(v) ? v : 0
+  );
+
 export default function VNPayScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+
+  const params: RouteParams = route?.params ?? {};
+  const tourId = params?.id;
+  const total = typeof params?.total === "number" ? params.total : 0;
+  const orderId = params?.orderId || "DL" + Date.now();
+
+  const amountText = useMemo(() => {
+    return params?.amountText || formatVND(total);
+  }, [params?.amountText, total]);
+
   const [timeLeft, setTimeLeft] = useState(900); // 15 phút
   const [isProcessing, setIsProcessing] = useState(false);
-
-  const amount = route.params?.amount || "40.500.000đ";
-  const orderId = route.params?.orderId || "DL" + Date.now();
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigation.replace("PaymentFailedScreen", { reason: "timeout" });
+          navigation.replace("PaymentFailedScreen", {
+            reason: "timeout",
+            method: "VNPay",
+            orderId,
+            id: tourId,
+            total,
+            amountText,
+          });
           return 0;
         }
         return prev - 1;
@@ -26,24 +60,39 @@ export default function VNPayScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [navigation, orderId, tourId, total, amountText]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   const handleOpenVNPayApp = () => {
-    // Trong thực tế sẽ mở deep link VNPay
+    // TODO: deep link VNPay (sau này)
     console.log("Opening VNPay app...");
   };
 
   const handleCheckPayment = () => {
     setIsProcessing(true);
+
+    // Giả lập kiểm tra thanh toán
     setTimeout(() => {
       setIsProcessing(false);
-      navigation.replace("PaymentFailedScreen", { method: "VNPay", orderId });
+
+      // Demo: bạn muốn success thì replace qua PaymentSuccessScreen
+      // navigation.replace("PaymentSuccessScreen", { method: "VNPay", orderId, id: tourId, total, amountText });
+
+      navigation.replace("PaymentFailedScreen", {
+        reason: "failed",
+        method: "VNPay",
+        orderId,
+        id: tourId,
+        total,
+        amountText,
+      });
     }, 2000);
   };
 
@@ -51,12 +100,15 @@ export default function VNPayScreen() {
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.headerIcon} onPress={() => navigation.goBack()} hitSlop={10}>
+        <Pressable
+          style={styles.headerIcon}
+          onPress={() => navigation.goBack()}
+          hitSlop={10}
+        >
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </Pressable>
 
         <Text style={styles.headerTitle}>Thanh toán VNPay</Text>
-
         <View style={styles.headerIcon} />
       </View>
 
@@ -71,7 +123,9 @@ export default function VNPayScreen() {
         {/* Amount */}
         <View style={styles.amountBox}>
           <Text style={styles.amountLabel}>Số tiền thanh toán</Text>
-          <Text style={styles.amountValue}>{amount}</Text>
+          <Text style={styles.amountValue}>{amountText}</Text>
+          {!!tourId && <Text style={styles.subInfo}>Mã tour: {tourId}</Text>}
+          <Text style={styles.subInfo}>Mã đơn: {orderId}</Text>
         </View>
 
         {/* QR Code */}
@@ -91,7 +145,7 @@ export default function VNPayScreen() {
           <Text style={styles.orText}>HOẶC</Text>
           <View style={styles.line} />
         </View>
-        
+
         {/* Quick Action */}
         <Pressable style={styles.quickActionBtn} onPress={handleOpenVNPayApp}>
           <View style={styles.quickActionIcon}>
@@ -99,64 +153,50 @@ export default function VNPayScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.quickActionTitle}>Mở ứng dụng VNPay</Text>
-            <Text style={styles.quickActionDesc}>Thanh toán nhanh chóng và bảo mật</Text>
+            <Text style={styles.quickActionDesc}>
+              Thanh toán nhanh chóng và bảo mật
+            </Text>
           </View>
           <Ionicons name="chevron-forward" size={24} color={theme.colors.gray} />
         </Pressable>
 
         {/* Order Info */}
         <View style={styles.infoBox}>
-          <InfoRow icon="document-text-outline" label="Mã đơn hàng" value={orderId} />
+          <InfoRow
+            icon="document-text-outline"
+            label="Mã đơn hàng"
+            value={orderId}
+          />
           <Divider />
           <InfoRow icon="card-outline" label="Phương thức" value="VNPay QR" />
           <Divider />
-          <InfoRow icon="time-outline" label="Thời gian tạo" value={new Date().toLocaleString("vi-VN")} />
+          <InfoRow
+            icon="time-outline"
+            label="Thời gian tạo"
+            value={new Date().toLocaleString("vi-VN")}
+          />
         </View>
 
         {/* Instructions */}
         <View style={styles.instructionBox}>
           <Text style={styles.instructionTitle}>Hướng dẫn thanh toán</Text>
-          
+
           <Text style={styles.methodTitle}>Cách 1: Quét mã QR</Text>
-          <View style={styles.stepRow}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>1</Text>
-            </View>
-            <Text style={styles.stepText}>Mở ứng dụng VNPay</Text>
-          </View>
-          <View style={styles.stepRow}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>2</Text>
-            </View>
-            <Text style={styles.stepText}>Chọn biểu tượng quét QR</Text>
-          </View>
-          <View style={styles.stepRow}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>3</Text>
-            </View>
-            <Text style={styles.stepText}>Quét mã QR trên màn hình</Text>
-          </View>
+          <Step n={1} text="Mở ứng dụng VNPay" />
+          <Step n={2} text="Chọn biểu tượng quét QR" />
+          <Step n={3} text="Quét mã QR trên màn hình" />
 
           <Text style={styles.methodTitle}>Cách 2: Mở ứng dụng</Text>
-          <View style={styles.stepRow}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>1</Text>
-            </View>
-            <Text style={styles.stepText}>Nhấn nút "Mở ứng dụng VNPay"</Text>
-          </View>
-          <View style={styles.stepRow}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>2</Text>
-            </View>
-            <Text style={styles.stepText}>Xác nhận thanh toán trong app</Text>
-          </View>
+          <Step n={1} text='Nhấn nút "Mở ứng dụng VNPay"' />
+          <Step n={2} text="Xác nhận thanh toán trong app" />
         </View>
 
         {/* Note */}
         <View style={styles.noteBox}>
           <Ionicons name="information-circle" size={20} color="#DC2626" />
           <Text style={styles.noteText}>
-            VNPay hỗ trợ thanh toán qua thẻ ATM nội địa, thẻ quốc tế và tài khoản ngân hàng liên kết.
+            VNPay hỗ trợ thanh toán qua thẻ ATM nội địa, thẻ quốc tế và tài khoản
+            ngân hàng liên kết.
           </Text>
         </View>
 
@@ -185,6 +225,17 @@ export default function VNPayScreen() {
         </Pressable>
       </View>
     </SafeAreaView>
+  );
+}
+
+function Step({ n, text }: { n: number; text: string }) {
+  return (
+    <View style={styles.stepRow}>
+      <View style={styles.stepNumber}>
+        <Text style={styles.stepNumberText}>{n}</Text>
+      </View>
+      <Text style={styles.stepText}>{text}</Text>
+    </View>
   );
 }
 
@@ -220,11 +271,8 @@ const styles = StyleSheet.create({
   headerIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   headerTitle: { fontSize: theme.fontSize.lg, fontWeight: "800", color: theme.colors.text },
 
-  content: {
-    padding: theme.spacing.md,
-  },
+  content: { padding: theme.spacing.md },
 
-  // Timer
   timerBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -235,38 +283,21 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
     gap: theme.spacing.xs,
   },
-  timerText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    fontWeight: "600",
-  },
-  timerValue: {
-    fontSize: theme.fontSize.lg,
-    color: "#DC2626",
-    fontWeight: "800",
-  },
+  timerText: { fontSize: theme.fontSize.sm, color: theme.colors.text, fontWeight: "600" },
+  timerValue: { fontSize: theme.fontSize.lg, color: "#DC2626", fontWeight: "800" },
 
-  // Amount
   amountBox: {
     alignItems: "center",
     padding: theme.spacing.lg,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
     marginBottom: theme.spacing.lg,
+    gap: 6,
   },
-  amountLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
-    marginBottom: theme.spacing.xs,
-  },
-  amountValue: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#DC2626",
-  },
+  amountLabel: { fontSize: theme.fontSize.sm, color: theme.colors.gray, fontWeight: "600" },
+  amountValue: { fontSize: 32, fontWeight: "800", color: "#DC2626" },
+  subInfo: { fontSize: theme.fontSize.xs, color: theme.colors.gray, fontWeight: "600" },
 
-  // Quick Action
   quickActionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -286,39 +317,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  quickActionTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: "#DC2626",
-  },
-  quickActionDesc: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    marginTop: 2,
-  },
+  quickActionTitle: { fontSize: theme.fontSize.md, fontWeight: "700", color: "#DC2626" },
+  quickActionDesc: { fontSize: theme.fontSize.sm, color: theme.colors.gray, marginTop: 2 },
 
-  // Or Divider
   orDivider: {
     flexDirection: "row",
     alignItems: "center",
     marginVertical: theme.spacing.lg,
     gap: theme.spacing.md,
   },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: theme.colors.border,
-  },
-  orText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
-  },
+  line: { flex: 1, height: 1, backgroundColor: theme.colors.border },
+  orText: { fontSize: theme.fontSize.sm, color: theme.colors.gray, fontWeight: "600" },
 
-  // QR
-  qrSection: {
-    marginBottom: theme.spacing.lg,
-  },
+  qrSection: { marginBottom: theme.spacing.lg },
   sectionTitle: {
     fontSize: theme.fontSize.md,
     fontWeight: "700",
@@ -343,30 +354,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: theme.spacing.md,
   },
-  qrHint: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    textAlign: "center",
-  },
+  qrHint: { fontSize: theme.fontSize.sm, color: theme.colors.gray, textAlign: "center" },
 
-  // Open App Button
-  openAppBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: theme.spacing.sm,
-    height: 54,
-    backgroundColor: "#DC2626",
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.lg,
-  },
-  openAppText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
-
-  // Info
   infoBox: {
     backgroundColor: theme.colors.white,
     borderRadius: theme.radius.lg,
@@ -375,42 +364,18 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     marginBottom: theme.spacing.lg,
   },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-  },
-  infoLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
-  },
-  infoValue: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.sm,
-  },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, paddingVertical: theme.spacing.xs },
+  infoLabel: { fontSize: theme.fontSize.sm, color: theme.colors.gray, fontWeight: "600" },
+  infoValue: { fontSize: theme.fontSize.sm, color: theme.colors.text, fontWeight: "700", marginTop: 2 },
+  divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.sm },
 
-  // Instructions
   instructionBox: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.lg,
   },
-  instructionTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
+  instructionTitle: { fontSize: theme.fontSize.md, fontWeight: "700", color: theme.colors.text, marginBottom: theme.spacing.md },
   methodTitle: {
     fontSize: theme.fontSize.sm,
     fontWeight: "700",
@@ -418,12 +383,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     marginBottom: theme.spacing.sm,
   },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.sm,
-  },
+  stepRow: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing.sm, marginBottom: theme.spacing.sm },
   stepNumber: {
     width: 24,
     height: 24,
@@ -432,20 +392,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  stepNumberText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.xs,
-    fontWeight: "700",
-  },
-  stepText: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    lineHeight: 20,
-    paddingTop: 2,
-  },
+  stepNumberText: { color: theme.colors.white, fontSize: theme.fontSize.xs, fontWeight: "700" },
+  stepText: { flex: 1, fontSize: theme.fontSize.sm, color: theme.colors.text, lineHeight: 20, paddingTop: 2 },
 
-  // Note
   noteBox: {
     flexDirection: "row",
     gap: theme.spacing.sm,
@@ -454,14 +403,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     alignItems: "flex-start",
   },
-  noteText: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    color: "#991B1B",
-    lineHeight: 20,
-  },
+  noteText: { flex: 1, fontSize: theme.fontSize.sm, color: "#991B1B", lineHeight: 20 },
 
-  // Bottom Bar
   bottomBar: {
     position: "absolute",
     left: 0,
@@ -481,11 +424,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryBtnText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
+  primaryBtnText: { color: theme.colors.white, fontSize: theme.fontSize.md, fontWeight: "700" },
   secondaryBtn: {
     height: 54,
     borderRadius: theme.radius.lg,
@@ -495,9 +434,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryBtnText: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
+  secondaryBtnText: { color: theme.colors.text, fontSize: theme.fontSize.md, fontWeight: "700" },
 });
