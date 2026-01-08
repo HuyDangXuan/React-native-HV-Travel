@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { use, useCallback, useEffect, useState } from "react";
 import {
   View,
   Image,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Pressable,
   SafeAreaView,
 } from "react-native";
 import AppInput from "../../components/TextInput";
@@ -15,17 +16,98 @@ import AppButton from "../../components/Button";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { AuthService } from "../../services/AuthService";
 import LoadingOverlay from "../Loading/LoadingOverlay";
+import { MessageBoxService } from "../MessageBox/MessageBoxService";
+import { verifyOtpSchema } from "../../validators/authSchema";
 import theme from "../../config/theme";
 
-export default function CodeVerificationScreen() {
-  const [code, setCode] = useState("");
-  const navigation = useNavigation<any>();
-  const [loading, setLoading] = useState(false);
+interface FormErrors {
+  code?: string;
+}
 
-  const route = useRoute<any>();
-  const { otpId } = route.params as { otpId: string };
+export default function CodeVerificationScreen() {
+    const [code, setCode] = useState("");
+    const navigation = useNavigation<any>();
+    const [resendTimer, setResendTimer] = useState(60);
+    const [resendDisabled, setResendDisabled] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<FormErrors>({});
+    const route = useRoute<any>();
+    const { email, otpId } = route.params as { email: string; otpId: string };
+
+    useEffect(()=>{
+        if (!resendDisabled) return;
+        const interval = setInterval(() => {
+            setResendTimer((prev) => {
+                if (prev <= 1) {
+                    setResendDisabled(false);
+                    clearInterval(interval);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [resendDisabled]);
+
+    const [currentOtpId, setCurrentOtpId] = useState(otpId); // state để lưu otpId mới
+
+    const handleResendCode = async () => {
+    setLoading(true);
+    try {
+        const res = await AuthService.forgotPassword(email);
+        if (res.status === true) {
+        setCurrentOtpId(res.otpId); // cập nhật otpId mới
+        setResendDisabled(true);
+        setResendTimer(60); // reset timer
+        }
+    } catch (err: any) {
+        MessageBoxService.error("Lỗi", err.message || "Không thể gửi lại mã", "OK");
+    } finally {
+        setLoading(false);
+    }
+    };
+
+
+    const validateField = (fieldName: keyof FormErrors) => {
+        const currentValues = { code };
+
+        const { error } = verifyOtpSchema.validate(currentValues, {
+        abortEarly: false,
+        });
+
+        const fieldError = error?.details.find((e) => e.path[0] === fieldName);
+
+        setErrors((prev) => ({
+        ...prev,
+        [fieldName]: fieldError?.message,
+        }));
+    };
+    const validateForm = (): boolean => {
+        const { error } = verifyOtpSchema.validate(
+        { code },
+        { abortEarly: false }
+        );
+
+        if (error) {
+        const newErrors: FormErrors = {};
+        error.details.forEach((detail) => {
+            const field = detail.path[0] as keyof FormErrors;
+            if (!newErrors[field]) {
+            newErrors[field] = detail.message;
+            }
+        });
+        setErrors(newErrors);
+        return false;
+        }
+
+        setErrors({});
+        return true;
+    };
 
   const handleVerifyCode = useCallback(async () => {
+    if (!validateForm()) return;
+
     setLoading(true);
     await new Promise((res) => setTimeout(res, 50));
 
@@ -35,7 +117,7 @@ export default function CodeVerificationScreen() {
         navigation.navigate("CreateNewPasswordScreen", { otpId });
       }
     } catch (error: any) {
-      console.log("Verify OTP error: ", error);
+      MessageBoxService.error("Lỗi", error.message, "OK");
     } finally {
       setLoading(false);
     }
@@ -66,8 +148,25 @@ export default function CodeVerificationScreen() {
           <AppInput
             placeholder="Mã xác nhận"
             value={code}
-            onChangeText={setCode}
+            onChangeText={(text) => {
+                setCode(text);
+                if (errors.code) {
+                    setErrors((prev) => ({ ...prev, code: undefined }));
+                }
+                
+            }}
+            onBlur={() => validateField("code")}
+            error={errors.code}
           />
+          <Pressable
+            onPress={handleResendCode}
+            disabled={resendDisabled}
+            >
+            <Text style={[styles.resendCode, { color: resendDisabled ? theme.colors.gray : theme.colors.primary }]}>
+                {resendDisabled ? `Gửi lại mã (${resendTimer}s)` : "Gửi lại mã"}
+            </Text>
+            </Pressable>
+          
 
           <AppButton title="Xác nhận" onPress={handleVerifyCode} />
 
@@ -112,5 +211,9 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginBottom: theme.spacing.lg,
     textAlign: "center",
+  },
+  resendCode:{
+    fontWeight: "600",
+    marginBottom: theme.spacing.md,
   },
 });

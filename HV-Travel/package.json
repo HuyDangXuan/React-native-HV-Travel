@@ -16,6 +16,7 @@
     "crypto-js": "^4.2.0",
     "expo": "~54.0.30",
     "expo-status-bar": "~3.0.9",
+    "joi": "^18.0.2",
     "lottie-ios": "^4.5.1",
     "lottie-react-native": "^7.3.4",
     "react": "19.1.0",

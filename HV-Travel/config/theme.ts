@@ -15,7 +15,9 @@ const theme = {
     text: "#111111",
     gray: "#8E8E93",
     border: "#E5E5EA",
-    danger: "#FF3B30",
+    error: "#FF3B30",
+    placeholder: "#999",
+    icon: "#666",
   },
 
   radius: {
@@ -36,6 +38,8 @@ const theme = {
   icon: {
     favicon: require('../assets/favicon.png'),
     back: require('../assets/back.png'),
+    eye: require('../assets/eye.png'),
+    hidden: require('../assets/hidden.png'),
   },
   animation: {
     success: require('../assets/animations/success.json'),

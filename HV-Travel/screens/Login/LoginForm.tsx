@@ -6,88 +6,140 @@ import { useNavigation } from "@react-navigation/native";
 import { MessageBoxService } from "../MessageBox/MessageBoxService";
 import LoadingOverlay from "../Loading/LoadingOverlay";
 import { AuthService } from "../../services/AuthService";
+import { loginSchema } from "../../validators/authSchema";
+
+interface FormErrors {
+  email?: string;
+  password?: string;
+}
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({}); // ⭐ State cho errors
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation<any>();
 
-  const checkValidData = () =>{
-    if (!email.trim()) {
-      MessageBoxService.error("Lỗi", "Vui lòng nhập email!", "OK");
-      return false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      MessageBoxService.error("Lỗi", "Email không hợp lệ!", "OK");
-      return false;
-    }
-    if (!password.trim()){
-      MessageBoxService.error("Lỗi", "Vui lòng nhập mật khẩu!", "OK");
-      return false;
-    }
+  // ⭐ Validate single field (gọi khi blur)
+  const validateField = (fieldName: keyof FormErrors, value: string) => {
+    const { error } = loginSchema.validate(
+      { email, password, [fieldName]: value },
+      { abortEarly: true }
+    );
 
-    return true;
-
-  }
-  const handleLogin = async () => {
+    const fieldError = error?.details.find((e) => e.path[0] === fieldName);
     
-    const resultValid = await checkValidData();
-    if (!resultValid) return;
+    setErrors((prev) => ({
+      ...prev,
+      [fieldName]: fieldError?.message,
+    }));
+  };
+
+  // ⭐ Validate toàn bộ form (gọi khi submit)
+  const validateForm = (): boolean => {
+    const { error } = loginSchema.validate(
+      { email, password },
+      { abortEarly: false }
+    );
+
+    if (error) {
+      const newErrors: FormErrors = {};
+      error.details.forEach((detail) => {
+        const field = detail.path[0] as keyof FormErrors;
+        if (!newErrors[field]) {
+          newErrors[field] = detail.message;
+        }
+      });
+      setErrors(newErrors);
+      return false;
+    }
+
+    setErrors({});
+    return true;
+  };
+
+  const handleLogin = async () => {
+    // ⭐ Validate form trước khi submit
+    if (!validateForm()) {
+      console.log("Validation failed");
+      return;
+    }
+
     setLoading(true);
     await new Promise((res) => setTimeout(res, 50));
-    try{
+
+    try {
       const res = await AuthService.login(email, password);
       console.log("Login success: ", res);
-      if (res.status === true){
+      
+      if (res.status === true) {
         navigation.replace("MainTabs");
         console.log("Login Successfully!");
       }
-    }
-    catch(error: any){
+    } catch (error: any) {
       console.log("Login error: ", error);
-      
-      if (error.status === 401){
+
+      // ⭐ Chỉ dùng MessageBox cho system errors
+      if (error.status === 401) {
         MessageBoxService.error(
           "Đăng nhập thất bại!",
           error.message,
-          "Ok",
+          "OK"
         );
-      }
-      else if (error.message === "Request failed"){
+      } else if (error.message === "Request failed") {
         MessageBoxService.error(
           "Lỗi kết nối",
           "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.",
           "OK"
         );
-      }
-      else if (error.message === "Request timeout"){
+      } else if (error.message === "Request timeout") {
         MessageBoxService.error(
           "Hết thời gian chờ",
           "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.",
           "OK"
         );
-      }
-      else{
+      } else {
         MessageBoxService.error(
           "Lỗi",
-          "Đã xảy ra lỗi. Vui lòng thử lại sau.",
+          error.message,
           "OK"
         );
       }
-    }
-    finally{
+    } finally {
       setLoading(false);
     }
-
-    
   };
 
   return (
     <View>
-      <AppInput placeholder="Email" value={email} onChangeText={setEmail} />
-      <AppInput placeholder="Password" value={password} onChangeText={setPassword} isPassword />
+      <AppInput
+        placeholder="Email"
+        value={email}
+        onChangeText={(text) => {
+          setEmail(text);
+          // ⭐ Clear error khi user đang nhập
+          if (errors.email) {
+            setErrors((prev) => ({ ...prev, email: undefined }));
+          }
+        }}
+        onBlur={() => validateField("email", email)} // ⭐ Validate khi blur
+        error={errors.email} // ⭐ Hiển thị error
+      />
+
+      <AppInput
+        placeholder="Mật khẩu"
+        value={password}
+        onChangeText={(text) => {
+          setPassword(text);
+          // ⭐ Clear error khi user đang nhập
+          if (errors.password) {
+            setErrors((prev) => ({ ...prev, password: undefined }));
+          }
+        }}
+        onBlur={() => validateField("password", password)} // ⭐ Validate khi blur
+        error={errors.password} // ⭐ Hiển thị error
+        isPassword
+      />
 
       <AppButton title="Đăng nhập" onPress={handleLogin} />
 
