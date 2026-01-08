@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   Pressable,
   ScrollView,
   Linking,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import SuccessTick from "../../../../../components/SuccessTick";
 
 type RouteParams = {
   id?: string;
@@ -25,6 +27,58 @@ export default function CashPaymentScreen() {
 
   const params: RouteParams = route?.params ?? {};
   const { id: tourId, amountText, orderId } = params;
+
+  // Animation values
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(50));
+  const [scaleAnim] = useState(new Animated.Value(0.8));
+
+  // Timer state (24 hours countdown)
+  const [timeLeft, setTimeLeft] = useState(86400); // 24 hours in seconds
+
+  useEffect(() => {
+    // Entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Timer countdown
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [fadeAnim, slideAnim, scaleAnim]);
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, "0")}:${mins
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const handleCall = () => {
     Linking.openURL("tel:19001234");
@@ -42,8 +96,19 @@ export default function CashPaymentScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Success Icon */}
-        <View style={styles.iconContainer}>
+        {/* Timer Box */}
+        <SuccessTick color={theme.colors.primary || "#10B981"} />
+
+        {/* Success Icon with Animation */}
+        <Animated.View
+          style={[
+            styles.iconContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
           <View style={styles.iconCircle}>
             <Ionicons
               name="document-text"
@@ -51,13 +116,20 @@ export default function CashPaymentScreen() {
               color={theme.colors.primary}
             />
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Title */}
-        <Text style={styles.title}>Đã ghi nhận đơn hàng</Text>
-        <Text style={styles.subtitle}>
-          Chúng tôi đã ghi nhận yêu cầu thanh toán tiền mặt của bạn
-        </Text>
+        {/* Title with Animation */}
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          }}
+        >
+          <Text style={styles.title}>Đã ghi nhận đơn hàng</Text>
+          <Text style={styles.subtitle}>
+            Chúng tôi đã ghi nhận yêu cầu thanh toán tiền mặt của bạn
+          </Text>
+        </Animated.View>
 
         {/* Order Info Card */}
         <View style={styles.infoCard}>
@@ -227,14 +299,14 @@ export default function CashPaymentScreen() {
       <View style={styles.footer}>
         <Pressable
           style={styles.secondaryBtn}
-          onPress={() => navigation.navigate("BookingHistory")}
+          onPress={() => navigation.navigate("MyBookingScreen")}
         >
           <Text style={styles.secondaryBtnText}>Xem đơn hàng</Text>
         </Pressable>
 
         <Pressable
           style={styles.primaryBtn}
-          onPress={() => navigation.navigate("MainTabs")}
+          onPress={() => navigation.replace("MainTabs")}
         >
           <Text style={styles.primaryBtnText}>Về trang chủ</Text>
         </Pressable>
@@ -251,6 +323,29 @@ const styles = StyleSheet.create({
   container: {
     padding: theme.spacing.lg,
     paddingBottom: 120,
+  },
+
+  timerBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: theme.spacing.md,
+    backgroundColor: "#EFF6FF",
+    borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing.lg,
+    gap: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  timerText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.text,
+    fontWeight: "600",
+  },
+  timerValue: {
+    fontSize: theme.fontSize.lg,
+    color: "#2563EB",
+    fontWeight: "800",
   },
 
   iconContainer: {

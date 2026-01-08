@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   SafeAreaView,
   Pressable,
   ScrollView,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import SuccessTick from "../../../../../components/SuccessTick";
 
 type RouteParams = {
   id?: string;
@@ -29,15 +31,7 @@ export default function BankTransferScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
         {/* Success Icon */}
-        <View style={styles.iconContainer}>
-          <View style={styles.iconCircle}>
-            <Ionicons
-              name="checkmark-circle"
-              size={80}
-              color={theme.colors.primary || "#10B981"}
-            />
-          </View>
-        </View>
+        <SuccessTick color={theme.colors.primary || "#10B981"} />
 
         {/* Title */}
         <Text style={styles.title}>Đã ghi nhận yêu cầu</Text>
@@ -168,7 +162,7 @@ export default function BankTransferScreen() {
       <View style={styles.footer}>
         <Pressable
           style={styles.secondaryBtn}
-          onPress={() => navigation.navigate("BookingHistory")}
+          onPress={() => navigation.replace("MyBookingScreen")}
         >
           <Text style={styles.secondaryBtnText}>Xem đơn hàng</Text>
         </Pressable>
