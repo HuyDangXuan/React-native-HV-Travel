@@ -5,8 +5,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   SafeAreaView,
 } from "react-native";
@@ -110,46 +108,42 @@ export default function ForgetPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="automatic"
       >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
         >
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Image source={theme.icon.back} style={styles.backIcon} />
-          </TouchableOpacity>
+          <Image source={theme.icon.back} style={styles.backIcon} />
+        </TouchableOpacity>
 
-          <Text style={styles.title}>Đặt lại mật khẩu</Text>
-          <Text style={styles.desc}>
-            Một mã xác nhận sẽ được gửi đến Email của bạn để đặt lại mật khẩu
-          </Text>
+        <Text style={styles.title}>Đặt lại mật khẩu</Text>
+        <Text style={styles.desc}>
+          Một mã xác nhận sẽ được gửi đến Email của bạn để đặt lại mật khẩu
+        </Text>
 
-          <AppInput
-            placeholder="Email"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (errors.email) {
-                setErrors((prev) => ({ ...prev, email: undefined }));
-              }
-            }}
-            onBlur={() => validateField("email")}
-            error={errors.email}
-          />
+        <AppInput
+          placeholder="Email"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (errors.email) {
+              setErrors((prev) => ({ ...prev, email: undefined }));
+            }
+          }}
+          onBlur={() => validateField("email")}
+          error={errors.email}
+        />
 
-          <AppButton title="Gửi mã xác nhận" onPress={handleSendEmail} />
+        <AppButton title="Gửi mã xác nhận" onPress={handleSendEmail} />
 
-          <LoadingOverlay visible={loading} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <LoadingOverlay visible={loading} />
+      </ScrollView>
     </SafeAreaView>
   );
 }

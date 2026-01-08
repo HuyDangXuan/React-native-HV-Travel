@@ -1,33 +1,36 @@
 import React from "react";
-import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { StyleSheet, ScrollView, SafeAreaView } from "react-native";
 import SignUpHeader from "./SignUpHeader";
 import SignUpForm from "./SignUpForm";
 import SignUpFooter from "./SignUpFooter";
+import theme from "../../config/theme";
 
 export default function SignUpScreen() {
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-    >
+    <SafeAreaView style={styles.safe}>
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="automatic"
       >
         <SignUpHeader />
         <SignUpForm />
         <SignUpFooter />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: theme.colors.white,
+  },
   container: {
     flexGrow: 1,
     padding: 16,
-    justifyContent: "flex-start", // ✅ bỏ center
+    justifyContent: "flex-start",
   },
 });

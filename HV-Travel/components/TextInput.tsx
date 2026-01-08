@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, TextInput, TouchableOpacity, Image, StyleSheet, Text } from "react-native";
+import { View, TextInput, TouchableOpacity, Image, StyleSheet, Text, KeyboardTypeOptions} from "react-native";
 import theme from "../config/theme";
 
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
   isPassword?: boolean;
   error?: string; // ⭐ Thêm prop error
   onBlur?: () => void; // ⭐ Thêm onBlur handler
+  keyboardType?: KeyboardTypeOptions; // ⭐ Thêm prop keyboardType
 };
 
 export default function AppInput({
@@ -18,6 +19,7 @@ export default function AppInput({
   isPassword = false,
   error,
   onBlur,
+  keyboardType = "default",
 }: Props) {
   const [secure, setSecure] = useState(true);
   const [isFocused, setIsFocused] = useState(false);
@@ -38,6 +40,7 @@ export default function AppInput({
           placeholderTextColor={error ? theme.colors.error : theme.colors.placeholder}
           secureTextEntry={isPassword && secure}
           style={styles.input}
+          keyboardType={keyboardType} // ⭐ Sử dụng prop keyboardType
           onFocus={() => setIsFocused(true)} // ⭐ Thêm focus handler
           onBlur={() => {
             setIsFocused(false);
@@ -66,6 +69,7 @@ export default function AppInput({
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   wrapper: {

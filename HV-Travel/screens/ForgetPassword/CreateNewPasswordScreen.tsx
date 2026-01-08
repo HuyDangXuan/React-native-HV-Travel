@@ -5,8 +5,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   SafeAreaView,
 } from "react-native";
@@ -118,10 +116,12 @@ export default function CreateNewPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="automatic"
       >
         <ScrollView
           contentContainerStyle={styles.container}
@@ -168,11 +168,11 @@ export default function CreateNewPasswordScreen() {
             isPassword
           />
 
-          <AppButton title="Đặt lại mật khẩu" onPress={handleResetPassword} />
+        <AppButton title="Đặt lại mật khẩu" onPress={handleResetPassword} />
 
-          <LoadingOverlay visible={loading} />
+        <LoadingOverlay visible={loading} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </ScrollView>
     </SafeAreaView>
   );
 }
