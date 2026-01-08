@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import FailureIcon from "../../../../../../components/FailureIcon";
 
 type RouteParams = {
   id?: string;
@@ -154,19 +155,8 @@ export default function PaymentFailedScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* Error Icon */}
-        <Animated.View
-          style={[
-            styles.iconContainer,
-            {
-              transform: [{ scale: scaleAnim }, { translateX: shakeAnim }],
-            },
-          ]}
-        >
-          <View style={[styles.iconCircle, { backgroundColor: color }]}>
-            <Ionicons name="close" size={80} color={theme.colors.white} />
-          </View>
-          <View style={[styles.iconRing, { borderColor: color }]} />
-        </Animated.View>
+        <FailureIcon color={color} iconName="close" shakeAxis="x" />
+
 
         <Animated.View style={[styles.contentWrapper, { opacity: fadeAnim }]}>
           <Text style={styles.title}>{failureInfo.title}</Text>

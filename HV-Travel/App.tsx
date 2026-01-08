@@ -65,13 +65,13 @@ export default function App() {
           <Stack.Screen name="ZaloPayScreen" component={ZaloPayScreen} />
           <Stack.Screen name="VNPayScreen" component={VNPayScreen} />
           <Stack.Screen name="MoMoScreen" component={MoMoScreen} />
-          <Stack.Screen name="PaymentSuccessScreen" component={PaymentSuccessScreen} />
-          <Stack.Screen name="PaymentFailedScreen" component={PaymentFailedScreen} />
+          <Stack.Screen name="PaymentSuccessScreen" component={PaymentSuccessScreen} options={{gestureEnabled: false}} />
+          <Stack.Screen name="PaymentFailedScreen" component={PaymentFailedScreen} options={{gestureEnabled: false}} />
           <Stack.Screen name="MyBookingScreen" component={MyBookingScreen} />
           <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
           <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
-          <Stack.Screen name="BankTransferScreen" component={BankTransferScreen} />
-          <Stack.Screen name="CashPaymentScreen" component={CashPaymentScreen} />
+          <Stack.Screen name="BankTransferScreen" component={BankTransferScreen} options={{gestureEnabled: false}} />
+          <Stack.Screen name="CashPaymentScreen" component={CashPaymentScreen} options={{gestureEnabled: false}} />
         </Stack.Navigator>
       </NavigationContainer>
     </MessageBoxProvider>

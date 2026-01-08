@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import SuccessTick from "../../../../../../components/SuccessTick";
 
 type RouteParams = {
   id?: string;
@@ -126,19 +127,7 @@ export default function PaymentSuccessScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* Success Icon */}
-        <Animated.View
-          style={[
-            styles.iconContainer,
-            {
-              transform: [{ scale: scaleAnim }, { translateY: shakeAnim }],
-            },
-          ]}
-        >
-          <View style={[styles.iconCircle, { backgroundColor: color }]}>
-            <Ionicons name="checkmark" size={80} color={theme.colors.white} />
-          </View>
-          <View style={[styles.iconRing, { borderColor: color }]} />
-        </Animated.View>
+        <SuccessTick color={theme.colors.primary || "#10B981"} />
 
         <Animated.View style={[styles.contentWrapper, { opacity: fadeAnim }]}>
           <Text style={styles.title}>Thanh toán thành công!</Text>
@@ -226,7 +215,7 @@ export default function PaymentSuccessScreen() {
         <Pressable
           style={[styles.secondaryBtn, { borderColor: color }]}
           onPress={() => {
-            navigation.navigate("BookingHistory")
+            navigation.replace("MyBookingScreen")
           }}
         >
           <Text style={[styles.secondaryBtnText, { color }]}>Xem đơn hàng</Text>
