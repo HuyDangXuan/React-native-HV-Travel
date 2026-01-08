@@ -1,17 +1,72 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView, Animated } from "react-native";
+import React, { useEffect, useMemo, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  Pressable,
+  ScrollView,
+  Animated,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
+type RouteParams = {
+  id?: string;
+  total?: number;
+  amountText?: string; // flow mới
+  amount?: string;     // fallback cũ
+  orderId?: string;
+  method?: string;
+  reason?: string;
+};
+
+const formatVND = (v: number) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+    Number.isFinite(v) ? v : 0
+  );
+
 export default function PaymentFailedScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  
-  const reason = route.params?.reason || "unknown";
-  const method = route.params?.method || "Unknown";
-  const orderId = route.params?.orderId || "DL" + Date.now();
-  const amount = route.params?.amount || "40.500.000đ";
+
+  const params: RouteParams = route?.params ?? {};
+
+  const reason = params?.reason || "unknown";
+  const method = params?.method || "Unknown";
+  const orderId = params?.orderId || "DL" + Date.now();
+  const tourId = params?.id;
+
+  const total = typeof params?.total === "number" ? params.total : 0;
+
+  const amountText = useMemo(() => {
+    if (typeof params?.amountText === "string" && params.amountText.trim()) return params.amountText;
+    if (total > 0) return formatVND(total);
+    if (typeof params?.amount === "string" && params.amount.trim()) return params.amount;
+    return formatVND(0);
+  }, [params?.amountText, params?.amount, total]);
+
+  const getMethodColor = () => {
+    switch ((method || "").toLowerCase()) {
+      case "zalopay":
+        return "#3B82F6";
+      case "vnpay":
+        return "#DC2626";
+      case "momo":
+        return "#A50064";
+      case "bank":
+      case "chuyển khoản":
+        return "#059669";
+      case "cash":
+      case "tiền mặt":
+        return "#F59E0B";
+      default:
+        return "#DC2626";
+    }
+  };
+
+  const color = getMethodColor();
 
   // Animation
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -19,7 +74,6 @@ export default function PaymentFailedScreen() {
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Error icon animation with shake
     Animated.sequence([
       Animated.spring(scaleAnim, {
         toValue: 1,
@@ -28,85 +82,27 @@ export default function PaymentFailedScreen() {
         useNativeDriver: true,
       }),
       Animated.sequence([
-        Animated.timing(shakeAnim, {
-          toValue: 30,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: -30,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: 30,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: -30,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: 30,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: -30,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: 30,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: -15,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: 15,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: -7,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: 7,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: -3,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: 3,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shakeAnim, {
-          toValue: 0,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        
+        Animated.timing(shakeAnim, { toValue: 30, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -30, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 30, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -30, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 30, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -30, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 30, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -15, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 15, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -7, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 7, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -3, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 3, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
       ]),
     ]).start();
 
-    // Fade in content
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 800,
-      delay: 300,
+      delay: 250,
       useNativeDriver: true,
     }).start();
   }, []);
@@ -162,104 +158,86 @@ export default function PaymentFailedScreen() {
           style={[
             styles.iconContainer,
             {
-              transform: [
-                { scale: scaleAnim },
-                { translateX: shakeAnim },
-              ],
+              transform: [{ scale: scaleAnim }, { translateX: shakeAnim }],
             },
           ]}
         >
-          <View style={styles.iconCircle}>
+          <View style={[styles.iconCircle, { backgroundColor: color }]}>
             <Ionicons name="close" size={80} color={theme.colors.white} />
           </View>
-          <View style={styles.iconRing} />
+          <View style={[styles.iconRing, { borderColor: color }]} />
         </Animated.View>
 
         <Animated.View style={[styles.contentWrapper, { opacity: fadeAnim }]}>
-          {/* Error Message */}
           <Text style={styles.title}>{failureInfo.title}</Text>
           <Text style={styles.subtitle}>{failureInfo.message}</Text>
 
           {/* Transaction Details */}
           <View style={styles.detailsCard}>
-            <DetailRow
-              icon="receipt-outline"
-              label="Mã đơn hàng"
-              value={orderId}
-            />
+            {!!tourId && (
+              <>
+                <DetailRow icon="pricetag-outline" label="Mã tour" value={tourId} iconColor={color} />
+                <Divider />
+              </>
+            )}
+
+            <DetailRow icon="receipt-outline" label="Mã đơn hàng" value={orderId} iconColor={color} />
             <Divider />
-            <DetailRow
-              icon="cash-outline"
-              label="Số tiền"
-              value={amount}
-            />
+            <DetailRow icon="cash-outline" label="Số tiền" value={amountText} iconColor={color} />
             <Divider />
-            <DetailRow
-              icon="card-outline"
-              label="Phương thức"
-              value={method}
-            />
+            <DetailRow icon="card-outline" label="Phương thức" value={method} iconColor={color} />
             <Divider />
-            <DetailRow
-              icon="time-outline"
-              label="Thời gian"
-              value={new Date().toLocaleString("vi-VN")}
-            />
+            <DetailRow icon="time-outline" label="Thời gian" value={new Date().toLocaleString("vi-VN")} iconColor={color} />
             <Divider />
             <DetailRow
               icon={failureInfo.icon}
               label="Lý do"
               value={failureInfo.title}
-              valueStyle={styles.errorText}
+              iconColor={color}
+              valueStyle={[styles.errorText, { color }]}
             />
           </View>
 
           {/* Common Solutions */}
-          <View style={styles.solutionsCard}>
+          <View style={[styles.solutionsCard, { backgroundColor: color + "12" }]}>
             <Text style={styles.solutionsTitle}>💡 Giải pháp</Text>
-            
+
             <View style={styles.solutionItem}>
               <View style={styles.solutionIcon}>
-                <Ionicons name="refresh" size={20} color="#DC2626" />
+                <Ionicons name="refresh" size={20} color={color} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.solutionTitle}>Thử lại</Text>
-                <Text style={styles.solutionDesc}>
-                  Kiểm tra lại thông tin và thử thanh toán lại
-                </Text>
+                <Text style={styles.solutionDesc}>Kiểm tra lại thông tin và thử thanh toán lại</Text>
               </View>
             </View>
 
             <View style={styles.solutionItem}>
               <View style={styles.solutionIcon}>
-                <Ionicons name="card" size={20} color="#DC2626" />
+                <Ionicons name="card" size={20} color={color} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.solutionTitle}>Đổi phương thức khác</Text>
-                <Text style={styles.solutionDesc}>
-                  Thử thanh toán bằng phương thức khác
-                </Text>
+                <Text style={styles.solutionDesc}>Thử thanh toán bằng phương thức khác</Text>
               </View>
             </View>
 
             <View style={styles.solutionItem}>
               <View style={styles.solutionIcon}>
-                <Ionicons name="call" size={20} color="#DC2626" />
+                <Ionicons name="call" size={20} color={color} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.solutionTitle}>Liên hệ hỗ trợ</Text>
-                <Text style={styles.solutionDesc}>
-                  Gọi hotline 1900-xxxx để được hỗ trợ
-                </Text>
+                <Text style={styles.solutionDesc}>Gọi hotline 1900-xxxx để được hỗ trợ</Text>
               </View>
             </View>
           </View>
 
           {/* Warning Box */}
-          <View style={styles.warningBox}>
-            <Ionicons name="warning" size={20} color="#DC2626" />
-            <Text style={styles.warningText}>
-              Đơn hàng của bạn chưa được xác nhận. Nếu bạn đã thanh toán thành công, 
+          <View style={[styles.warningBox, { borderColor: color + "22", backgroundColor: color + "10" }]}>
+            <Ionicons name="warning" size={20} color={color} />
+            <Text style={[styles.warningText, { color }]}>
+              Đơn hàng của bạn chưa được xác nhận. Nếu bạn đã thanh toán thành công,
               vui lòng liên hệ với chúng tôi để được hỗ trợ.
             </Text>
           </View>
@@ -271,9 +249,7 @@ export default function PaymentFailedScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.supportTitle}>Cần hỗ trợ?</Text>
-              <Text style={styles.supportDesc}>
-                Liên hệ với chúng tôi qua hotline hoặc email
-              </Text>
+              <Text style={styles.supportDesc}>Liên hệ với chúng tôi qua hotline hoặc email</Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color={theme.colors.gray} />
           </Pressable>
@@ -286,19 +262,21 @@ export default function PaymentFailedScreen() {
       <View style={styles.bottomBar}>
         <Pressable
           style={styles.secondaryBtn}
-          onPress={() => {
-            // Go back to home
-            navigation.replace("MainTabs");
-          }}
+          onPress={() => navigation.replace("MainTabs")}
         >
           <Text style={styles.secondaryBtnText}>Về trang chủ</Text>
         </Pressable>
 
         <Pressable
-          style={styles.primaryBtn}
+          style={[styles.primaryBtn, { backgroundColor: color }]}
           onPress={() => {
-            // Retry payment - go back to payment method selection
-            navigation.replace("PaymentMethodScreen", { amount, orderId });
+            // Retry -> quay về chọn phương thức, giữ nguyên data
+            navigation.replace("PaymentMethodScreen", {
+              id: tourId,
+              total,
+              amountText,
+              orderId,
+            });
           }}
         >
           <Ionicons name="refresh" size={20} color={theme.colors.white} />
@@ -313,16 +291,18 @@ function DetailRow({
   icon,
   label,
   value,
+  iconColor,
   valueStyle,
 }: {
   icon: any;
   label: string;
   value: string;
+  iconColor: string;
   valueStyle?: any;
 }) {
   return (
     <View style={styles.detailRow}>
-      <Ionicons name={icon} size={20} color="#DC2626" />
+      <Ionicons name={icon} size={20} color={iconColor} />
       <View style={{ flex: 1 }}>
         <Text style={styles.detailLabel}>{label}</Text>
         <Text style={[styles.detailValue, valueStyle]}>{value}</Text>
@@ -338,12 +318,8 @@ function Divider() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.white },
 
-  content: {
-    padding: theme.spacing.lg,
-    alignItems: "center",
-  },
+  content: { padding: theme.spacing.lg, alignItems: "center" },
 
-  // Error Icon
   iconContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -354,7 +330,6 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: "#DC2626",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -369,15 +344,11 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 75,
     borderWidth: 3,
-    borderColor: "#DC2626",
     opacity: 0.3,
   },
 
-  contentWrapper: {
-    width: "100%",
-  },
+  contentWrapper: { width: "100%" },
 
-  // Title
   title: {
     fontSize: 28,
     fontWeight: "800",
@@ -393,7 +364,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // Details Card
   detailsCard: {
     backgroundColor: theme.colors.white,
     borderRadius: theme.radius.lg,
@@ -419,18 +389,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 2,
   },
-  errorText: {
-    color: "#DC2626",
-  },
+  errorText: { fontWeight: "800" },
   divider: {
     height: 1,
     backgroundColor: theme.colors.border,
     marginVertical: theme.spacing.sm,
   },
 
-  // Solutions
   solutionsCard: {
-    backgroundColor: "#FEF2F2",
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.lg,
@@ -467,26 +433,21 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Warning Box
   warningBox: {
     flexDirection: "row",
     gap: theme.spacing.sm,
     padding: theme.spacing.md,
-    backgroundColor: "#FEF2F2",
     borderRadius: theme.radius.lg,
     alignItems: "flex-start",
     marginBottom: theme.spacing.lg,
     borderWidth: 1,
-    borderColor: "#FEE2E2",
   },
   warningText: {
     flex: 1,
     fontSize: theme.fontSize.sm,
-    color: "#991B1B",
     lineHeight: 20,
   },
 
-  // Support Card
   supportCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -516,7 +477,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Bottom Bar
   bottomBar: {
     position: "absolute",
     left: 0,
@@ -533,7 +493,6 @@ const styles = StyleSheet.create({
     flex: 2,
     height: 54,
     borderRadius: theme.radius.lg,
-    backgroundColor: "#DC2626",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
