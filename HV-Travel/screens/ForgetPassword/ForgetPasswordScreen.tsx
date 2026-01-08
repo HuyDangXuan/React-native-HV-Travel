@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Image,
@@ -13,22 +13,58 @@ import AppButton from "../../components/Button";
 import { useNavigation } from "@react-navigation/native";
 import LoadingOverlay from "../Loading/LoadingOverlay";
 import { AuthService } from "../../services/AuthService";
-import theme from "../../config/theme";
+import { forgotPasswordSchema } from "../../validators/authSchema";
 import { MessageBoxService } from "../MessageBox/MessageBoxService";
+import theme from "../../config/theme";
+
+interface FormErrors {
+  email?: string;
+}
 
 export default function ForgetPasswordScreen() {
   const [email, setEmail] = useState("");
-  const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const navigation = useNavigation<any>();
 
-  const handleSendEmail = useCallback(async () => {
-    if (!email.trim()) {
-      MessageBoxService.error("Lỗi", "Vui lòng nhập email!", "OK");
-      return;
+  const validateField = (fieldName: keyof FormErrors) => {
+    const { error } = forgotPasswordSchema.validate(
+      { email },
+      { abortEarly: true }
+    );
+
+    const fieldError = error?.details.find((e) => e.path[0] === fieldName);
+
+    setErrors((prev) => ({
+      ...prev,
+      [fieldName]: fieldError?.message,
+    }));
+  };
+
+  const validateForm = (): boolean => {
+    const { error } = forgotPasswordSchema.validate(
+      { email },
+      { abortEarly: false }
+    );
+
+    if (error) {
+      const newErrors: FormErrors = {};
+      error.details.forEach((detail) => {
+        const field = detail.path[0] as keyof FormErrors;
+        if (!newErrors[field]) {
+          newErrors[field] = detail.message;
+        }
+      });
+      setErrors(newErrors);
+      return false;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      MessageBoxService.error("Lỗi", "Email không hợp lệ!", "OK");
+
+    setErrors({});
+    return true;
+  };
+
+  const handleSendEmail = async () => {
+    if (!validateForm()) {
       return;
     }
 
@@ -39,15 +75,36 @@ export default function ForgetPasswordScreen() {
       const res = await AuthService.forgotPassword(email);
       if (res.status === true) {
         const otpId = res.otpId;
-        navigation.navigate("CodeVerificationScreen", { otpId });
+        navigation.navigate("CodeVerificationScreen", { email, otpId });
       }
     } catch (error: any) {
-      console.log("Forgot password error: ", error);
-      MessageBoxService.error("Lỗi", "Không thể gửi email. Vui lòng thử lại.", "OK");
+      if (error.status === 404) {
+        setErrors({
+          email: error.message || "Email không tồn tại trong hệ thống!",
+        });
+      } else if (error.message === "Request failed") {
+        MessageBoxService.error(
+          "Lỗi kết nối",
+          "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.",
+          "OK"
+        );
+      } else if (error.message === "Request timeout") {
+        MessageBoxService.error(
+          "Hết thời gian chờ",
+          "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.",
+          "OK"
+        );
+      } else {
+        MessageBoxService.error(
+          "Lỗi",
+          error.message || "Đã xảy ra lỗi. Vui lòng thử lại sau.",
+          "OK"
+        );
+      }
     } finally {
       setLoading(false);
     }
-  }, [email, navigation]);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,7 +115,10 @@ export default function ForgetPasswordScreen() {
         automaticallyAdjustKeyboardInsets
         contentInsetAdjustmentBehavior="automatic"
       >
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
           <Image source={theme.icon.back} style={styles.backIcon} />
         </TouchableOpacity>
 
@@ -70,15 +130,17 @@ export default function ForgetPasswordScreen() {
         <AppInput
           placeholder="Email"
           value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoComplete="email"
-          textContentType="emailAddress"
-          autoCapitalize="none"
-          autoCorrect={false}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (errors.email) {
+              setErrors((prev) => ({ ...prev, email: undefined }));
+            }
+          }}
+          onBlur={() => validateField("email")}
+          error={errors.email}
         />
 
-        <AppButton title="Gửi Email" onPress={handleSendEmail} />
+        <AppButton title="Gửi mã xác nhận" onPress={handleSendEmail} />
 
         <LoadingOverlay visible={loading} />
       </ScrollView>
@@ -88,14 +150,12 @@ export default function ForgetPasswordScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.white },
-
   container: {
     flexGrow: 1,
     padding: theme.spacing.lg,
     paddingTop: theme.spacing.xl,
     justifyContent: "flex-start",
   },
-
   backButton: {
     position: "absolute",
     top: 10,
@@ -107,7 +167,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
   },
-
   title: {
     fontSize: theme.fontSize.xl,
     fontWeight: "bold",
