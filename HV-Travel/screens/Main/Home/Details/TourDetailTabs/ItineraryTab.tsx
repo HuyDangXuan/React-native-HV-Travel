@@ -3,7 +3,17 @@ import { View, Text, StyleSheet } from "react-native";
 import theme from "../../../../../config/theme";
 
 type Tour = {
-  schedules?: { title?: string; description?: string; day?: number; activities?: { time?: string; desc?: string }[] }[];
+  // ✅ NEW: backend trả itinerary theo format vừa tạo
+  itinerary?: { day?: number; title?: string; description?: string }[];
+
+  // ✅ OLD: backend cũ schedules (giữ lại để không break)
+  schedules?: {
+    title?: string;
+    description?: string;
+    day?: number;
+    activities?: { time?: string; desc?: string }[];
+  }[];
+
   time?: string;
   description?: string;
 };
@@ -11,18 +21,31 @@ type Tour = {
 type ItineraryDay = {
   day: number;
   title: string;
-  activities: { time: string; desc: string }[];
+  activities: { time?: string; desc: string }[];
 };
 
 export default function ItineraryTab({ tour }: { tour: Tour | null }) {
   const itinerary = useMemo<ItineraryDay[]>(() => {
     if (!tour) return [];
 
-    // ✅ Case 1: backend có schedules dạng đơn giản: [{title, description}]
-    // -> convert thành "Ngày 1..n" mỗi item là 1 ngày, activity 1 dòng
+    // ✅ Case 0 (NEW): backend có itinerary: [{day,title,description}]
+    // -> convert thành mỗi ngày 1 activity (desc = description)
+    if (Array.isArray(tour.itinerary) && tour.itinerary.length > 0) {
+      return tour.itinerary.map((d, idx) => ({
+        day: d.day ?? idx + 1,
+        title: d.title || `Lịch trình ngày ${idx + 1}`,
+        activities: [
+          {
+            desc: d.description || "Chưa có mô tả lịch trình.",
+          },
+        ],
+      }));
+    }
+
+    // ✅ Case 1 (OLD): backend có schedules dạng đơn giản: [{title, description}] hoặc có activities
     if (Array.isArray(tour.schedules) && tour.schedules.length > 0) {
       return tour.schedules.map((s, idx) => {
-        // ✅ nếu backend sau này trả s.activities thì ưu tiên hiển thị chi tiết
+        // ✅ nếu backend trả s.activities thì ưu tiên hiển thị chi tiết
         if (Array.isArray(s.activities) && s.activities.length > 0) {
           return {
             day: s.day ?? idx + 1,
@@ -47,8 +70,7 @@ export default function ItineraryTab({ tour }: { tour: Tour | null }) {
       });
     }
 
-    // ❗ Case 2: chưa có schedules trong DB -> fallback nhẹ
-    // Có thể hiện 1 ngày tổng quan từ description + time
+    // ❗ Fallback: chưa có itinerary/schedules -> hiện tổng quan từ description + time
     const fallbackDesc =
       tour.description || "Hiện tour chưa cập nhật lịch trình chi tiết.";
     return [
@@ -118,7 +140,9 @@ function DayCard({
             </View>
 
             <View style={styles.activityContent}>
-              <Text style={styles.activityTime}>{activity.time}</Text>
+              {activity.time ? (
+                <Text style={styles.activityTime}>{activity.time}</Text>
+              ) : null}
               <Text style={styles.activityDesc}>{activity.desc}</Text>
             </View>
           </View>
