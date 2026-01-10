@@ -14,6 +14,14 @@ export class AuthService {
     });
   };
 
+  static logout = async (token: string) => {
+    console.log("api logout:", api.logout);
+    return ApiService.fetchWithTimeout(`${api.logout}`, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token },
+    });
+  }
+
   static register = async (fullname: string, email: string, password: string, repassword: string) => {
     return ApiService.fetchWithTimeout(`${api.register}`, {
       method: "POST",
@@ -58,4 +66,11 @@ export class AuthService {
       body: JSON.stringify({ otpId, newPassword })
     });
   };
+
+  static authToken = async (token: string) => {
+    return ApiService.fetchWithTimeout(`${api.me}`, {
+      method: "GET",
+      headers: { "Authorization": "Bearer " + token },
+    });
+  }
 }

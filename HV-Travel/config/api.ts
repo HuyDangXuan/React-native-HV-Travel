@@ -1,9 +1,11 @@
 const base_url = "https://hv-travel-api.vercel.app/api";
-// const base_url = "http://192.168.0.101:3000/api";
+//const base_url = "http://192.168.239.22:3000/api";
 
 const api = {
     check_connect_db: base_url + "/test",
     login: base_url + "/auth/login",
+    me: base_url + "/auth/me",
+    logout: base_url + "/auth/logout",
     register: base_url + "/auth/register",
     forgot_password: base_url + "/auth/forgot-password",
     verify_otp: base_url + "/auth/verify-otp",

@@ -11,6 +11,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../config/theme";
 import { useNavigation } from "@react-navigation/native";
+import { AuthService } from "../../../services/AuthService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useUser } from "../../../context/UserContext";
+import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 
 type RowItem = {
   id: string;
@@ -28,7 +32,19 @@ type Section = {
 
 export default function SettingScreen() {
   const navigation = useNavigation<any>();
+  const {user} = useUser();
 
+  const handleLogout = async ()=> {
+    console.log("[SettingScreen] logout...");
+    const token = await AsyncStorage.getItem("token") || '';
+    await AsyncStorage.setItem("token", "");
+    try {
+      const res = await AuthService.logout(token);
+    }
+    catch (err: any){
+    }
+    navigation.replace("LoginScreen");
+  }
   const sections: Section[] = useMemo(
     () => [
       {
@@ -63,7 +79,16 @@ export default function SettingScreen() {
             label: "Đăng Xuất",
             icon: "log-out-outline",
             danger: true,
-            onPress: () => navigation.replace("LoginScreen"),
+            onPress: () => {
+              MessageBoxService.confirm({
+                  title: "Hệ thống",
+                  content: "Bạn có chắc muốn đăng xuất không?",
+                  confirmText: "Không",
+                  cancelText: "Có",
+                  onCancel: async() => {handleLogout()},
+              });
+              
+            },
           },
         ],
       },
@@ -80,8 +105,8 @@ export default function SettingScreen() {
           style={styles.avatar}
         />
         <View style={{ flex: 1 }}>
-          <Text style={styles.profileName}>Huy Đặng Xuân</Text>
-          <Text style={styles.profileEmail}>hv-travel@gmail.com</Text>
+          <Text style={styles.profileName}>{user?.fullName}</Text>
+          <Text style={styles.profileEmail}>{user?.email}</Text>
         </View>
       </View>
 
@@ -108,9 +133,9 @@ export default function SettingScreen() {
                       <Ionicons
                         name={row.icon}
                         size={22}
-                        color={row.danger ? theme.colors.danger : theme.colors.primary}
+                        color={row.danger ? theme.colors.error : theme.colors.primary}
                       />
-                      <Text style={[styles.label, row.danger && { color: theme.colors.danger }]}>
+                      <Text style={[styles.label, row.danger && { color: theme.colors.error }]}>
                         {row.label}
                       </Text>
                     </View>

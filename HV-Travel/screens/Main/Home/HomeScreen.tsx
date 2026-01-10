@@ -18,6 +18,7 @@ import theme from "../../../config/theme";
 import { TourService } from "../../../services/TourService";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
+import { useUser } from "../../../context/UserContext";
 
 const { width } = Dimensions.get("window");
 
@@ -92,6 +93,8 @@ export default function HomeScreen() {
 
   const [categories, setCategories] = useState<any[]>([]);
   const [tours, setTours] = useState<any[]>([]);
+
+  const {user} = useUser();
 
   const fetchHomeData = useCallback(async () => {
     setLoading(true);
@@ -170,7 +173,7 @@ export default function HomeScreen() {
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>Chào buổi tối</Text>
-            <Text style={styles.name}>Huy Đặng Xuân!</Text>
+            <Text style={styles.name}>{user?.fullName}</Text>
           </View>
 
           <Pressable style={styles.bellWrap} onPress={() => navigation.navigate("Notifications")}>

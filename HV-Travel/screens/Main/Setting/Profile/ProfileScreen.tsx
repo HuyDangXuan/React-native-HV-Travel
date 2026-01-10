@@ -11,6 +11,7 @@ import {
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import theme from "../../../../config/theme";
+import { useUser } from "../../../../context/UserContext";
 
 type InfoRowProps = {
   icon: any;
@@ -20,6 +21,7 @@ type InfoRowProps = {
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
+  const {user} = useUser();
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -53,8 +55,8 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <Text style={styles.name}>Huy Đặng Xuân</Text>
-          <Text style={styles.email}>hv-travel@gmail.com</Text>
+          <Text style={styles.name}>{user?.fullName}</Text>
+          <Text style={styles.email}>{user?.email}</Text>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -89,25 +91,25 @@ export default function ProfileScreen() {
             <InfoRow
               icon="call-outline"
               label="Số điện thoại"
-              value="+84 170 000 0000"
+              value={user?.phone || "Chưa cập nhật"}
             />
             <Divider />
             <InfoRow
               icon="person-outline"
               label="Giới tính"
-              value="Nam"
+              value={user?.gender || "Chưa cập nhật"}
             />
             <Divider />
             <InfoRow
               icon="calendar-outline"
               label="Ngày sinh"
-              value="01/01/1990"
+              value={user?.birthday || "Chưa cập nhật"}
             />
             <Divider />
             <InfoRow
               icon="location-outline"
               label="Địa chỉ"
-              value="Hà Nội, Việt Nam"
+              value={user?.address || "Chưa cập nhật"}
             />
           </View>
         </View>

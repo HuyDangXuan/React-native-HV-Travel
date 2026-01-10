@@ -6,11 +6,13 @@ import OnboardingDots from "../../components/Onboarding/OnboardingDots";
 import AppButton from "../../components/Button";
 import { useNavigation } from "@react-navigation/native";
 import theme from "../../config/theme";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function OnboardingScreen() {
   const [index, setIndex] = useState(0);
   const slide = onboardingData[index];
   const isLast = index === onboardingData.length - 1;
+  const ONBOARDING_KEY = "has_seen_onboarding";
 
   const navigation = useNavigation<any>();
 
@@ -19,7 +21,10 @@ export default function OnboardingScreen() {
       
       <TouchableOpacity
         style={styles.skip}
-        onPress={() => navigation.replace("LoginScreen")}
+        onPress={async() => {
+          await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+          navigation.replace("LoginScreen")
+        }}
       >
         <Text style={styles.skipText}>Bỏ qua</Text>
       </TouchableOpacity>
@@ -41,8 +46,9 @@ export default function OnboardingScreen() {
 
       <AppButton
         title={isLast ? "Bắt đầu" : "Tiếp theo"}
-        onPress={() => {
+        onPress={async () => {
           if (isLast) {
+            await AsyncStorage.setItem(ONBOARDING_KEY, "true");
             navigation.replace("LoginScreen");
           } else {
             setIndex(index + 1);
