@@ -28,26 +28,19 @@ import ProfileScreen from "./screens/Main/Setting/Profile/ProfileScreen";
 import EditProfileScreen from "./screens/Main/Setting/Profile/EditProfile/EditProfileScreen";
 import BankTransferScreen from "./screens/Main/Home/Payment/Method/BankTransferScreen";
 import CashPaymentScreen from "./screens/Main/Home/Payment/Method/CashPaymentScreen";
+import { UserProvider } from "./context/UserContext";
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
-
-  if (!isReady) {
-    return (
-      <MessageBoxProvider>
-        <MessageBoxBridge />
-        <SplashScreen onFinish={() => setIsReady(true)} />
-      </MessageBoxProvider>
-    );
-  }
 
   return (
     <MessageBoxProvider>
       <MessageBoxBridge />
+      <UserProvider>
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="SplashScreen" component={SplashScreen} />
           <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />
           <Stack.Screen name="LoginScreen" component={LoginScreen} options={{gestureEnabled: false}}/>
           <Stack.Screen name="SignUpScreen" component={SignUpScreen} options={{gestureEnabled: false}}/>
@@ -74,6 +67,7 @@ export default function App() {
           <Stack.Screen name="CashPaymentScreen" component={CashPaymentScreen} options={{gestureEnabled: false}} />
         </Stack.Navigator>
       </NavigationContainer>
+      </UserProvider>
     </MessageBoxProvider>
   );
 }

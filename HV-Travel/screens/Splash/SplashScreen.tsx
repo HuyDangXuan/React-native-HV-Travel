@@ -1,45 +1,73 @@
 import { View, Image, StyleSheet, BackHandler, Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect } from "react";
 import theme from "../../config/theme";
 import { MessageBoxService } from "../MessageBox/MessageBoxService";
-import { DatabaseService } from "../../services/DatabaseService";
+import { AuthService } from "../../services/AuthService";
+import { useNavigation } from "@react-navigation/native";
+import { onboardingData } from "../../data/onboardingData";
+import { useUser } from "../../context/UserContext";
+import { User } from "../../models/User";
 
 type Props = {
   onFinish: () => void;
 };
 
-export default function SplashScreen({ onFinish }: Props) {
-
-  const checkDB = async () => {
+export default function SplashScreen() {
+  const navigation = useNavigation<any>();
+  const { setUser } = useUser();
+  const authToken = async () => {
     try {
-      console.log("Checking database connection...");
-      const res = await DatabaseService.checkConnection();
-      if (res) {
-        console.log("Connect database successfully!");
-        onFinish();
-      } else {
-        console.log("Connect database failed!");
+      const token = await AsyncStorage.getItem("token");
+      console.log("[SplashScreen] token storage: " + token);
+      if (token) {
+        const res = await AuthService.authToken(token);
+        if (res) {
+          console.log("[SplashScreen] response api auth token: ", res);
+          const user: User = res.data;
+          setUser(user);
+          navigation.replace("MainTabs");
+          return;
+        } 
+      }
+      const ONBOARDING_VALUE = await AsyncStorage.getItem("has_seen_onboarding");
+      console.log("onboarding skip value storage: " + ONBOARDING_VALUE);
+      if (ONBOARDING_VALUE === "true"){
+        navigation.replace("LoginScreen");
+      }
+      else {
+        navigation.replace("OnboardingScreen");
+      }
+      
+    } catch (err: any) {
+      console.log("API error or timeout:", err);
+      if (err.status === 401)
+      {
         MessageBoxService.error(
-          "Kết nối đến Database thất bại!",
-          "Ứng dụng hiện tại không thể tải dữ liệu. Vui lòng kiểm tra kết nối internet hoặc thử lại sau.",
-          "Thử lại",
-          checkDB
+          "Lỗi",
+          err.message,
+          "OK",
+          async () => {
+            await AsyncStorage.setItem("token", "");
+            navigation.replace("LoginScreen")
+          }
         );
       }
-    } catch (err: unknown) {
-      console.log("API error or timeout:", err);
-      MessageBoxService.error(
-          "Kết nối đến Database thất bại!",
-          "Ứng dụng hiện tại không thể tải dữ liệu. Vui lòng kiểm tra kết nối internet hoặc thử lại sau.",
-          "Thử lại",
-          checkDB
+      else{
+        MessageBoxService.error(
+          "Lỗi",
+          err.message,
+          "OK",
+          authToken
         );
+      }
+      
     }
   };
 
   useEffect(() => {
     
-    checkDB();
+  authToken();
 
   }, []);
 

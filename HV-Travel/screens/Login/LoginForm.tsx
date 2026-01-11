@@ -4,21 +4,26 @@ import AppInput from "../../components/TextInput";
 import AppButton from "../../components/Button";
 import { useNavigation } from "@react-navigation/native";
 import { MessageBoxService } from "../MessageBox/MessageBoxService";
-import LoadingOverlay from "../Loading/LoadingOverlay";
 import { AuthService } from "../../services/AuthService";
 import { loginSchema } from "../../validators/authSchema";
+import { useUser } from "../../context/UserContext";
+import { User } from "../../models/User";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface FormErrors {
   email?: string;
   password?: string;
 }
 
+
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<FormErrors>({}); // ⭐ State cho errors
   const [loading, setLoading] = useState(false);
+
   const navigation = useNavigation<any>();
+  const { setUser } = useUser();
 
   // ⭐ Validate single field (gọi khi blur)
   const validateField = (fieldName: keyof FormErrors, value: string) => {
@@ -66,7 +71,6 @@ export default function LoginForm() {
     }
 
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 50));
 
     try {
       const res = await AuthService.login(email, password);
@@ -75,6 +79,9 @@ export default function LoginForm() {
       if (res.status === true) {
         navigation.replace("MainTabs");
         console.log("Login Successfully!");
+        const user: User = res.data.user;
+        setUser(user);
+        await AsyncStorage.setItem("token", res.data.token);
       }
     } catch (error: any) {
       console.log("Login error: ", error);
@@ -141,9 +148,7 @@ export default function LoginForm() {
         isPassword
       />
 
-      <AppButton title="Đăng nhập" onPress={handleLogin} />
-
-      <LoadingOverlay visible={loading} />
+      <AppButton title="Đăng nhập" onPress={handleLogin} loading={loading} />
     </View>
   );
 }

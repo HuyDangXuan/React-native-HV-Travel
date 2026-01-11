@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
   },
   btnCancel: {
-    backgroundColor: theme.colors.danger,
+    backgroundColor: theme.colors.error,
   },
   txt: {
     fontSize: theme.fontSize.md,
