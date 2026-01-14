@@ -13,12 +13,13 @@ import {
   FlatList,
 } from "react-native";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import theme from "../../../config/theme";
 import { TourService } from "../../../services/TourService";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { useUser } from "../../../context/UserContext";
+import pickRandom from "../../../utils/PickRandom";
 
 const { width } = Dimensions.get("window");
 
@@ -29,37 +30,6 @@ type SpecialItem = {
   desc: string;
   icon: "shield-check" | "cash-multiple" | "headset";
 };
-
-const KNOW: MiniPlace[] = [
-  {
-    id: "k1",
-    title: "Dubai",
-    subtitle: "Thành phố ở Ả Rập Xê Út",
-    image:
-      "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1200&q=80&auto=format&fit=crop",
-  },
-  {
-    id: "k2",
-    title: "Bangkok",
-    subtitle: "Thủ đô của Thailand",
-    image:
-      "https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=1200&q=80&auto=format&fit=crop",
-  },
-  {
-    id: "k3",
-    title: "Sikkim",
-    subtitle: "Một bang của Ấn Độ",
-    image:
-      "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80&auto=format&fit=crop",
-  },
-  {
-    id: "k4",
-    title: "Singapore",
-    subtitle: "Quốc gia ở Châu Á",
-    image:
-      "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?w=1200&q=80&auto=format&fit=crop",
-  },
-];
 
 const SPECIAL: SpecialItem[] = [
   {
@@ -93,22 +63,29 @@ export default function HomeScreen() {
 
   const [categories, setCategories] = useState<any[]>([]);
   const [tours, setTours] = useState<any[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
+  const [citiesShow, setCitiesShow] = useState<any[]>([]);
 
   const {user} = useUser();
 
   const fetchHomeData = useCallback(async () => {
     setLoading(true);
     try {
-      const [catRes, tourRes] = await Promise.all([
+      const [catRes, tourRes, cityRes] = await Promise.all([
         TourService.getCategories(),
         TourService.getTours(),
+        TourService.getCities(),
       ]);
 
       const catList = Array.isArray(catRes) ? catRes : catRes?.data ?? [];
       const tourList = Array.isArray(tourRes) ? tourRes : tourRes?.data ?? [];
+      const cityList = Array.isArray(cityRes) ? cityRes : cityRes?.data ?? [];
 
       setCategories(catList);
       setTours(tourList);
+      setCities(cityList);
+      setCitiesShow(pickRandom(cityList, 4));
+
     } catch (e: any) {
       console.log("Fetch home error:", e);
       MessageBoxService.error("Lỗi", e?.message || "Không lấy được dữ liệu.", "OK");
@@ -116,6 +93,18 @@ export default function HomeScreen() {
       setLoading(false);
     }
   }, []);
+
+  useFocusEffect(
+  useCallback(() => {
+      // Nếu đã có data rồi thì chỉ random lại (đỡ gọi API)
+      if (cities.length) {
+        setCitiesShow(pickRandom(cities, 4));
+        return;
+      }
+      // lần đầu vào screen thì fetch
+      fetchHomeData();
+    }, [cities, fetchHomeData])
+  );
 
   useEffect(() => {
     fetchHomeData();
@@ -324,20 +313,36 @@ export default function HomeScreen() {
         <Text style={styles.sectionSub}>Mở rộng tầm hiểu biết thế giới của bạn!</Text>
 
         <View style={styles.knowGrid}>
-          {KNOW.map((k) => (
-            <Pressable
-              key={k.id}
-              style={styles.knowItem}
-              onPress={() => navigation.navigate("Explore", { location: k.title })}
-            >
-              <Image source={{ uri: k.image }} style={styles.knowImg} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.knowTitle}>{k.title}</Text>
-                <Text style={styles.knowSub}>{k.subtitle}</Text>
-              </View>
-            </Pressable>
-          ))}
+          {citiesShow?.length ? (
+            citiesShow.map((c, idx) => (
+              <Pressable
+                key={c?._id || String(idx)}
+                style={styles.knowItem}
+                onPress={() =>
+                  navigation.navigate("Explore", {
+                    location: (c?.name || "").trim(),
+                    cityId: c?._id,
+                  })
+                }
+              >
+                <Image source={{ uri: c?.image }} style={styles.knowImg} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.knowTitle} numberOfLines={1}>
+                    {(c?.name || "Unknown").trim()}
+                  </Text>
+                  <Text style={styles.knowSub} numberOfLines={1}>
+                    Chạm để khám phá tour
+                  </Text>
+                </View>
+              </Pressable>
+            ))
+          ) : (
+            <Text style={[styles.emptyText, { paddingHorizontal: theme.spacing.md }]}>
+              Chưa có thành phố
+            </Text>
+          )}
         </View>
+
 
         {/* App Special */}
         <SectionHeader title="Tại sao chọn chúng tôi?" />

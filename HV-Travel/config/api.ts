@@ -13,7 +13,7 @@ const api = {
     change_password: base_url + "/auth/change-password",
     get_list_tours: base_url + "/tours/list",
     get_tour_detail: (id: string) => `${base_url}/tours/${id}`,
-    get_list_cities: base_url + "/cities",
+    get_list_cities: base_url + "/cities/list",
     get_list_categories: base_url + "/categories/list",
 }
 
