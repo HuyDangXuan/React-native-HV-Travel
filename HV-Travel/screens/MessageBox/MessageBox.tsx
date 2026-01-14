@@ -9,7 +9,7 @@ import {
 import LottieView from 'lottie-react-native';
 import theme from '../../config/theme';
 
-export type MessageBoxType = 'success' | 'error' | 'question' | 'warning' | 'info';
+export type MessageBoxType = 'success' | 'error' | 'question' | 'warning' | 'info' | 'animationlogo';
 
 interface MessageBoxProps {
   visible: boolean;
@@ -34,6 +34,7 @@ const animationMap: Record<MessageBoxType, any> = {
   question: theme.animation.question,
   warning: theme.animation.warning,
   info: theme.animation.info,
+  animationlogo: theme.animation.animationlogo,
 };
 
 
