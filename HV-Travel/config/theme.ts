@@ -48,6 +48,7 @@ const theme = {
     question: require('../assets/animations/question.json'),
     info: require('../assets/animations/warning.json'),
     loading: require('../assets/animations/loading.json'),
+    animationlogo: require('../assets/animations/AnimationLogo.json')
   },
 
   animationColor: {
