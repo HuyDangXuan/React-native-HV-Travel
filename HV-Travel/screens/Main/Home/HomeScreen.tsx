@@ -23,7 +23,6 @@ import pickRandom from "../../../utils/PickRandom";
 
 const { width } = Dimensions.get("window");
 
-type MiniPlace = { id: string; title: string; subtitle: string; image: string };
 type SpecialItem = {
   id: string;
   title: string;
@@ -255,9 +254,7 @@ export default function HomeScreen() {
                 <Image
                   source={{
                     uri:
-                      tour?.thumbnail_url ||
-                      tour?.images?.[0] ||
-                      "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&q=80&auto=format&fit=crop",
+                      tour?.thumbnail_url
                   }}
                   style={styles.tourImage}
                   resizeMode="cover"
@@ -306,7 +303,6 @@ export default function HomeScreen() {
             )}
           />
         )}
-
 
         {/* Know Your World */}
         <SectionHeader title="Khám phá thêm" />

@@ -16,6 +16,9 @@ const api = {
     get_list_cities: base_url + "/cities/list",
     get_city_detail: (id: string) => `${base_url}/cities/${id}`,
     get_list_categories: base_url + "/categories/list",
+    get_list_favourites: base_url + "/favourites/list",
+    delete_favourite_by_tour: (tourId: string) => `${base_url}/favourites/tour/${tourId}`,
+
 }
 
 export default api;
