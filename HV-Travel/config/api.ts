@@ -18,7 +18,7 @@ const api = {
     get_list_categories: base_url + "/categories/list",
     get_list_favourites: base_url + "/favourites/list",
     delete_favourite_by_tour: (tourId: string) => `${base_url}/favourites/tour/${tourId}`,
-
+    add_favourite_by_tour: (tourId: string) => `${base_url}/favourites/tour/${tourId}`,
 }
 
 export default api;
