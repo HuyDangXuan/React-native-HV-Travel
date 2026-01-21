@@ -16,6 +16,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { FavouriteService } from "../../../services/FavouriteService";
+import { TourService } from "../../../services/TourService";
 
 type FavouriteTour = {
   favouriteId: string;   // id document favourite
@@ -36,94 +37,113 @@ type FavouriteTour = {
   category?: string;
 };
 
-
 export default function FavouriteScreen() {
   const navigation = useNavigation<any>();
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [favourites, setFavourites] = useState<FavouriteTour[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const categories = [
-    { id: "all", label: "Tất cả", icon: "apps" },
-    { id: "beach", label: "Biển", icon: "beach" },
-    { id: "mountain", label: "Núi", icon: "terrain" },
-    { id: "city", label: "Thành phố", icon: "location-city" },
-    { id: "resort", label: "Resort", icon: "hotel" },
-  ];
+  const [cities, setCities] = useState<any[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+
+  const [showFilters, setShowFilters] = useState(false);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const catRes = await TourService.getCategories();
+      const catList = Array.isArray(catRes) ? catRes : catRes?.data ?? [];
+      setCategories(catList);
+    } catch (error) {
+      console.error("Fetch categories error:", error);
+    }
+  }, []);
 
   const fetchFavourites = useCallback(async () => {
-  setLoading(true);
-  try {
-    const res = await FavouriteService.getFavourites();
+    setLoading(true);
+    try {
+      const res = await FavouriteService.getFavourites();
 
-    // backend: { status: true, data: [...] }
-    const list: any[] = res?.data ?? [];
+      // backend: { status: true, data: [...] }
+      const list: any[] = res?.data ?? [];
 
-    const mapped: FavouriteTour[] = list.map((f) => {
-      const adultPrice = f?.price?.adult ?? 0;
-      const adultNew = f?.newPrice?.adult;
+      const mapped: FavouriteTour[] = list.map((f) => {
+        const adultPrice = f?.price?.adult ?? 0;
+        const adultNew = f?.newPrice?.adult;
 
-      const oldPrice =
-        typeof adultNew === "number" && adultNew < adultPrice
-          ? { adult: adultPrice }
-          : undefined;
+        const oldPrice =
+          typeof adultNew === "number" && adultNew < adultPrice
+            ? { adult: adultPrice }
+            : undefined;
 
-      const discount =
-        typeof adultNew === "number" && adultNew < adultPrice && adultPrice > 0
-          ? Math.round(((adultPrice - adultNew) / adultPrice) * 100)
-          : undefined;
+        const discount =
+          typeof adultNew === "number" && adultNew < adultPrice && adultPrice > 0
+            ? Math.round(((adultPrice - adultNew) / adultPrice) * 100)
+            : undefined;
 
-      return {
-        favouriteId: String(f._id),     // ✅ favouriteId
-        tourId: String(f.tour),         // ✅ tourId thật
-        cityId: f.city ? String(f.city) : undefined,
+        return {
+          favouriteId: String(f._id),     // ✅ favouriteId
+          tourId: String(f.tour),         // ✅ tourId thật
+          cityId: f.city ? String(f.city) : undefined,
 
-        name: f.name,
-        time: f.time,
-        vehicle: f.vehicle,
+          name: f.name,
+          time: f.time,
+          vehicle: f.vehicle,
 
-        price: f.price ?? { adult: 0 },
-        newPrice: f.newPrice,
+          price: f.price ?? { adult: 0 },
+          newPrice: f.newPrice,
 
-        thumbnail_url: f.thumbnail_url,
+          thumbnail_url: f.thumbnail_url,
 
-        oldPrice,
-        discount,
+          oldPrice,
+          discount,
 
-        rating: f.rating ?? 0,
-        location: f.location,
-        category: f.category,
-      };
-    });
+          rating: f.rating ?? 0,
+          location: f.location,
+          category: f.category,
+        };
+      });
 
+      setFavourites(mapped);
+    } catch (error: any) {
+      console.error("Fetch favourites error:", error);
+      MessageBoxService.error(
+        "Lỗi",
+        error?.message || "Không thể tải danh sách yêu thích",
+        "OK"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    setFavourites(mapped);
-  } catch (error: any) {
-    console.error("Fetch favourites error:", error);
-    MessageBoxService.error(
-      "Lỗi",
-      error?.message || "Không thể tải danh sách yêu thích",
-      "OK"
-    );
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  const fetchCities = useCallback(async () => {
+    try {
+      const cityRes = await TourService.getCities();
+      const cityList = Array.isArray(cityRes) ? cityRes : cityRes?.data ?? [];
+      setCities(cityList);
+    } catch (error) {
+      console.error("Fetch cities error:", error);
+    }
+  }, []);
 
 
   useFocusEffect(
     useCallback(() => {
+      fetchCategories();
+      fetchCities();       // ✅ add
       fetchFavourites();
-    }, [fetchFavourites])
+    }, [fetchCategories, fetchCities, fetchFavourites])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchFavourites();
+    await Promise.all([fetchCategories(), fetchCities(), fetchFavourites()]); // ✅ add fetchCities
     setRefreshing(false);
-  }, [fetchFavourites]);
+  }, [fetchCategories, fetchCities, fetchFavourites]);
+
 
   const handleRemoveFavourite = useCallback((tourId: string) => {
     MessageBoxService.confirm({
@@ -132,18 +152,36 @@ export default function FavouriteScreen() {
       confirmText: "Xóa",
       cancelText: "Hủy",
       onConfirm: async () => {
-        await FavouriteService.deleteByTourId(tourId);
-        setFavourites((prev) => prev.filter((f) => f.tourId !== tourId));
-        MessageBoxService.success("Thành công", "Đã xóa khỏi danh sách yêu thích", "OK");
+        try {
+          await FavouriteService.deleteByTourId(tourId);
+          setFavourites((prev) => prev.filter((f) => f.tourId !== tourId));
+          MessageBoxService.success("Thành công", "Đã xóa khỏi danh sách yêu thích", "OK");
+        } catch (error: any) {
+          MessageBoxService.error("Lỗi", error?.message || "Không thể xóa", "OK");
+        }
       },
     });
   }, []);
 
+  const selectedCityObj = cities.find((c) => String(c?._id) === String(selectedCity));
+  const selectedCityName = (selectedCityObj?.name || "").trim().toLowerCase();
 
   const filteredFavourites = favourites.filter((fav) => {
-    if (selectedCategory === "all") return true;
-    return fav.category === selectedCategory;
+    // category filter
+    const okCategory = !selectedCategory || String(fav.category) === String(selectedCategory);
+
+    // city filter (ưu tiên cityId, fallback bằng location)
+    const favCityId = fav.cityId ? String(fav.cityId) : "";
+    const favLocation = (fav.location || "").trim().toLowerCase();
+
+    const okCity =
+      !selectedCity ||
+      favCityId === String(selectedCity) ||
+      (!!selectedCityName && (favLocation === selectedCityName || favLocation.includes(selectedCityName)));
+
+    return okCategory && okCity;
   });
+
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -172,7 +210,7 @@ export default function FavouriteScreen() {
     </View>
   );
 
-  const renderTourCard = ({ item }: { item: FavouriteTour; index: number }) => (
+  const renderTourCard = ({ item }: { item: FavouriteTour }) => (
     <Pressable
       style={styles.tourCard}
       onPress={() => navigation.navigate("TourDetailScreen", { id: item.tourId })}
@@ -276,53 +314,110 @@ export default function FavouriteScreen() {
         </View>
 
         {favourites.length > 0 && (
-          <Pressable style={styles.sortButton}>
-            <MaterialCommunityIcons
-              name="sort-variant"
-              size={20}
-              color={theme.colors.text}
-            />
+          <Pressable
+            style={styles.sortButton}
+            onPress={() => setShowFilters((prev) => !prev)}
+          >
+            <View style={{ position: "relative" }}>
+              <MaterialCommunityIcons
+                name={showFilters ? "filter-off-outline" : "filter-outline"}
+                size={20}
+                color={theme.colors.text}
+              />
+              {(selectedCategory || selectedCity) && (
+                <View style={styles.filterDot} />
+              )}
+            </View>
           </Pressable>
         )}
       </View>
 
-      {/* Category Filter */}
-      {favourites.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContainer}
-        >
-          {categories.map((cat) => (
-            <Pressable
-              key={cat.id}
-              style={[
-                styles.categoryChip,
-                selectedCategory === cat.id && styles.categoryChipActive,
-              ]}
-              onPress={() => setSelectedCategory(cat.id)}
-            >
-              <MaterialCommunityIcons
-                name={cat.icon as any}
-                size={18}
-                color={
-                  selectedCategory === cat.id
-                    ? theme.colors.white
-                    : theme.colors.text
-                }
-              />
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === cat.id && styles.categoryTextActive,
-                ]}
-              >
-                {cat.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+      {favourites.length > 0 && showFilters && (
+        <>
+          {/* Label: Category */}
+          {categories.length > 0 && (
+            <View style={styles.filterLabelRow}>
+              <Text style={styles.filterLabel}>Danh mục</Text>
+            </View>
+          )}
+
+          {/* Category chips */}
+          {categories.length > 0 && (
+            <FlatList
+              style={{ flexGrow: 0 }}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={categories}
+              keyExtractor={(item) => item?._id?.toString()}
+              contentContainerStyle={styles.categoriesContainer}
+              ItemSeparatorComponent={() => <View style={{ width: theme.spacing.sm }} />}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory === item._id && styles.categoryChipActive,
+                  ]}
+                  onPress={() =>
+                    setSelectedCategory(selectedCategory === item._id ? null : item._id)
+                  }
+                >
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={[
+                      styles.categoryText,
+                      selectedCategory === item._id && styles.categoryTextActive,
+                    ]}
+                  >
+                    {item?.name || "Unknown"}
+                  </Text>
+                </Pressable>
+              )}
+            />
+          )}
+
+          {/* Label: City */}
+          {cities.length > 0 && (
+            <View style={styles.filterLabelRow}>
+              <Text style={styles.filterLabel}>Thành phố</Text>
+            </View>
+          )}
+
+          {/* City chips */}
+          {cities.length > 0 && (
+            <FlatList
+              style={{ flexGrow: 0 }}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={cities}
+              keyExtractor={(item) => item?._id?.toString()}
+              contentContainerStyle={styles.categoriesContainer}
+              ItemSeparatorComponent={() => <View style={{ width: theme.spacing.sm }} />}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[
+                    styles.categoryChip,
+                    selectedCity === item._id && styles.categoryChipActive,
+                  ]}
+                  onPress={() => setSelectedCity(selectedCity === item._id ? null : item._id)}
+                >
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={[
+                      styles.categoryText,
+                      selectedCity === item._id && styles.categoryTextActive,
+                    ]}
+                  >
+                    {item?.name || "Unknown"}
+                  </Text>
+                </Pressable>
+              )}
+            />
+          )}
+        </>
       )}
+
 
       {/* Tours List */}
       {favourites.length === 0 ? (
@@ -414,23 +509,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
+  filterLabelRow: {
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+  },
+  filterLabel: {
+    fontSize: theme.fontSize.md,
+    fontWeight: "800",
+    color: theme.colors.text,
+  },
   // Categories
+  // Categories (FavouriteScreen) - giống HomeScreen + fix phình
   categoriesContainer: {
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,   // ✅ giống HomeScreen (xs)
+    alignItems: "center",               // ✅ chống stretch
   },
   categoryChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.lg,
+    height: 32,                         // ✅ khóa chiều cao chip
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "flex-start",
   },
   categoryChipActive: {
     backgroundColor: theme.colors.primary,
@@ -439,12 +543,20 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: theme.fontSize.sm,
     fontWeight: "700",
-    color: theme.colors.text,
+    color: "#111827",
   },
   categoryTextActive: {
     color: theme.colors.white,
   },
-
+  filterDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.error,
+  },
   // List
   scrollContent: {
     flexGrow: 1,

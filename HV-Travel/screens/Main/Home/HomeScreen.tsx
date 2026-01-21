@@ -24,6 +24,25 @@ import { FavouriteService } from "../../../services/FavouriteService";
 
 const { width } = Dimensions.get("window");
 
+type TourCard = {
+  _id: string;
+  name: string;
+  rating?: number;
+
+  price: { adult: number };
+  newPrice?: { adult: number };
+
+  oldPrice?: { adult: number };
+  discount?: number;
+
+  thumbnail_url: string;
+  time: string;
+  vehicle: string;
+
+  category?: string;
+  city?: string;
+};
+
 type SpecialItem = {
   id: string;
   title: string;
@@ -62,7 +81,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
 
   const [categories, setCategories] = useState<any[]>([]);
-  const [tours, setTours] = useState<any[]>([]);
+  const [tours, setTours] = useState<TourCard[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [citiesShow, setCitiesShow] = useState<any[]>([]);
 
@@ -82,10 +101,36 @@ export default function HomeScreen() {
 
       const catList = Array.isArray(catRes) ? catRes : catRes?.data ?? [];
       const tourList = Array.isArray(tourRes) ? tourRes : tourRes?.data ?? [];
+
+      const mappedTours: TourCard[] = tourList.map((t: any) => {
+        const adultPrice = t?.price?.adult ?? 0;
+        const adultNew = t?.newPrice?.adult;
+
+        const oldPrice =
+          typeof adultNew === "number" && adultNew < adultPrice
+            ? { adult: adultPrice }
+            : undefined;
+
+        const discount =
+          typeof adultNew === "number" && adultNew < adultPrice && adultPrice > 0
+            ? Math.round(((adultPrice - adultNew) / adultPrice) * 100)
+            : undefined;
+
+        return {
+          ...t,
+          _id: String(t?._id),
+          price: t?.price ?? { adult: 0 },
+          newPrice: t?.newPrice,
+          oldPrice,
+          discount,
+        };
+      });
+
+      setTours(mappedTours);
+
       const cityList = Array.isArray(cityRes) ? cityRes : cityRes?.data ?? [];
 
       setCategories(catList);
-      setTours(tourList);
       setCities(cityList);
       setCitiesShow(pickRandom(cityList, 4));
 
@@ -323,11 +368,11 @@ export default function HomeScreen() {
                   resizeMode="cover"
                 />
 
-                {/* Heart button */}
+                {/* Heart button - LEFT */}
                 <Pressable
                   style={[styles.favouriteButton, favBusy.has(String(tour._id)) && { opacity: 0.6 }]}
                   onPress={(e) => {
-                    e.stopPropagation(); // ✅ không trigger mở TourDetail
+                    e.stopPropagation();
                     toggleFavourite(String(tour._id));
                   }}
                   disabled={favBusy.has(String(tour._id))}
@@ -335,16 +380,17 @@ export default function HomeScreen() {
                   <Ionicons
                     name={favTourIds.has(String(tour._id)) ? "heart" : "heart-outline"}
                     size={20}
-                    color={theme.colors.error} // ✅ outline đỏ + tim đỏ
+                    color={theme.colors.error}
                   />
                 </Pressable>
 
-                {/* Discount Badge */}
-                {tour?.discount > 0 && (
+                {/* Discount Badge - RIGHT */}
+                {(tour.discount ?? 0) > 0 && (
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountText}>-{tour.discount}%</Text>
                   </View>
                 )}
+
 
                 <View style={styles.tourContent}>
                   <Text style={styles.tourName} numberOfLines={2}>
@@ -364,11 +410,11 @@ export default function HomeScreen() {
 
                   <View style={styles.tourFooter}>
                     <View>
-                      {tour?.oldPrice?.adult && (
+                      {tour?.oldPrice?.adult ? (
                         <Text style={styles.oldPrice}>{formatPrice(tour.oldPrice.adult)}</Text>
-                      )}
+                      ) : null}
                       <Text style={styles.newPrice}>
-                        {formatPrice(tour?.newPrice?.adult || tour?.price?.adult || 0)}
+                        {formatPrice(tour?.newPrice?.adult ?? tour?.price?.adult ?? 0)}
                       </Text>
                     </View>
 
@@ -495,7 +541,7 @@ const styles = StyleSheet.create({
   favouriteButton: {
     position: "absolute",
     top: theme.spacing.sm,
-    left: theme.spacing.sm, // hoặc right tuỳ bạn
+    right: theme.spacing.sm,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -507,6 +553,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
+    zIndex: 20,
   },
   searchBox: {
     marginHorizontal: theme.spacing.md,
@@ -604,11 +651,13 @@ const styles = StyleSheet.create({
   discountBadge: {
     position: "absolute",
     top: theme.spacing.sm,
-    right: theme.spacing.sm,
+    left: theme.spacing.sm,     // ✅ badge bên phải
     backgroundColor: "#DC2626",
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 4,
     borderRadius: theme.radius.sm,
+    zIndex: 30,                  // ✅ đè lên ảnh và đè lên tim nếu có overlap
+    elevation: 4,
   },
   discountText: {
     color: theme.colors.white,
