@@ -20,6 +20,7 @@ import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { useUser } from "../../../context/UserContext";
 import pickRandom from "../../../utils/PickRandom";
+import { FavouriteService } from "../../../services/FavouriteService";
 
 const { width } = Dimensions.get("window");
 
@@ -65,6 +66,9 @@ export default function HomeScreen() {
   const [cities, setCities] = useState<any[]>([]);
   const [citiesShow, setCitiesShow] = useState<any[]>([]);
 
+  const [favTourIds, setFavTourIds] = useState<Set<string>>(new Set());
+  const [favBusy, setFavBusy] = useState<Set<string>>(new Set()); // tourId đang loading
+
   const {user} = useUser();
 
   const fetchHomeData = useCallback(async () => {
@@ -85,6 +89,8 @@ export default function HomeScreen() {
       setCities(cityList);
       setCitiesShow(pickRandom(cityList, 4));
 
+      await fetchFavouriteIds();
+
     } catch (e: any) {
       console.log("Fetch home error:", e);
       MessageBoxService.error("Lỗi", e?.message || "Không lấy được dữ liệu.", "OK");
@@ -92,6 +98,63 @@ export default function HomeScreen() {
       setLoading(false);
     }
   }, []);
+
+  const fetchFavouriteIds = useCallback(async () => {
+    try {
+      const res = await FavouriteService.getFavourites();
+      const list: any[] = res?.data?.data ?? res?.data ?? [];
+      const ids = new Set<string>(list.map((f) => String(f?.tour)));
+      setFavTourIds(ids);
+    } catch (e) {
+      console.log("fetchFavouriteIds error:", e);
+    }
+  }, []);
+
+  const toggleFavourite = useCallback(
+    async (tourId: string) => {
+      if (!tourId) return;
+
+      const isFav = favTourIds.has(String(tourId));
+
+      // mark busy
+      setFavBusy((prev) => new Set(prev).add(String(tourId)));
+
+      // optimistic update
+      setFavTourIds((prev) => {
+        const next = new Set(prev);
+        if (isFav) next.delete(String(tourId));
+        else next.add(String(tourId));
+        return next;
+      });
+
+      try {
+        if (!isFav) {
+          await FavouriteService.addByTourId(tourId);
+          MessageBoxService.success("Thành công", "Đã thêm vào yêu thích", "OK");
+        } else {
+          await FavouriteService.deleteByTourId(tourId);
+          MessageBoxService.success("Thành công", "Đã xoá khỏi yêu thích", "OK");
+        }
+      } catch (e: any) {
+        // rollback
+        setFavTourIds((prev) => {
+          const next = new Set(prev);
+          if (isFav) next.add(String(tourId));
+          else next.delete(String(tourId));
+          return next;
+        });
+
+        MessageBoxService.error("Lỗi", e?.message || "Không thể cập nhật yêu thích", "OK");
+      } finally {
+        setFavBusy((prev) => {
+          const next = new Set(prev);
+          next.delete(String(tourId));
+          return next;
+        });
+      }
+    },
+    [favTourIds]
+  );
 
   useFocusEffect(
   useCallback(() => {
@@ -260,6 +323,22 @@ export default function HomeScreen() {
                   resizeMode="cover"
                 />
 
+                {/* Heart button */}
+                <Pressable
+                  style={[styles.favouriteButton, favBusy.has(String(tour._id)) && { opacity: 0.6 }]}
+                  onPress={(e) => {
+                    e.stopPropagation(); // ✅ không trigger mở TourDetail
+                    toggleFavourite(String(tour._id));
+                  }}
+                  disabled={favBusy.has(String(tour._id))}
+                >
+                  <Ionicons
+                    name={favTourIds.has(String(tour._id)) ? "heart" : "heart-outline"}
+                    size={20}
+                    color={theme.colors.error} // ✅ outline đỏ + tim đỏ
+                  />
+                </Pressable>
+
                 {/* Discount Badge */}
                 {tour?.discount > 0 && (
                   <View style={styles.discountBadge}>
@@ -413,7 +492,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.colors.error,
   },
-
+  favouriteButton: {
+    position: "absolute",
+    top: theme.spacing.sm,
+    left: theme.spacing.sm, // hoặc right tuỳ bạn
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   searchBox: {
     marginHorizontal: theme.spacing.md,
     marginTop: theme.spacing.md,
