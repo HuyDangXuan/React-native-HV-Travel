@@ -1,4 +1,5 @@
 import { View, Image, StyleSheet, BackHandler, Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect } from "react";
 import theme from "../../config/theme";
@@ -18,12 +19,11 @@ export default function SplashScreen() {
   const { setUser } = useUser();
   const authToken = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
-      console.log("[SplashScreen] token storage: " + token);
+      const token = await SecureStore.getItemAsync("SecureStore");
+      console.log("[SplashScreen] access_token storage: " + token);
       if (token) {
         const res = await AuthService.authToken(token);
         if (res) {
-          console.log("[SplashScreen] response api auth token: ", res);
           const user: User = res.data;
           setUser(user);
           navigation.replace("MainTabs");
@@ -67,7 +67,7 @@ export default function SplashScreen() {
 
   useEffect(() => {
     
-  authToken();
+    authToken();
 
   }, []);
 

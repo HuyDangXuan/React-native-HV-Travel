@@ -10,22 +10,24 @@ export class ApiService {
     const timer = setTimeout(() => controller.abort(), timeout);
 
     try {
-      // --- merge headers ---
+      // merge headers
       const rawHeaders = (options.headers || {}) as Record<string, string>;
       const headers: Record<string, string> = { ...rawHeaders };
 
-      // auto set content-type nếu chưa có và có body (tránh override nếu bạn tự set)
-      const hasContentType =
-        Object.keys(headers).some((k) => k.toLowerCase() === "content-type");
+      // auto Content-Type
+      const hasContentType = Object.keys(headers).some(
+        (k) => k.toLowerCase() === "content-type"
+      );
       if (!hasContentType && options.body) {
         headers["Content-Type"] = "application/json";
       }
 
-      // ✅ auto attach Authorization nếu chưa có
-      const hasAuth =
-        Object.keys(headers).some((k) => k.toLowerCase() === "authorization");
+      // auto Authorization
+      const hasAuth = Object.keys(headers).some(
+        (k) => k.toLowerCase() === "authorization"
+      );
       if (!hasAuth) {
-        const token = await AsyncStorage.getItem("token"); // đổi key nếu bạn lưu khác
+        const token = await AsyncStorage.getItem("access_token");
         if (token) headers["Authorization"] = `Bearer ${token}`;
       }
 
@@ -35,13 +37,13 @@ export class ApiService {
         signal: controller.signal,
       });
 
-      const data = await res.json().catch(() => null);
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
 
       if (!res.ok) {
         throw {
           status: res.status,
-          message: data?.message || data?.error || "Request failed",
-          errors: data?.errors,
+          message: data?.message || res.statusText || "Request failed",
           data,
         };
       }
