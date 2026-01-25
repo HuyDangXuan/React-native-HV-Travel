@@ -17,6 +17,7 @@ import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { FavouriteService } from "../../../services/FavouriteService";
 import { TourService } from "../../../services/TourService";
+import { useAuth } from "../../../context/AuthContext";
 
 type FavouriteTour = {
   favouriteId: string;   // id document favourite
@@ -50,6 +51,7 @@ export default function FavouriteScreen() {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
 
   const [showFilters, setShowFilters] = useState(false);
+  const {token} = useAuth();
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -64,7 +66,12 @@ export default function FavouriteScreen() {
   const fetchFavourites = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await FavouriteService.getFavourites();
+      if (!token) {
+        MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+        navigation.replace("Login");
+        return;
+      }
+      const res = await FavouriteService.getFavourites(token);
 
       // backend: { status: true, data: [...] }
       const list: any[] = res?.data ?? [];
@@ -153,7 +160,12 @@ export default function FavouriteScreen() {
       cancelText: "Hủy",
       onConfirm: async () => {
         try {
-          await FavouriteService.deleteByTourId(tourId);
+          if (!token) {
+            MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+            navigation.replace("Login");
+            return;
+          }
+          await FavouriteService.deleteByTourId(token, tourId);
           setFavourites((prev) => prev.filter((f) => f.tourId !== tourId));
           MessageBoxService.success("Thành công", "Đã xóa khỏi danh sách yêu thích", "OK");
         } catch (error: any) {
