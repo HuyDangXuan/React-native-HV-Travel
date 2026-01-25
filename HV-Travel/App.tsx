@@ -30,6 +30,8 @@ import BankTransferScreen from "./screens/Main/Home/Payment/Method/BankTransferS
 import CashPaymentScreen from "./screens/Main/Home/Payment/Method/CashPaymentScreen";
 import { UserProvider } from "./context/UserContext";
 import AccountManager from "./screens/Login/AccountManager";
+import ExploreScreen from "./screens/Main/Home/ExploreScreen/ExploreScreen";
+
 
 const Stack = createNativeStackNavigator();
 
@@ -67,6 +69,7 @@ export default function App() {
           <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
           <Stack.Screen name="BankTransferScreen" component={BankTransferScreen} options={{gestureEnabled: false}} />
           <Stack.Screen name="CashPaymentScreen" component={CashPaymentScreen} options={{gestureEnabled: false}} />
+          <Stack.Screen name="Explore" component={ExploreScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       </UserProvider>

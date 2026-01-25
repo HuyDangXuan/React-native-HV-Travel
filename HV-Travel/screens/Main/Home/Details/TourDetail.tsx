@@ -19,6 +19,7 @@ import LoadingOverlay from "../../../Loading/LoadingOverlay";
 import OverviewTab from "./TourDetailTabs/OverviewTab";
 import ItineraryTab from "./TourDetailTabs/ItineraryTab";
 import ReviewTab from "./TourDetailTabs/ReviewTab";
+import { FavouriteService } from "../../../../services/FavouriteService";
 
 const { height } = Dimensions.get("window");
 const HERO_HEIGHT = height * 0.35;
@@ -56,6 +57,9 @@ export default function TourDetail() {
   const [loading, setLoading] = useState(false);
   const [tour, setTour] = useState<Tour | null>(null);
 
+  const [isFavourite, setIsFavourite] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
+
   const fetchTourDetail = useCallback(async () => {
     if (!tourId) {
       MessageBoxService.error("Lỗi", "Thiếu id tour.", "OK");
@@ -78,6 +82,48 @@ export default function TourDetail() {
   useEffect(() => {
     fetchTourDetail();
   }, [fetchTourDetail]);
+
+  const handleToggleFavourite = useCallback(async () => {
+    if (!tourId) {
+      MessageBoxService.error("Lỗi", "Thiếu id tour.", "OK");
+      return;
+    }
+
+    const next = !isFavourite;
+
+    // optimistic UI
+    setIsFavourite(next);
+    setFavLoading(true);
+
+    try {
+      if (next) {
+        await FavouriteService.addByTourId(tourId);
+        MessageBoxService.success("Thành công", "Đã thêm vào yêu thích", "OK");
+      } else {
+        await FavouriteService.deleteByTourId(tourId);
+        MessageBoxService.success("Thành công", "Đã xoá khỏi yêu thích", "OK");
+      }
+    } catch (e: any) {
+      setIsFavourite(!next); // rollback
+      MessageBoxService.error("Lỗi", e?.message || "Không thể cập nhật yêu thích", "OK");
+    } finally {
+      setFavLoading(false);
+    }
+  }, [tourId, isFavourite]);
+
+  const checkIsFavourite = useCallback(async () => {
+    if (!tourId) return;
+    try {
+      const res = await FavouriteService.getFavourites();
+      const list: any[] = res?.data?.data ?? res?.data ?? [];
+      setIsFavourite(list.some((f) => String(f?.tour) === String(tourId)));
+    } catch {}
+  }, [tourId]);
+
+  useEffect(() => {
+    checkIsFavourite();
+  }, [checkIsFavourite]);
+
 
   const heroImage = useMemo(() => {
     return (
@@ -138,9 +184,19 @@ export default function TourDetail() {
             <Pressable style={styles.iconBtn} onPress={() => navigation.goBack()}>
               <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
             </Pressable>
-
-            <Pressable style={styles.iconBtn} onPress={() => {}}>
-              <Ionicons name="bookmark" size={26} color={theme.colors.white} />
+            <Pressable
+              style={[
+                styles.favouriteButton,
+                (favLoading || !tourId) && { opacity: 0.6 },
+              ]}
+              onPress={handleToggleFavourite}
+              disabled={favLoading || !tourId}
+            >
+              <Ionicons
+                name={isFavourite ? "heart" : "heart-outline"}
+                size={22}
+                color={theme.colors.error} // ✅ luôn đỏ: outline đỏ + tim đặc đỏ
+              />
             </Pressable>
           </SafeAreaView>
         </View>
@@ -249,6 +305,23 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.md,
   },
   iconBtn: { borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "transparent" },
+
+  favouriteButton: {
+    position: "absolute",
+    top: theme.spacing.sm,
+    right: theme.spacing.sm,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
 
   infoCard: {
     marginHorizontal: theme.spacing.md,

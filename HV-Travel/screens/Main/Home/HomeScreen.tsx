@@ -13,53 +13,42 @@ import {
   FlatList,
 } from "react-native";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import theme from "../../../config/theme";
 import { TourService } from "../../../services/TourService";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { useUser } from "../../../context/UserContext";
+import pickRandom from "../../../utils/PickRandom";
+import { FavouriteService } from "../../../services/FavouriteService";
 
 const { width } = Dimensions.get("window");
 
-type MiniPlace = { id: string; title: string; subtitle: string; image: string };
+type TourCard = {
+  _id: string;
+  name: string;
+  rating?: number;
+
+  price: { adult: number };
+  newPrice?: { adult: number };
+
+  oldPrice?: { adult: number };
+  discount?: number;
+
+  thumbnail_url: string;
+  time: string;
+  vehicle: string;
+
+  category?: string;
+  city?: string;
+};
+
 type SpecialItem = {
   id: string;
   title: string;
   desc: string;
   icon: "shield-check" | "cash-multiple" | "headset";
 };
-
-const KNOW: MiniPlace[] = [
-  {
-    id: "k1",
-    title: "Dubai",
-    subtitle: "Thành phố ở Ả Rập Xê Út",
-    image:
-      "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1200&q=80&auto=format&fit=crop",
-  },
-  {
-    id: "k2",
-    title: "Bangkok",
-    subtitle: "Thủ đô của Thailand",
-    image:
-      "https://images.unsplash.com/photo-1519451241324-20b4ea2c4220?w=1200&q=80&auto=format&fit=crop",
-  },
-  {
-    id: "k3",
-    title: "Sikkim",
-    subtitle: "Một bang của Ấn Độ",
-    image:
-      "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80&auto=format&fit=crop",
-  },
-  {
-    id: "k4",
-    title: "Singapore",
-    subtitle: "Quốc gia ở Châu Á",
-    image:
-      "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?w=1200&q=80&auto=format&fit=crop",
-  },
-];
 
 const SPECIAL: SpecialItem[] = [
   {
@@ -92,23 +81,61 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
 
   const [categories, setCategories] = useState<any[]>([]);
-  const [tours, setTours] = useState<any[]>([]);
+  const [tours, setTours] = useState<TourCard[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
+  const [citiesShow, setCitiesShow] = useState<any[]>([]);
+
+  const [favTourIds, setFavTourIds] = useState<Set<string>>(new Set());
+  const [favBusy, setFavBusy] = useState<Set<string>>(new Set()); // tourId đang loading
 
   const {user} = useUser();
 
   const fetchHomeData = useCallback(async () => {
     setLoading(true);
     try {
-      const [catRes, tourRes] = await Promise.all([
+      const [catRes, tourRes, cityRes] = await Promise.all([
         TourService.getCategories(),
         TourService.getTours(),
+        TourService.getCities(),
       ]);
 
       const catList = Array.isArray(catRes) ? catRes : catRes?.data ?? [];
       const tourList = Array.isArray(tourRes) ? tourRes : tourRes?.data ?? [];
 
+      const mappedTours: TourCard[] = tourList.map((t: any) => {
+        const adultPrice = t?.price?.adult ?? 0;
+        const adultNew = t?.newPrice?.adult;
+
+        const oldPrice =
+          typeof adultNew === "number" && adultNew < adultPrice
+            ? { adult: adultPrice }
+            : undefined;
+
+        const discount =
+          typeof adultNew === "number" && adultNew < adultPrice && adultPrice > 0
+            ? Math.round(((adultPrice - adultNew) / adultPrice) * 100)
+            : undefined;
+
+        return {
+          ...t,
+          _id: String(t?._id),
+          price: t?.price ?? { adult: 0 },
+          newPrice: t?.newPrice,
+          oldPrice,
+          discount,
+        };
+      });
+
+      setTours(mappedTours);
+
+      const cityList = Array.isArray(cityRes) ? cityRes : cityRes?.data ?? [];
+
       setCategories(catList);
-      setTours(tourList);
+      setCities(cityList);
+      setCitiesShow(pickRandom(cityList, 4));
+
+      await fetchFavouriteIds();
+
     } catch (e: any) {
       console.log("Fetch home error:", e);
       MessageBoxService.error("Lỗi", e?.message || "Không lấy được dữ liệu.", "OK");
@@ -116,6 +143,75 @@ export default function HomeScreen() {
       setLoading(false);
     }
   }, []);
+
+  const fetchFavouriteIds = useCallback(async () => {
+    try {
+      const res = await FavouriteService.getFavourites();
+      const list: any[] = res?.data?.data ?? res?.data ?? [];
+      const ids = new Set<string>(list.map((f) => String(f?.tour)));
+      setFavTourIds(ids);
+    } catch (e) {
+      console.log("fetchFavouriteIds error:", e);
+    }
+  }, []);
+
+  const toggleFavourite = useCallback(
+    async (tourId: string) => {
+      if (!tourId) return;
+
+      const isFav = favTourIds.has(String(tourId));
+
+      // mark busy
+      setFavBusy((prev) => new Set(prev).add(String(tourId)));
+
+      // optimistic update
+      setFavTourIds((prev) => {
+        const next = new Set(prev);
+        if (isFav) next.delete(String(tourId));
+        else next.add(String(tourId));
+        return next;
+      });
+
+      try {
+        if (!isFav) {
+          await FavouriteService.addByTourId(tourId);
+          MessageBoxService.success("Thành công", "Đã thêm vào yêu thích", "OK");
+        } else {
+          await FavouriteService.deleteByTourId(tourId);
+          MessageBoxService.success("Thành công", "Đã xoá khỏi yêu thích", "OK");
+        }
+      } catch (e: any) {
+        // rollback
+        setFavTourIds((prev) => {
+          const next = new Set(prev);
+          if (isFav) next.add(String(tourId));
+          else next.delete(String(tourId));
+          return next;
+        });
+
+        MessageBoxService.error("Lỗi", e?.message || "Không thể cập nhật yêu thích", "OK");
+      } finally {
+        setFavBusy((prev) => {
+          const next = new Set(prev);
+          next.delete(String(tourId));
+          return next;
+        });
+      }
+    },
+    [favTourIds]
+  );
+
+  useFocusEffect(
+  useCallback(() => {
+      // Nếu đã có data rồi thì chỉ random lại (đỡ gọi API)
+      if (cities.length) {
+        setCitiesShow(pickRandom(cities, 4));
+        return;
+      }
+      // lần đầu vào screen thì fetch
+      fetchHomeData();
+    }, [cities, fetchHomeData])
+  );
 
   useEffect(() => {
     fetchHomeData();
@@ -266,20 +362,35 @@ export default function HomeScreen() {
                 <Image
                   source={{
                     uri:
-                      tour?.thumbnail_url ||
-                      tour?.images?.[0] ||
-                      "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&q=80&auto=format&fit=crop",
+                      tour?.thumbnail_url
                   }}
                   style={styles.tourImage}
                   resizeMode="cover"
                 />
 
-                {/* Discount Badge */}
-                {tour?.discount > 0 && (
+                {/* Heart button - LEFT */}
+                <Pressable
+                  style={[styles.favouriteButton, favBusy.has(String(tour._id)) && { opacity: 0.6 }]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    toggleFavourite(String(tour._id));
+                  }}
+                  disabled={favBusy.has(String(tour._id))}
+                >
+                  <Ionicons
+                    name={favTourIds.has(String(tour._id)) ? "heart" : "heart-outline"}
+                    size={20}
+                    color={theme.colors.error}
+                  />
+                </Pressable>
+
+                {/* Discount Badge - RIGHT */}
+                {(tour.discount ?? 0) > 0 && (
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountText}>-{tour.discount}%</Text>
                   </View>
                 )}
+
 
                 <View style={styles.tourContent}>
                   <Text style={styles.tourName} numberOfLines={2}>
@@ -299,11 +410,11 @@ export default function HomeScreen() {
 
                   <View style={styles.tourFooter}>
                     <View>
-                      {tour?.oldPrice?.adult && (
+                      {tour?.oldPrice?.adult ? (
                         <Text style={styles.oldPrice}>{formatPrice(tour.oldPrice.adult)}</Text>
-                      )}
+                      ) : null}
                       <Text style={styles.newPrice}>
-                        {formatPrice(tour?.newPrice?.adult || tour?.price?.adult || 0)}
+                        {formatPrice(tour?.newPrice?.adult ?? tour?.price?.adult ?? 0)}
                       </Text>
                     </View>
 
@@ -318,26 +429,41 @@ export default function HomeScreen() {
           />
         )}
 
-
         {/* Know Your World */}
         <SectionHeader title="Khám phá thêm" />
         <Text style={styles.sectionSub}>Mở rộng tầm hiểu biết thế giới của bạn!</Text>
 
         <View style={styles.knowGrid}>
-          {KNOW.map((k) => (
-            <Pressable
-              key={k.id}
-              style={styles.knowItem}
-              onPress={() => navigation.navigate("Explore", { location: k.title })}
-            >
-              <Image source={{ uri: k.image }} style={styles.knowImg} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.knowTitle}>{k.title}</Text>
-                <Text style={styles.knowSub}>{k.subtitle}</Text>
-              </View>
-            </Pressable>
-          ))}
+          {citiesShow?.length ? (
+            citiesShow.map((c, idx) => (
+              <Pressable
+                key={c?._id || String(idx)}
+                style={styles.knowItem}
+                onPress={() =>
+                  navigation.navigate("Explore", {
+                    location: (c?.name || "").trim(),
+                    cityId: c?._id,
+                  })
+                }
+              >
+                <Image source={{ uri: c?.image }} style={styles.knowImg} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.knowTitle} numberOfLines={1}>
+                    {(c?.name || "Unknown").trim()}
+                  </Text>
+                  <Text style={styles.knowSub} numberOfLines={1}>
+                    Chạm để khám phá tour
+                  </Text>
+                </View>
+              </Pressable>
+            ))
+          ) : (
+            <Text style={[styles.emptyText, { paddingHorizontal: theme.spacing.md }]}>
+              Chưa có thành phố
+            </Text>
+          )}
         </View>
+
 
         {/* App Special */}
         <SectionHeader title="Tại sao chọn chúng tôi?" />
@@ -412,7 +538,23 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.colors.error,
   },
-
+  favouriteButton: {
+    position: "absolute",
+    top: theme.spacing.sm,
+    right: theme.spacing.sm,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 20,
+  },
   searchBox: {
     marginHorizontal: theme.spacing.md,
     marginTop: theme.spacing.md,
@@ -509,11 +651,13 @@ const styles = StyleSheet.create({
   discountBadge: {
     position: "absolute",
     top: theme.spacing.sm,
-    right: theme.spacing.sm,
+    left: theme.spacing.sm,     // ✅ badge bên phải
     backgroundColor: "#DC2626",
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 4,
     borderRadius: theme.radius.sm,
+    zIndex: 30,                  // ✅ đè lên ảnh và đè lên tim nếu có overlap
+    elevation: 4,
   },
   discountText: {
     color: theme.colors.white,
