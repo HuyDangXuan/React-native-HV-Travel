@@ -41,6 +41,11 @@ const theme = {
     eye: require('../assets/eye.png'),
     hidden: require('../assets/hidden.png'),
   },
+  image: {
+    headerLogin: require("../assets/header-login.png"),
+    logo: require("../assets/favicon.png"),
+    testAvatar: require("../assets/rose.jpg"),
+  },
   animation: {
     success: require('../assets/animations/success.json'),
     error: require('../assets/animations/error.json'),

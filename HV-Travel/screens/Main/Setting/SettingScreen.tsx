@@ -12,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import theme from "../../../config/theme";
 import { useNavigation } from "@react-navigation/native";
 import { AuthService } from "../../../services/AuthService";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { useUser } from "../../../context/UserContext";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 
@@ -35,14 +35,8 @@ export default function SettingScreen() {
   const {user} = useUser();
 
   const handleLogout = async ()=> {
-    console.log("[SettingScreen] logout...");
-    const token = await AsyncStorage.getItem("token") || '';
-    await AsyncStorage.setItem("token", "");
-    try {
-      const res = await AuthService.logout(token);
-    }
-    catch (err: any){
-    }
+    const token = await SecureStore.getItemAsync("access_token") || '';
+    await SecureStore.setItemAsync("token", "");
     navigation.replace("LoginScreen");
   }
   const sections: Section[] = useMemo(
@@ -83,9 +77,9 @@ export default function SettingScreen() {
               MessageBoxService.confirm({
                   title: "Hệ thống",
                   content: "Bạn có chắc muốn đăng xuất không?",
-                  confirmText: "Không",
-                  cancelText: "Có",
-                  onCancel: async() => {handleLogout()},
+                  cancelText: "Không",
+                  confirmText: "Đăng xuất",
+                  onConfirm: async() => {handleLogout()},
               });
               
             },

@@ -38,6 +38,7 @@ export default function MainTabs() {
 
           if (route.name === "Home") iconName = focused ? "home" : "home-outline";
           if (route.name === "Favourite") iconName = focused ? "heart" : "heart-outline";
+          if (route.name === "Inbox") iconName = focused ? "mail" : "mail-outline";
           if (route.name === "Setting") iconName = focused ? "settings" : "settings-outline";
 
           return <Ionicons name={iconName} size={size ?? 22} color={color} />;
@@ -46,6 +47,7 @@ export default function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: "Trang chủ" }} />
       <Tab.Screen name="Favourite" component={FavouriteScreen} options={{ title: "Yêu thích" }} />
+      <Tab.Screen name="Inbox" component={FavouriteScreen} options={{ title: "Tin nhắn" }} />
       <Tab.Screen name="Setting" component={SettingScreen} options={{ title: "Cài đặt" }} />
     </Tab.Navigator>
   );

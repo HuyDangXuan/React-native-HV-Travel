@@ -1,24 +1,28 @@
-import React from "react";
-import { StyleSheet, ScrollView, SafeAreaView } from "react-native";
+import React, {useState} from "react";
+import { StyleSheet, ScrollView, SafeAreaView, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import LoginHeader from "./LoginHeader";
 import LoginForm from "./LoginForm";
 import LoginFooter from "./LoginFooter";
 import theme from "../../config/theme";
 
 export default function LoginScreen() {
+  const [forceLogin, setForceLogin] = useState(false);
+  const navigation = useNavigation<any>();
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        automaticallyAdjustKeyboardInsets
-        contentInsetAdjustmentBehavior="automatic"
-      >
-        <LoginHeader />
-        <LoginForm />
+      <View style={styles.container}>
+         <LoginHeader
+            showBack={forceLogin}
+            onBack={() => setForceLogin(false)}
+            onMore={() => navigation.navigate("AccountManager")}
+          />
+        <LoginForm
+          forceLogin={forceLogin}
+          setForceLogin={setForceLogin}
+        />
         <LoginFooter />
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -26,8 +30,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.white },
   container: {
-    flexGrow: 1,
+    flex: 1,
     padding: 16,
-    justifyContent: "flex-start",
   },
 });

@@ -16,6 +16,7 @@
     "@react-navigation/native-stack": "^7.9.0",
     "crypto-js": "^4.2.0",
     "expo": "~54.0.30",
+    "expo-secure-store": "^15.0.8",
     "expo-status-bar": "~3.0.9",
     "joi": "^18.0.2",
     "lottie-ios": "^4.5.1",

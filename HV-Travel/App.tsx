@@ -29,6 +29,7 @@ import EditProfileScreen from "./screens/Main/Setting/Profile/EditProfile/EditPr
 import BankTransferScreen from "./screens/Main/Home/Payment/Method/BankTransferScreen";
 import CashPaymentScreen from "./screens/Main/Home/Payment/Method/CashPaymentScreen";
 import { UserProvider } from "./context/UserContext";
+import AccountManager from "./screens/Login/AccountManager";
 
 const Stack = createNativeStackNavigator();
 
@@ -43,6 +44,7 @@ export default function App() {
           <Stack.Screen name="SplashScreen" component={SplashScreen} />
           <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />
           <Stack.Screen name="LoginScreen" component={LoginScreen} options={{gestureEnabled: false}}/>
+          <Stack.Screen name="AccountManager" component={AccountManager} options={{gestureEnabled: false}}/>
           <Stack.Screen name="SignUpScreen" component={SignUpScreen} options={{gestureEnabled: false}}/>
           <Stack.Screen name="ForgetPasswordScreen" component={ForgetPasswordScreen} options={{gestureEnabled: false}}/>
           <Stack.Screen name="CodeVerificationScreen" component={CodeVerificationScreen} options={{gestureEnabled: false}}/>

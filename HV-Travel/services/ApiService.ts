@@ -1,30 +1,36 @@
 export class ApiService {
   static fetchWithTimeout = async (
-    url: string,
-    options: RequestInit = {},
-    timeout = 10000
+  url: string,
+  options: RequestInit = {},
+  timeout = 10000
   ): Promise<any> => {
-    try {
-      const res = await Promise.race([
-        fetch(url, options),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Request timeout")), timeout)
-        )
-      ]) as Response;
+  let res: Response;
 
-      const data = await res.json().catch(() => null);
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
 
-      if (!res.ok) {
-        throw {
-          status: res.status,
-          message: data?.message || "Request failed",
-          errors: data?.errors
-        };
-      }
+    res = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
 
-      return data;
-    } catch (err) {
-      throw err;
+    clearTimeout(id);
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
+    if (!res.ok) {
+      throw {
+        status: res.status,
+        message: data?.message || res.statusText,
+        data
+      };
     }
-  };
+
+    return data;
+  } catch (err: any) {
+    throw err;
+  }
+};
+
 }

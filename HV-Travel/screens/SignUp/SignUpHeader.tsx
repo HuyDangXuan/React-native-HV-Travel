@@ -5,7 +5,7 @@ export default function SignUpHeader() {
   return (
     <View style={styles.container}>
       <Image
-        source={require("../../assets/header-signup.png")} // thay bằng đường dẫn ảnh của mày
+        source={theme.image.logo}
         style={styles.image}
         resizeMode="contain"
       />
@@ -22,8 +22,8 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   image: {
-    width: 500,
-    height: 300,
+    width: 100,
+    height: 100,
     marginBottom: theme.spacing.xs, 
   },
   title: {
