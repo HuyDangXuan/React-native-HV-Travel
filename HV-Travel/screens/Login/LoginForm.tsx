@@ -13,6 +13,7 @@ import theme from "../../config/theme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AccountStorageService, StoredAccount } from "../../services/AccountStorageService";
 import * as SecureStore from "expo-secure-store";
+import { useAuth } from "../../context/AuthContext";
 
 interface FormErrors {
   email?: string;
@@ -33,6 +34,7 @@ export default function LoginForm({forceLogin, setForceLogin}: Props) {
   const navigation = useNavigation<any>();
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const { setUser } = useUser();
+  const { signIn, signInWithToken } = useAuth();
 
   // ⭐ Validate single field (gọi khi blur)
   const validateField = (fieldName: keyof FormErrors, value: string) => {
@@ -74,7 +76,6 @@ export default function LoginForm({forceLogin, setForceLogin}: Props) {
 
   const handleLoginSelect = async (userId: string, email: string) => {
     const token = await SecureStore.getItemAsync(`token_${userId}`);
-    console.log(`Token of user id ${userId}:`, token);
 
     if (!token) {
       setEmail(email);
@@ -83,22 +84,18 @@ export default function LoginForm({forceLogin, setForceLogin}: Props) {
     }
 
     try {
-      const res = await AuthService.authToken(token);
-      console.log("AUTH TOKEN RES:", res);
-
-      const user: User = res.data;
-      setUser(user);
+      await signInWithToken(token);
       navigation.replace("MainTabs");
 
     } catch (err: any) {
-      console.log("AUTH TOKEN ERROR:", err);
-
       if (err.status === 401) {
-        // token die → xoá + quay về login
         await SecureStore.deleteItemAsync(`token_${userId}`);
         setEmail(email);
         setForceLogin(true);
-        console.log("phiên đã hết hạn");
+        MessageBoxService.error(
+          "Phiên hết hạn",
+          "Vui lòng đăng nhập lại"
+        );
       }
     }
   };
@@ -106,18 +103,11 @@ export default function LoginForm({forceLogin, setForceLogin}: Props) {
 
   const handleLogin = async () => {
     if (!validateForm()) return;
-
     setLoading(true);
 
     try {
-      const res = await AuthService.login(email, password);
-      console.log("Login success: ", res);
-      
-      if (res.status === true) {
-        console.log("Login Successfully!");
-        const user: User = res.data.user;
-        setUser(user);
-        await AccountStorageService.saveAccount({
+      const user = await signIn(email, password);
+      await AccountStorageService.saveAccount({
           id: user._id,
           fullName: user.fullName,
           email: user.email,
@@ -130,24 +120,21 @@ export default function LoginForm({forceLogin, setForceLogin}: Props) {
           confirmText: "Lưu",
           cancelText: "Lúc khác",
           onConfirm: async()=> {
-            await SecureStore.setItemAsync(
+            const token = await SecureStore.getItemAsync("access_token");
+            if (token){
+              await SecureStore.setItemAsync(
               `token_${user._id}`,
-              res.data.token,
+              token,
               { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK }
             );
-            await SecureStore.setItemAsync(
-              "access_token",
-              res.data.token,
-              { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK }
-            );
+            }
+            
           }
         });
         
         navigation.replace("MainTabs");
-      }
-    } catch (error: any) {
-      console.log("Login error: ", error);
-
+    } 
+    catch (error: any) {
       if (error.status === 401) {
         MessageBoxService.error(
           "Đăng nhập thất bại!",

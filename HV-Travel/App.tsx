@@ -29,6 +29,7 @@ import EditProfileScreen from "./screens/Main/Setting/Profile/EditProfile/EditPr
 import BankTransferScreen from "./screens/Main/Home/Payment/Method/BankTransferScreen";
 import CashPaymentScreen from "./screens/Main/Home/Payment/Method/CashPaymentScreen";
 import { UserProvider } from "./context/UserContext";
+import { AuthProvider } from "./context/AuthContext";
 import AccountManager from "./screens/Login/AccountManager";
 import ExploreScreen from "./screens/Main/Home/ExploreScreen/ExploreScreen";
 
@@ -41,6 +42,7 @@ export default function App() {
     <MessageBoxProvider>
       <MessageBoxBridge />
       <UserProvider>
+      <AuthProvider>
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="SplashScreen" component={SplashScreen} />
@@ -51,11 +53,7 @@ export default function App() {
           <Stack.Screen name="ForgetPasswordScreen" component={ForgetPasswordScreen} options={{gestureEnabled: false}}/>
           <Stack.Screen name="CodeVerificationScreen" component={CodeVerificationScreen} options={{gestureEnabled: false}}/>
           <Stack.Screen name="CreateNewPasswordScreen" component={CreateNewPasswordScreen} options={{gestureEnabled: false}}/>
-
-          {/* ✅ Main: bottom tabs */}
           <Stack.Screen name="MainTabs" component={MainTabs} options={{gestureEnabled: false}} />
-
-          {/* ✅ Detail screens */}
           <Stack.Screen name="TourDetailScreen" component={TourDetailScreen} />
           <Stack.Screen name="BookingScreen" component={BookingScreen} />
           <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
@@ -72,6 +70,7 @@ export default function App() {
           <Stack.Screen name="Explore" component={ExploreScreen} />
         </Stack.Navigator>
       </NavigationContainer>
+      </AuthProvider>
       </UserProvider>
     </MessageBoxProvider>
   );

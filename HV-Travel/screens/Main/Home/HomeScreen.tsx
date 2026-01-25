@@ -21,6 +21,7 @@ import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { useUser } from "../../../context/UserContext";
 import pickRandom from "../../../utils/PickRandom";
 import { FavouriteService } from "../../../services/FavouriteService";
+import { useAuth } from "../../../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -89,6 +90,7 @@ export default function HomeScreen() {
   const [favBusy, setFavBusy] = useState<Set<string>>(new Set()); // tourId đang loading
 
   const {user} = useUser();
+  const {token} = useAuth();
 
   const fetchHomeData = useCallback(async () => {
     setLoading(true);
@@ -146,7 +148,12 @@ export default function HomeScreen() {
 
   const fetchFavouriteIds = useCallback(async () => {
     try {
-      const res = await FavouriteService.getFavourites();
+      if (!token) {
+        MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+        navigation.replace("Login");
+        return;
+      }
+      const res = await FavouriteService.getFavourites(token);
       const list: any[] = res?.data?.data ?? res?.data ?? [];
       const ids = new Set<string>(list.map((f) => String(f?.tour)));
       setFavTourIds(ids);
@@ -173,11 +180,16 @@ export default function HomeScreen() {
       });
 
       try {
+        if (!token) {
+          MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+          navigation.replace("Login");
+          return;
+        }
         if (!isFav) {
-          await FavouriteService.addByTourId(tourId);
+          await FavouriteService.addByTourId(token, tourId);
           MessageBoxService.success("Thành công", "Đã thêm vào yêu thích", "OK");
         } else {
-          await FavouriteService.deleteByTourId(tourId);
+          await FavouriteService.deleteByTourId(token, tourId);
           MessageBoxService.success("Thành công", "Đã xoá khỏi yêu thích", "OK");
         }
       } catch (e: any) {

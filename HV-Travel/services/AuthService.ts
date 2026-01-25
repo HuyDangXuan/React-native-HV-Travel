@@ -68,7 +68,6 @@ export class AuthService {
   };
 
   static authToken = async (token: string) => {
-    console.log("api auth:", api.me);
     return ApiService.fetchWithTimeout(`${api.me}`, {
       method: "GET",
       headers: { "Authorization": "Bearer " + token },

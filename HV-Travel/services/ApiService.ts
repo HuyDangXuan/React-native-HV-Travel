@@ -1,5 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 export class ApiService {
   static fetchWithTimeout = async (
     url: string,
@@ -14,21 +12,12 @@ export class ApiService {
       const rawHeaders = (options.headers || {}) as Record<string, string>;
       const headers: Record<string, string> = { ...rawHeaders };
 
-      // auto Content-Type
+      // auto Content-Type nếu có body và chưa set
       const hasContentType = Object.keys(headers).some(
         (k) => k.toLowerCase() === "content-type"
       );
       if (!hasContentType && options.body) {
         headers["Content-Type"] = "application/json";
-      }
-
-      // auto Authorization
-      const hasAuth = Object.keys(headers).some(
-        (k) => k.toLowerCase() === "authorization"
-      );
-      if (!hasAuth) {
-        const token = await AsyncStorage.getItem("access_token");
-        if (token) headers["Authorization"] = `Bearer ${token}`;
       }
 
       const res = await fetch(url, {
@@ -37,13 +26,12 @@ export class ApiService {
         signal: controller.signal,
       });
 
-      const text = await res.text();
-      const data = text ? JSON.parse(text) : null;
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
         throw {
           status: res.status,
-          message: data?.message || res.statusText || "Request failed",
+          message: data?.message || data?.error || "Request failed",
           data,
         };
       }
