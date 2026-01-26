@@ -20,6 +20,9 @@ import OverviewTab from "./TourDetailTabs/OverviewTab";
 import ItineraryTab from "./TourDetailTabs/ItineraryTab";
 import ReviewTab from "./TourDetailTabs/ReviewTab";
 import { FavouriteService } from "../../../../services/FavouriteService";
+import { useAuth } from "../../../../context/AuthContext";
+import ChatbotButton from "../../../../components/Chatbot/ChatbotButton";
+import ChatbotModal from "../../../../components/Chatbot/ChatbotModal";
 
 const { height } = Dimensions.get("window");
 const HERO_HEIGHT = height * 0.35;
@@ -59,6 +62,8 @@ export default function TourDetail() {
 
   const [isFavourite, setIsFavourite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
+  const {token} = useAuth();
+  const [openChat, setOpenChat] = useState(false);
 
   const fetchTourDetail = useCallback(async () => {
     if (!tourId) {
@@ -96,11 +101,16 @@ export default function TourDetail() {
     setFavLoading(true);
 
     try {
+      if (!token) {
+        MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+        navigation.replace("Login");
+        return;
+      }
       if (next) {
-        await FavouriteService.addByTourId(tourId);
+        await FavouriteService.addByTourId(token, tourId);
         MessageBoxService.success("Thành công", "Đã thêm vào yêu thích", "OK");
       } else {
-        await FavouriteService.deleteByTourId(tourId);
+        await FavouriteService.deleteByTourId(token, tourId);
         MessageBoxService.success("Thành công", "Đã xoá khỏi yêu thích", "OK");
       }
     } catch (e: any) {
@@ -113,8 +123,13 @@ export default function TourDetail() {
 
   const checkIsFavourite = useCallback(async () => {
     if (!tourId) return;
+    if (!token) {
+      MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+      navigation.replace("Login");
+      return;
+    }
     try {
-      const res = await FavouriteService.getFavourites();
+      const res = await FavouriteService.getFavourites(token);
       const list: any[] = res?.data?.data ?? res?.data ?? [];
       setIsFavourite(list.some((f) => String(f?.tour) === String(tourId)));
     } catch {}
@@ -261,11 +276,15 @@ export default function TourDetail() {
       </View>
 
       <LoadingOverlay visible={loading} />
+      <ChatbotButton onPress={() => setOpenChat(true)} />
+      <ChatbotModal
+        visible={openChat}
+        onClose={() => setOpenChat(false)}
+        tour={tour}
+      />
     </View>
   );
 }
-
-/* ---------------- Components ---------------- */
 
 function TabButton({
   label,
@@ -282,10 +301,9 @@ function TabButton({
         {label}
       </Text>
     </Pressable>
+    
   );
 }
-
-/* ---------------- Styles ---------------- */
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.surface },

@@ -1,5 +1,5 @@
-const base_url = "https://hv-travel-api.vercel.app/api";
-//const base_url = "http://192.168.0.101:3000/api";
+//const base_url = "https://hv-travel-api.vercel.app/api";
+const base_url = "http://192.168.0.101:3000/api";
 
 const api = {
     check_connect_db: base_url + "/test",
@@ -19,6 +19,7 @@ const api = {
     get_list_favourites: base_url + "/favourites/list",
     delete_favourite_by_tour: (tourId: string) => `${base_url}/favourites/tour/${tourId}`,
     add_favourite_by_tour: (tourId: string) => `${base_url}/favourites/tour/${tourId}`,
+    chatbot: base_url + "/chatbot/tour",
 }
 
 export default api;

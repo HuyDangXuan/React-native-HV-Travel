@@ -93,7 +93,6 @@ export default function HomeScreen() {
   const {token} = useAuth();
 
   const fetchHomeData = useCallback(async () => {
-    setLoading(true);
     try {
       const [catRes, tourRes, cityRes] = await Promise.all([
         TourService.getCategories(),
