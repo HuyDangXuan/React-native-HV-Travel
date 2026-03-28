@@ -1,16 +1,21 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
-  Modal} from 'react-native';
+  Modal,
+  Image,
+  TextInput,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import theme from "../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { Image, TextInput } from "react-native";
+import { StatusBar } from "expo-status-bar";
+
+import { useAppTheme, useThemeMode } from "../../../../context/ThemeModeContext";
+import { useI18n } from "../../../../context/I18nContext";
 import { TourService } from "../../../../services/TourService";
 import { MessageBoxService } from "../../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../../Loading/LoadingOverlay";
@@ -20,21 +25,91 @@ import { BookingService } from "../../../../services/BookingService";
 import { Tour } from "../../../../models/Tour";
 import { BookingQuote } from "../../../../services/dataAdapters";
 
+const SYSTEM_ERROR_PATTERNS = [
+  /network request failed/i,
+  /failed to fetch/i,
+  /fetch failed/i,
+  /timeout/i,
+  /timed out/i,
+  /could not connect/i,
+  /connection lost/i,
+  /server error/i,
+  /unexpected token/i,
+];
+
+type BookingUi = {
+  bg: string;
+  surface: string;
+  mutedSurface: string;
+  textPrimary: string;
+  textSecondary: string;
+  border: string;
+  primary: string;
+  onPrimary: string;
+  placeholder: string;
+  overlay: string;
+  accent: string;
+};
+
+function isSystemErrorMessage(message: string) {
+  return SYSTEM_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  const message =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message ?? "").trim()
+      : "";
+
+  if (!message) return fallback;
+  return isSystemErrorMessage(message) ? fallback : message;
+}
+
+function getCurrencyLocale(locale: string) {
+  return locale === "vi" ? "vi-VN" : "en-US";
+}
+
+function formatReadableDate(dateValue: string, locale: string) {
+  return new Date(dateValue).toLocaleDateString(locale === "vi" ? "vi-VN" : "en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export default function BookingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const tourId: string | undefined = route?.params?.id;
 
-  const [showGuestModal, setShowGuestModal] = useState(false);
+  const { t, locale } = useI18n();
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+  const ui = useMemo<BookingUi>(
+    () => ({
+      bg: appTheme.semantic.screenBackground,
+      surface: appTheme.semantic.screenSurface,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      primary: appTheme.colors.primary,
+      onPrimary: appTheme.colors.white,
+      placeholder: appTheme.colors.placeholder,
+      overlay: appTheme.colors.overlay,
+      accent: appTheme.colors.secondary,
+    }),
+    [appTheme]
+  );
+  const styles = useMemo(() => createStyles(ui), [ui]);
 
+  const [showGuestModal, setShowGuestModal] = useState(false);
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [infants, setInfants] = useState(0);
-
   const [loading, setLoading] = useState(false);
   const [tour, setTour] = useState<Tour | null>(null);
-
   const [showDateModal, setShowDateModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -45,260 +120,334 @@ export default function BookingScreen() {
   const [contactEmail, setContactEmail] = useState(user?.email || "");
   const [contactPhone, setContactPhone] = useState(user?.phoneNumber || "");
   const [contactNotes, setContactNotes] = useState("");
-
   const [quote, setQuote] = useState<BookingQuote | null>(null);
+  const tourRequestIdRef = useRef(0);
+  const quoteRequestIdRef = useRef(0);
 
-  // Auto-fill profile
   useEffect(() => {
     if (user) {
       if (!contactName) setContactName(user.fullName || "");
       if (!contactEmail) setContactEmail(user.email || "");
       if (!contactPhone) setContactPhone(user.phoneNumber || "");
     }
-  }, [user]);
+  }, [contactEmail, contactName, contactPhone, user]);
+
+  const currencyLocale = useMemo(() => getCurrencyLocale(locale), [locale]);
+
+  const formatMoney = useCallback(
+    (amount: number) =>
+      new Intl.NumberFormat(currencyLocale, {
+        style: "currency",
+        currency: "VND",
+      }).format(amount || 0),
+    [currencyLocale]
+  );
 
   const fetchTour = useCallback(async () => {
     if (!tourId) {
-      MessageBoxService.error("Lỗi", "Thiếu id tour.", "OK");
+      MessageBoxService.error(t("booking.errorTitle"), t("booking.missingTourId"), t("common.ok"));
       return;
     }
+
     setLoading(true);
+    const requestId = tourRequestIdRef.current + 1;
+    tourRequestIdRef.current = requestId;
     try {
       const detail = await TourService.getTourDetail(tourId);
-      // backend bạn đang trả { status: true, data: {...} }
-      setTour(detail);
-      // Set default selected date
-      const defaultDate = detail?.startDates?.[0];
-      if (defaultDate) setSelectedDate(defaultDate);
-    } catch (e: any) {
-      console.log("Fetch booking tour error:", e);
-      MessageBoxService.error("Lỗi", e?.message || "Không lấy được dữ liệu tour.", "OK");
+      if (tourRequestIdRef.current === requestId) {
+        setTour(detail);
+
+        const defaultDate = detail?.startDates?.[0];
+        setSelectedDate(defaultDate ?? null);
+      }
+    } catch (error: any) {
+      console.log("Fetch booking tour error:", error);
+      if (tourRequestIdRef.current === requestId) {
+        MessageBoxService.error(
+          t("booking.errorTitle"),
+          getErrorMessage(error, t("booking.loadTourFailed")),
+          t("common.ok")
+        );
+      }
     } finally {
-      setLoading(false);
+      if (tourRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
-  }, [tourId]);
+  }, [t, tourId]);
 
   useEffect(() => {
     fetchTour();
   }, [fetchTour]);
 
-  // ----- Fetch Quote from Server -----
   const fetchQuote = useCallback(async () => {
-    if (!tourId || !token) return;
+    if (!tourId || !token) {
+      setQuote(null);
+      return;
+    }
+
+    const requestId = quoteRequestIdRef.current + 1;
+    quoteRequestIdRef.current = requestId;
     try {
-      const res = await BookingService.calculatePrice(token, {
+      const response = await BookingService.calculatePrice(token, {
         tourId,
         adultCount: adults,
         childCount: children,
         infantCount: infants,
       });
-      setQuote(res);
-    } catch (e) {
-      console.log("Fetch quote error:", e);
+      if (quoteRequestIdRef.current === requestId) {
+        setQuote(response);
+      }
+    } catch (error) {
+      console.log("Fetch quote error:", error);
+      if (quoteRequestIdRef.current === requestId) {
+        setQuote(null);
+      }
     }
-  }, [tourId, token, adults, children, infants]);
+  }, [adults, children, infants, token, tourId]);
 
   useEffect(() => {
     fetchQuote();
   }, [fetchQuote]);
 
-  // ----- Prices from API -----
   const pricePerAdult = useMemo(() => {
     const base = tour?.price?.adult ?? 0;
-    const disc = tour?.price?.discount ?? 0;
-    return disc > 0 ? Math.round(base * (1 - disc / 100)) : base;
+    const discount = tour?.price?.discount ?? 0;
+    return discount > 0 ? Math.round(base * (1 - discount / 100)) : base;
   }, [tour]);
-  const pricePerChild = useMemo(
-    () => tour?.price?.child ?? 0,
-    [tour]
-  );
-  const pricePerInfant = useMemo(
-    () => tour?.price?.infant ?? 0,
-    [tour]
-  );
 
-  const maxP = tour?.maxParticipants ?? 0;
-  const curP = tour?.currentParticipants ?? 0;
-  const availableSlots = Math.max(0, maxP - curP);
-  const maxGuests = availableSlots;
+  const pricePerChild = useMemo(() => tour?.price?.child ?? 0, [tour]);
+  const pricePerInfant = useMemo(() => tour?.price?.infant ?? 0, [tour]);
+  const availableSlots = Math.max(0, (tour?.maxParticipants ?? 0) - (tour?.currentParticipants ?? 0));
 
-  const subtotal = quote?.subtotal ?? (adults * pricePerAdult + children * pricePerChild + infants * pricePerInfant);
+  const subtotal =
+    quote?.subtotal ?? adults * pricePerAdult + children * pricePerChild + infants * pricePerInfant;
   const serviceFee = quote?.serviceFee ?? 6000000;
   const discount = quote?.promoDiscount ?? 5500000;
-  const total = quote?.total ?? (subtotal + serviceFee - discount);
+  const total = quote?.total ?? subtotal + serviceFee - discount;
 
-  const formatMoney = (amount: number) => amount.toLocaleString("vi-VN") + "đ";
-
-  const getGuestSummary = () => {
+  const getGuestSummary = useCallback(() => {
     const parts: string[] = [];
-    if (adults > 0) parts.push(`${adults} Người lớn`);
-    if (children > 0) parts.push(`${children} Trẻ em`);
-    if (infants > 0) parts.push(`${infants} Em bé`);
-    return parts.join(", ") || "Chưa chọn";
-  };
-
-  const hotelOptions: string[] = []; // Backend không còn accomodations
+    if (adults > 0) parts.push(t("booking.guestAdultSummary", { count: adults }));
+    if (children > 0) parts.push(t("booking.guestChildSummary", { count: children }));
+    if (infants > 0) parts.push(t("booking.guestInfantSummary", { count: infants }));
+    return parts.join(", ") || t("booking.notSelected");
+  }, [adults, children, infants, t]);
 
   const dateText = useMemo(() => {
-    if (!selectedDate) return "Chưa chọn";
-    const d = new Date(selectedDate);
-    return d.toLocaleDateString("vi-VN");
-  }, [selectedDate]);
+    if (!selectedDate) return t("booking.notSelected");
+    return new Date(selectedDate).toLocaleDateString(currencyLocale);
+  }, [currencyLocale, selectedDate, t]);
 
   const availableDates = useMemo(() => {
     const dates = new Set<string>();
-    tour?.startDates?.forEach(d => dates.add(d));
+    tour?.startDates?.forEach((dateValue) => dates.add(dateValue));
     return Array.from(dates).sort();
   }, [tour]);
 
+  const ratingText = useMemo(() => {
+    if (typeof tour?.rating === "number") {
+      const count = typeof tour?.reviewCount === "number" ? Math.max(tour.reviewCount, 0) : 0;
+      return t("booking.ratingSummary", { rating: tour.rating.toFixed(1), count });
+    }
+    return t("booking.ratingFallback");
+  }, [t, tour?.rating, tour?.reviewCount]);
+
+  const requestedGuests = adults + children + infants;
+  const hasCapacity = availableSlots > 0 && requestedGuests <= availableSlots;
+
+  const isSubmitDisabled = !tour?.id && !tourId
+    ? true
+    : !contactName || !contactEmail || !contactPhone || !contactNotes || !selectedDate || !hasCapacity;
+
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} backgroundColor={ui.bg} />
+
       <View style={styles.header}>
         <Pressable style={styles.headerIcon} onPress={() => navigation.goBack()} hitSlop={10}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Ionicons name="arrow-back" size={24} color={ui.textPrimary} />
         </Pressable>
-        <Text style={styles.headerTitle}>Đặt vé</Text>
+        <Text style={styles.headerTitle}>{t("booking.title")}</Text>
         <View style={styles.headerIcon} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {/* Tour Summary Card */}
-        <View style={[styles.card, { marginBottom: theme.spacing.lg, flexDirection: 'row', padding: theme.spacing.sm }]}>
+        <View style={[styles.card, styles.tourSummaryCard]}>
           <View style={styles.tourImageWrapper}>
             <Image
-              source={{ uri: tour?.images?.[0] || 'https://via.placeholder.com/150' }}
+              source={{ uri: tour?.images?.[0] || "https://via.placeholder.com/150" }}
               style={styles.tourImage}
             />
           </View>
           <View style={styles.tourInfoShort}>
-            <Text style={styles.tourCategory}>{tour?.category || "Tour"}</Text>
-            <Text style={styles.tourTitleShort} numberOfLines={2}>{tour?.name || "Đang tải..."}</Text>
-            <View style={styles.tourMetaRow}>
-              <Ionicons name="star" size={14} color="#FFD700" />
-              <Text style={styles.tourMetaText}>4.9 (120+)</Text>
-              <Text style={styles.tourMetaDivider}>•</Text>
-              <Text style={styles.tourMetaText}>{tour?.duration?.text || "N/A"}</Text>
+            <Text style={styles.tourCategory}>
+              {tour?.category || t("booking.tourCategoryFallback")}
+            </Text>
+            <Text style={styles.tourTitleShort} numberOfLines={2}>
+              {tour?.name || t("booking.loadingTourTitle")}
+            </Text>
+            <View style={styles.tourMetaColumn}>
+              <View style={styles.tourMetaRow}>
+                <Ionicons name="calendar-outline" size={14} color={ui.primary} />
+                <Text style={styles.tourMetaText}>{dateText}</Text>
+                <View style={styles.tourMetaDot} />
+                <Ionicons name="time-outline" size={14} color={ui.primary} />
+                <Text style={styles.tourMetaText}>
+                  {tour?.duration?.text || t("booking.notAvailable")}
+                </Text>
+              </View>
+              <View style={styles.tourMetaRowSecondary}>
+                <Ionicons name="star" size={14} color={ui.accent} />
+                <Text style={styles.tourMetaText}>{ratingText}</Text>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Booking Details */}
-        <Text style={styles.h2}>Thông tin vé</Text>
+        <Text style={styles.sectionTitle}>{t("booking.ticketInfoTitle")}</Text>
 
         <View style={styles.card}>
-          <DetailRow icon="pricetag-outline" label="Danh mục" value={tour?.category || "N/A"} />
-          <Divider />
-          <DetailRow icon="key-outline" label="Mã tour" value={tour?.code || tour?.id || tourId || "N/A"} />
-          <Divider />
-          <DetailRow icon="briefcase-outline" label="Gói tour" value={tour?.name || "Đang tải..."} />
-          <Divider />
-          <DetailRow icon="calendar-outline" label="Thời gian" value={tour?.duration?.text || "N/A"} />
-          <Divider />
+          <DetailRow
+            icon="pricetag-outline"
+            label={t("booking.labelCategory")}
+            value={tour?.category || t("booking.notAvailable")}
+            styles={styles}
+            ui={ui}
+          />
+          <Divider styles={styles} />
+          <DetailRow
+            icon="key-outline"
+            label={t("booking.labelTourCode")}
+            value={tour?.code || tour?.id || tourId || t("booking.notAvailable")}
+            styles={styles}
+            ui={ui}
+          />
+          <Divider styles={styles} />
+          <DetailRow
+            icon="briefcase-outline"
+            label={t("booking.labelPackage")}
+            value={tour?.name || t("booking.loadingTourTitle")}
+            styles={styles}
+            ui={ui}
+          />
+          <Divider styles={styles} />
+          <DetailRow
+            icon="calendar-outline"
+            label={t("booking.labelDuration")}
+            value={tour?.duration?.text || t("booking.notAvailable")}
+            styles={styles}
+            ui={ui}
+          />
+          <Divider styles={styles} />
           <SelectableDetailRow
             icon="people-outline"
-            label="Số lượng khách"
+            label={t("booking.labelGuestCount")}
             value={getGuestSummary()}
             onPress={() => setShowGuestModal(true)}
+            styles={styles}
+            ui={ui}
           />
-          <Divider />
+          <Divider styles={styles} />
           <SelectableDetailRow
             icon="time-outline"
-            label="Ngày xuất phát"
+            label={t("booking.labelDepartureDate")}
             value={dateText}
             onPress={() => setShowDateModal(true)}
+            styles={styles}
+            ui={ui}
           />
           {tour?.destination?.city && (
             <>
-              <Divider />
+              <Divider styles={styles} />
               <DetailRow
                 icon="location-outline"
-                label="Điểm đến"
+                label={t("booking.labelDestination")}
                 value={tour.destination.city}
+                styles={styles}
+                ui={ui}
               />
             </>
           )}
         </View>
 
-        {/* Contact Information */}
-        <Text style={[styles.h2, { marginTop: theme.spacing.xl }]}>Thông tin liên hệ</Text>
+        <Text style={styles.sectionTitleWithTop}>{t("booking.contactInfoTitle")}</Text>
         <View style={styles.card}>
           <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Họ và tên</Text>
+            <Text style={styles.inputLabel}>{t("booking.contactNameLabel")}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập họ và tên"
+              placeholder={t("booking.contactNamePlaceholder")}
               value={contactName}
               onChangeText={setContactName}
-              placeholderTextColor={theme.colors.placeholder}
+              placeholderTextColor={ui.placeholder}
             />
           </View>
-          <Divider />
+          <Divider styles={styles} />
           <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text style={styles.inputLabel}>{t("booking.contactEmailLabel")}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập địa chỉ email"
+              placeholder={t("booking.contactEmailPlaceholder")}
               value={contactEmail}
               onChangeText={setContactEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              placeholderTextColor={theme.colors.placeholder}
+              placeholderTextColor={ui.placeholder}
             />
           </View>
-          <Divider />
+          <Divider styles={styles} />
           <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Số điện thoại</Text>
+            <Text style={styles.inputLabel}>{t("booking.contactPhoneLabel")}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nhập số điện thoại"
+              placeholder={t("booking.contactPhonePlaceholder")}
               value={contactPhone}
               onChangeText={setContactPhone}
               keyboardType="phone-pad"
-              placeholderTextColor={theme.colors.placeholder}
+              placeholderTextColor={ui.placeholder}
             />
           </View>
-          <Divider />
+          <Divider styles={styles} />
           <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Ghi chú</Text>
+            <Text style={styles.inputLabel}>{t("booking.contactNotesLabel")}</Text>
             <TextInput
-              style={[styles.input, { minHeight: 60 }]}
-              placeholder="Nhập yêu cầu đặc biệt (dị ứng, phòng, v.v.)"
+              style={[styles.input, styles.notesInput]}
+              placeholder={t("booking.contactNotesPlaceholder")}
               value={contactNotes}
               onChangeText={setContactNotes}
               multiline
               textAlignVertical="top"
-              placeholderTextColor={theme.colors.placeholder}
+              placeholderTextColor={ui.placeholder}
             />
           </View>
         </View>
 
-        {/* Payment Summary */}
         <View style={styles.paymentHeader}>
-          <Text style={styles.h2}>Tổng thanh toán</Text>
-          <Pressable onPress={() => { }}>
-            <Text style={styles.addPromo}>Thêm khuyến mãi</Text>
+          <Text style={styles.sectionTitle}>{t("booking.paymentSummaryTitle")}</Text>
+          <Pressable onPress={() => {}}>
+            <Text style={styles.addPromo}>{t("booking.addPromo")}</Text>
           </Pressable>
         </View>
 
         <View style={styles.card}>
           <View style={styles.lineRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.itemTitle}>{tour?.name || "Tour"}</Text>
+            <View style={styles.summaryInfo}>
+              <Text style={styles.itemTitle}>{tour?.name || t("booking.tourCategoryFallback")}</Text>
 
               {adults > 0 && (
                 <Text style={styles.itemSub}>
-                  {adults} Người lớn x {formatMoney(pricePerAdult)}
+                  {t("booking.summaryAdultLine", { count: adults, price: formatMoney(pricePerAdult) })}
                 </Text>
               )}
               {children > 0 && (
                 <Text style={styles.itemSub}>
-                  {children} Trẻ em x {formatMoney(pricePerChild)}
+                  {t("booking.summaryChildLine", { count: children, price: formatMoney(pricePerChild) })}
                 </Text>
               )}
               {infants > 0 && (
                 <Text style={styles.itemSub}>
-                  {infants} Em bé x {formatMoney(pricePerInfant)}
+                  {t("booking.summaryInfantLine", { count: infants, price: formatMoney(pricePerInfant) })}
                 </Text>
               )}
             </View>
@@ -309,174 +458,187 @@ export default function BookingScreen() {
           <View style={styles.rule} />
 
           <View style={styles.lineRow}>
-            <Text style={styles.muted}>Tổng phụ</Text>
+            <Text style={styles.muted}>{t("booking.subtotalLabel")}</Text>
             <Text style={styles.money}>{formatMoney(subtotal)}</Text>
           </View>
 
           <View style={styles.lineRow}>
-            <Text style={styles.muted}>Phí dịch vụ</Text>
+            <Text style={styles.muted}>{t("booking.serviceFeeLabel")}</Text>
             <Text style={styles.money}>{formatMoney(serviceFee)}</Text>
           </View>
 
           <View style={styles.lineRow}>
-            <Text style={styles.muted}>Giảm giá</Text>
+            <Text style={styles.muted}>{t("booking.discountLabel")}</Text>
             <Text style={styles.money}>-{formatMoney(discount)}</Text>
           </View>
 
           <View style={styles.rule} />
 
           <View style={styles.lineRow}>
-            <Text style={styles.totalLabel}>Tổng</Text>
+            <Text style={styles.totalLabel}>{t("booking.totalLabel")}</Text>
             <Text style={styles.totalMoney}>{formatMoney(total)}</Text>
           </View>
         </View>
 
-        <View style={{ height: 110 }} />
+        <View style={styles.scrollSpacer} />
       </ScrollView>
 
-      {/* Bottom CTA */}
       <View style={styles.bottomBar}>
         <Pressable
-          style={[
-            styles.cta,
-            (!tour?.id && !tourId || !contactName || !contactEmail || !contactPhone || !contactNotes || !selectedDate) && styles.ctaDisabled
-          ]}
-          onPress={() => navigation.navigate("PaymentMethodScreen", {
-            id: tour?.id || tourId,
-            total,
-            adults,
-            children,
-            infants,
-            contactInfo: {
-              name: contactName,
-              email: contactEmail,
-              phone: contactPhone,
-              notes: contactNotes,
-              selectedDate
-            }
-          })}
-          disabled={!tour?.id && !tourId || !contactName || !contactEmail || !contactPhone || !contactNotes || !selectedDate}
+          style={[styles.cta, isSubmitDisabled && styles.ctaDisabled]}
+          onPress={() =>
+            navigation.navigate("PaymentMethodScreen", {
+              id: tour?.id || tourId,
+              total,
+              adults,
+              children,
+              infants,
+              contactInfo: {
+                name: contactName,
+                email: contactEmail,
+                phone: contactPhone,
+                notes: contactNotes,
+                selectedDate,
+              },
+            })
+          }
+          disabled={isSubmitDisabled}
         >
-          <Text style={styles.ctaText}>Thanh toán</Text>
+          <Text style={styles.ctaText}>{t("booking.payNow")}</Text>
         </Pressable>
       </View>
 
-      {/* Date Selection Modal */}
       <Modal visible={showDateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setShowDateModal(false)} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn ngày xuất phát</Text>
+              <Text style={styles.modalTitle}>{t("booking.selectDepartureDateTitle")}</Text>
               <Pressable onPress={() => setShowDateModal(false)} hitSlop={10}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
+                <Ionicons name="close" size={24} color={ui.textPrimary} />
               </Pressable>
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody}>
               {availableDates.length > 0 ? (
-                availableDates.map((date, index) => {
-                  const d = new Date(date);
-                  const isSelected = selectedDate === date;
+                availableDates.map((dateValue, index) => {
+                  const isSelected = selectedDate === dateValue;
                   return (
                     <Pressable
-                      key={index}
+                      key={`${dateValue}-${index}`}
                       style={[styles.dateOption, isSelected && styles.dateOptionActive]}
                       onPress={() => {
-                        setSelectedDate(date);
+                        setSelectedDate(dateValue);
                         setShowDateModal(false);
                       }}
                     >
                       <View style={styles.dateOptionInfo}>
                         <Text style={[styles.dateOptionText, isSelected && styles.dateOptionTextActive]}>
-                          {d.toLocaleDateString("vi-VN", { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                          {formatReadableDate(dateValue, locale)}
                         </Text>
-                        <Text style={styles.dateOptionStatus}>Còn trống</Text>
+                        <Text style={styles.dateOptionStatus}>{t("booking.availableStatus")}</Text>
                       </View>
-                      {isSelected && <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />}
+                      {isSelected && <Ionicons name="checkmark-circle" size={24} color={ui.primary} />}
                     </Pressable>
                   );
                 })
               ) : (
-                <Text style={styles.noDatesText}>Không có ngày khởi hành khả dụng</Text>
+                <Text style={styles.noDatesText}>{t("booking.noAvailableDates")}</Text>
               )}
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* Guest Selection Modal */}
       <Modal visible={showGuestModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setShowGuestModal(false)} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Số lượng khách</Text>
+              <Text style={styles.modalTitle}>{t("booking.selectGuestsTitle")}</Text>
               <Pressable onPress={() => setShowGuestModal(false)} hitSlop={10}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
+                <Ionicons name="close" size={24} color={ui.textPrimary} />
               </Pressable>
             </View>
 
             <View style={styles.modalBody}>
               <GuestCounter
-                label="Người lớn"
-                subtitle="Từ 12 tuổi trở lên"
+                label={t("booking.guestAdultLabel")}
+                subtitle={t("booking.guestAdultSubtitle")}
                 value={adults}
                 onDecrement={() => setAdults(Math.max(1, adults - 1))}
                 onIncrement={() => setAdults(Math.min(availableSlots - children - infants, adults + 1))}
                 minValue={1}
                 maxValue={Math.max(0, availableSlots - children - infants)}
+                seatsLeft={Math.max(0, availableSlots - children - infants)}
+                styles={styles}
+                ui={ui}
+                t={t}
               />
-              <Divider />
+              <Divider styles={styles} />
               <GuestCounter
-                label="Trẻ em"
-                subtitle="Từ 2 - 11 tuổi"
+                label={t("booking.guestChildLabel")}
+                subtitle={t("booking.guestChildSubtitle")}
                 value={children}
                 onDecrement={() => setChildren(Math.max(0, children - 1))}
                 onIncrement={() => setChildren(Math.min(availableSlots - adults - infants, children + 1))}
                 minValue={0}
                 maxValue={Math.max(0, availableSlots - adults - infants)}
+                seatsLeft={Math.max(0, availableSlots - adults - infants)}
+                styles={styles}
+                ui={ui}
+                t={t}
               />
-              <Divider />
+              <Divider styles={styles} />
               <GuestCounter
-                label="Em bé"
-                subtitle="Dưới 2 tuổi"
+                label={t("booking.guestInfantLabel")}
+                subtitle={t("booking.guestInfantSubtitle")}
                 value={infants}
                 onDecrement={() => setInfants(Math.max(0, infants - 1))}
                 onIncrement={() => setInfants(Math.min(availableSlots - adults - children, infants + 1))}
                 minValue={0}
                 maxValue={Math.max(0, availableSlots - adults - children)}
+                seatsLeft={Math.max(0, availableSlots - adults - children)}
+                styles={styles}
+                ui={ui}
+                t={t}
               />
             </View>
 
             <View style={styles.modalFooter}>
-              <Pressable
-                style={styles.modalBtn}
-                onPress={() => setShowGuestModal(false)}
-              >
-                <Text style={styles.modalBtnText}>Xác nhận</Text>
+              <Pressable style={styles.modalBtn} onPress={() => setShowGuestModal(false)}>
+                <Text style={styles.modalBtnText}>{t("booking.confirmSelection")}</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-
       <LoadingOverlay visible={loading} />
     </SafeAreaView>
   );
 }
 
-/* ---------- Small components ---------- */
-
-function DetailRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+function DetailRow({
+  icon,
+  label,
+  value,
+  styles,
+  ui,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+  ui: BookingUi;
+}) {
   return (
     <View style={styles.row}>
       <View style={styles.iconBox}>
-        <Ionicons name={icon} size={22} color={theme.colors.primary} />
+        <Ionicons name={icon} size={22} color={ui.primary} />
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={styles.rowContent}>
         <Text style={styles.rowLabel}>{label}</Text>
         <Text style={styles.rowValue} numberOfLines={2}>
           {value}
@@ -491,26 +653,30 @@ function SelectableDetailRow({
   label,
   value,
   onPress,
+  styles,
+  ui,
 }: {
   icon: any;
   label: string;
   value: string;
   onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+  ui: BookingUi;
 }) {
   return (
     <Pressable style={styles.row} onPress={onPress}>
       <View style={styles.iconBox}>
-        <Ionicons name={icon} size={22} color={theme.colors.primary} />
+        <Ionicons name={icon} size={22} color={ui.primary} />
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={styles.rowContent}>
         <Text style={styles.rowLabel}>{label}</Text>
         <Text style={styles.rowValue} numberOfLines={2}>
           {value}
         </Text>
       </View>
 
-      <Ionicons name="chevron-forward" size={20} color={theme.colors.gray} />
+      <Ionicons name="chevron-forward" size={20} color={ui.textSecondary} />
     </Pressable>
   );
 }
@@ -523,6 +689,10 @@ function GuestCounter({
   onIncrement,
   minValue,
   maxValue,
+  seatsLeft,
+  styles,
+  ui,
+  t,
 }: {
   label: string;
   subtitle: string;
@@ -531,15 +701,17 @@ function GuestCounter({
   onIncrement: () => void;
   minValue: number;
   maxValue: number;
+  seatsLeft: number;
+  styles: ReturnType<typeof createStyles>;
+  ui: BookingUi;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   return (
     <View style={styles.counterRow}>
-      <View style={{ flex: 1 }}>
+      <View style={styles.counterInfo}>
         <Text style={styles.counterLabel}>{label}</Text>
         <Text style={styles.counterSubtitle}>{subtitle}</Text>
-        <Text style={[styles.counterSubtitle, { marginTop: 2 }]}>
-          Còn {maxValue} chỗ
-        </Text>
+        <Text style={styles.counterSeats}>{t("booking.seatsLeftLabel", { count: seatsLeft })}</Text>
       </View>
 
       <View style={styles.counterControls}>
@@ -551,7 +723,7 @@ function GuestCounter({
           <Ionicons
             name="remove"
             size={20}
-            color={value <= minValue ? theme.colors.gray : theme.colors.primary}
+            color={value <= minValue ? ui.textSecondary : ui.primary}
           />
         </Pressable>
 
@@ -565,7 +737,7 @@ function GuestCounter({
           <Ionicons
             name="add"
             size={20}
-            color={value >= maxValue ? theme.colors.gray : theme.colors.primary}
+            color={value >= maxValue ? ui.textSecondary : ui.primary}
           />
         </Pressable>
       </View>
@@ -573,270 +745,271 @@ function GuestCounter({
   );
 }
 
-function Divider() {
+function Divider({ styles }: { styles: ReturnType<typeof createStyles> }) {
   return <View style={styles.divider} />;
 }
 
-/* ---------- Styles (giữ nguyên của bạn) ---------- */
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.background },
-
-  header: {
-    height: 54,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: theme.colors.white,
-  },
-  headerIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: theme.fontSize.lg, fontWeight: "800", color: theme.colors.text },
-
-  content: { padding: theme.spacing.md },
-
-  h2: { fontSize: theme.fontSize.lg, fontWeight: "800", color: theme.colors.text, marginBottom: theme.spacing.md },
-
-  card: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    overflow: "hidden",
-  },
-
-  row: {
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    alignItems: "center",
-  },
-
-  divider: { height: 1, backgroundColor: theme.colors.border, marginLeft: theme.spacing.md + 46 + theme.spacing.md },
-
-  iconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  rowLabel: { color: theme.colors.gray, fontSize: theme.fontSize.md, fontWeight: "600" },
-  rowValue: { color: theme.colors.text, fontSize: theme.fontSize.md, fontWeight: "500", marginTop: 2 },
-
-  paymentHeader: {
-    marginTop: theme.spacing.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  addPromo: { color: theme.colors.primary, fontSize: theme.fontSize.sm, fontWeight: "800" },
-
-  lineRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-
-  rule: { height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.sm },
-
-  itemTitle: { fontSize: theme.fontSize.md, fontWeight: "600", color: theme.colors.text },
-  itemSub: { marginTop: 6, fontSize: theme.fontSize.sm, color: theme.colors.gray, fontWeight: "600" },
-
-  muted: { fontSize: theme.fontSize.md, color: theme.colors.gray, fontWeight: "600" },
-  money: { fontSize: theme.fontSize.md, color: theme.colors.text, fontWeight: "600" },
-
-  totalLabel: { fontSize: theme.fontSize.lg, fontWeight: "900", color: theme.colors.text },
-  totalMoney: { fontSize: theme.fontSize.lg, fontWeight: "900", color: theme.colors.text },
-
-  bottomBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.white,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  cta: {
-    height: 54,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaText: { color: theme.colors.white, fontSize: theme.fontSize.md, fontWeight: "900" },
-  ctaDisabled: { backgroundColor: theme.colors.border },
-
-  // Input styles
-  inputWrapper: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-  },
-  inputLabel: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: '700',
-    color: theme.colors.gray,
-    marginBottom: 8,
-  },
-  input: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: '600',
-    padding: 0,
-  },
-  modalOverlay: { flex: 1, justifyContent: "flex-end" },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
-  modalContent: { backgroundColor: theme.colors.white, borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl, paddingBottom: 34 },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  modalTitle: { fontSize: theme.fontSize.lg, fontWeight: "700", color: theme.colors.text },
-  modalBody: { padding: theme.spacing.lg, gap: theme.spacing.lg },
-  modalFooter: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md },
-  modalBtn: { height: 54, borderRadius: theme.radius.lg, backgroundColor: theme.colors.primary, alignItems: "center", justifyContent: "center" },
-  modalBtnText: { color: theme.colors.white, fontSize: theme.fontSize.md, fontWeight: "700" },
-
-  hotelOption: {
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.white,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  hotelOptionActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.surface,
-  },
-  hotelOptionText: {
-    flex: 1,
-    color: theme.colors.text,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
-  hotelOptionTextActive: {
-    color: theme.colors.primary,
-  },
-
-
-  // Counter
-  counterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  counterLabel: { fontSize: theme.fontSize.md, fontWeight: "600", color: theme.colors.text },
-  counterSubtitle: { fontSize: theme.fontSize.sm, color: theme.colors.gray, marginTop: 2 },
-  counterControls: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
-  counterBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  counterBtnDisabled: { borderColor: theme.colors.border },
-  counterValue: { fontSize: theme.fontSize.md, fontWeight: "600", color: theme.colors.text, minWidth: 24, textAlign: "center" },
-
-  // Tour Summary Card Styles
-  tourImageWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: theme.radius.md,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.surface,
-  },
-  tourImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  tourInfoShort: {
-    flex: 1,
-    paddingLeft: theme.spacing.md,
-    justifyContent: 'center',
-  },
-  tourCategory: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.primary,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  tourTitleShort: {
-    fontSize: theme.fontSize.md,
-    fontWeight: '800',
-    color: theme.colors.text,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  tourMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  tourMetaText: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    fontWeight: '600',
-  },
-  tourMetaDivider: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.border,
-    marginHorizontal: 2,
-  },
-
-  // Date Option Styles
-  dateOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.sm,
-    backgroundColor: theme.colors.white,
-  },
-  dateOptionActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.surface,
-  },
-  dateOptionInfo: {
-    flex: 1,
-  },
-  dateOptionText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: '700',
-    color: theme.colors.text,
-    textTransform: 'capitalize',
-  },
-  dateOptionTextActive: {
-    color: theme.colors.primary,
-  },
-  dateOptionStatus: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.secondary,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  noDatesText: {
-    textAlign: 'center',
-    color: theme.colors.gray,
-    fontSize: theme.fontSize.md,
-    paddingVertical: theme.spacing.xl,
-  },
-});
+function createStyles(ui: BookingUi) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: ui.bg },
+    header: {
+      height: 54,
+      paddingHorizontal: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: ui.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: ui.border,
+    },
+    headerIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+    headerTitle: { fontSize: 18, fontWeight: "800", color: ui.textPrimary },
+    content: { padding: 16 },
+    sectionTitle: { fontSize: 18, fontWeight: "800", color: ui.textPrimary, marginBottom: 16 },
+    sectionTitleWithTop: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: ui.textPrimary,
+      marginTop: 32,
+      marginBottom: 16,
+    },
+    card: {
+      backgroundColor: ui.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: ui.border,
+      overflow: "hidden",
+    },
+    tourSummaryCard: {
+      marginBottom: 24,
+      flexDirection: "row",
+      padding: 12,
+    },
+    row: {
+      flexDirection: "row",
+      gap: 16,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      alignItems: "center",
+    },
+    rowContent: { flex: 1 },
+    divider: { height: 1, backgroundColor: ui.border, marginLeft: 78 },
+    iconBox: {
+      width: 46,
+      height: 46,
+      borderRadius: 12,
+      backgroundColor: ui.mutedSurface,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    rowLabel: { color: ui.textSecondary, fontSize: 16, fontWeight: "600" },
+    rowValue: { color: ui.textPrimary, fontSize: 16, fontWeight: "500", marginTop: 2 },
+    paymentHeader: {
+      marginTop: 32,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    addPromo: { color: ui.primary, fontSize: 14, fontWeight: "800" },
+    lineRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    summaryInfo: { flex: 1 },
+    rule: { height: 1, backgroundColor: ui.border, marginVertical: 8 },
+    itemTitle: { fontSize: 16, fontWeight: "600", color: ui.textPrimary },
+    itemSub: { marginTop: 6, fontSize: 14, color: ui.textSecondary, fontWeight: "600" },
+    muted: { fontSize: 16, color: ui.textSecondary, fontWeight: "600" },
+    money: { fontSize: 16, color: ui.textPrimary, fontWeight: "600" },
+    totalLabel: { fontSize: 18, fontWeight: "900", color: ui.textPrimary },
+    totalMoney: { fontSize: 18, fontWeight: "900", color: ui.textPrimary },
+    bottomBar: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      padding: 16,
+      backgroundColor: ui.surface,
+      borderTopWidth: 1,
+      borderTopColor: ui.border,
+    },
+    cta: {
+      height: 54,
+      borderRadius: 16,
+      backgroundColor: ui.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    ctaText: { color: ui.onPrimary, fontSize: 16, fontWeight: "900" },
+    ctaDisabled: { backgroundColor: ui.border },
+    inputWrapper: {
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: ui.textSecondary,
+      marginBottom: 8,
+    },
+    input: {
+      fontSize: 16,
+      color: ui.textPrimary,
+      fontWeight: "600",
+      padding: 0,
+    },
+    notesInput: { minHeight: 60 },
+    modalOverlay: { flex: 1, justifyContent: "flex-end" },
+    modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: ui.overlay },
+    modalContent: {
+      backgroundColor: ui.surface,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 34,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 24,
+      paddingVertical: 24,
+      borderBottomWidth: 1,
+      borderBottomColor: ui.border,
+    },
+    modalTitle: { fontSize: 18, fontWeight: "700", color: ui.textPrimary },
+    modalBody: { padding: 24, gap: 24 },
+    modalFooter: { paddingHorizontal: 24, paddingTop: 16 },
+    modalBtn: {
+      height: 54,
+      borderRadius: 16,
+      backgroundColor: ui.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    modalBtnText: { color: ui.onPrimary, fontSize: 16, fontWeight: "700" },
+    counterRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    counterInfo: { flex: 1 },
+    counterLabel: { fontSize: 16, fontWeight: "600", color: ui.textPrimary },
+    counterSubtitle: { fontSize: 14, color: ui.textSecondary, marginTop: 2 },
+    counterSeats: { fontSize: 14, color: ui.textSecondary, marginTop: 2 },
+    counterControls: { flexDirection: "row", alignItems: "center", gap: 16 },
+    counterBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: ui.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    counterBtnDisabled: { borderColor: ui.border },
+    counterValue: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: ui.textPrimary,
+      minWidth: 24,
+      textAlign: "center",
+    },
+    tourImageWrapper: {
+      width: 100,
+      height: 100,
+      borderRadius: 12,
+      overflow: "hidden",
+      backgroundColor: ui.mutedSurface,
+    },
+    tourImage: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
+    },
+    tourInfoShort: {
+      flex: 1,
+      paddingLeft: 16,
+      justifyContent: "center",
+    },
+    tourCategory: {
+      fontSize: 12,
+      color: ui.primary,
+      fontWeight: "800",
+      textTransform: "uppercase",
+      marginBottom: 4,
+    },
+    tourTitleShort: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: ui.textPrimary,
+      lineHeight: 20,
+      marginBottom: 8,
+    },
+    tourMetaColumn: {
+      gap: 6,
+    },
+    tourMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      flexWrap: "wrap",
+    },
+    tourMetaRowSecondary: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    tourMetaText: {
+      fontSize: 12,
+      color: ui.textSecondary,
+      fontWeight: "600",
+    },
+    tourMetaDot: {
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: ui.border,
+      marginHorizontal: 4,
+    },
+    dateOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: ui.border,
+      marginBottom: 8,
+      backgroundColor: ui.surface,
+    },
+    dateOptionActive: {
+      borderColor: ui.primary,
+      backgroundColor: ui.mutedSurface,
+    },
+    dateOptionInfo: { flex: 1 },
+    dateOptionText: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: ui.textPrimary,
+      textTransform: "capitalize",
+    },
+    dateOptionTextActive: {
+      color: ui.primary,
+    },
+    dateOptionStatus: {
+      fontSize: 12,
+      color: ui.accent,
+      fontWeight: "600",
+      marginTop: 2,
+    },
+    noDatesText: {
+      textAlign: "center",
+      color: ui.textSecondary,
+      fontSize: 16,
+      paddingVertical: 32,
+    },
+    scrollSpacer: { height: 110 },
+  });
+}

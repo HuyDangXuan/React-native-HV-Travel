@@ -14,8 +14,9 @@ import { Ionicons } from "@expo/vector-icons";
 import AppButton from "../../../../components/Button";
 import AppHeader from "../../../../components/ui/AppHeader";
 import SectionCard from "../../../../components/ui/SectionCard";
-import theme from "../../../../config/theme";
 import { useAuth } from "../../../../context/AuthContext";
+import { useI18n } from "../../../../context/I18nContext";
+import { useAppTheme } from "../../../../context/ThemeModeContext";
 import { AuthService } from "../../../../services/AuthService";
 import { MessageBoxService } from "../../../MessageBox/MessageBoxService";
 
@@ -28,36 +29,41 @@ type DeviceSession = {
   isCurrent: boolean;
 };
 
-function formatDateTime(value: string) {
+function formatDateTime(value: string, locale: string) {
   try {
-    return new Date(value).toLocaleString("vi-VN");
+    return new Date(value).toLocaleString(locale === "vi" ? "vi-VN" : "en-US");
   } catch {
     return value;
   }
 }
 
-function getSessionTitle(session: DeviceSession) {
-  if (session.isCurrent) {
-    return session.deviceLabel
-      ? `${session.deviceLabel} (thiết bị này)`
-      : "Thiết bị này";
-  }
-
-  if (session.deviceLabel) {
-    return session.deviceLabel;
-  }
-
-  const suffix = session.deviceId ? session.deviceId.slice(-6) : "khác";
-  return `Thiết bị ${suffix}`;
-}
-
 export default function SecurityScreen() {
   const navigation = useNavigation<any>();
   const { token, logoutAllDevices, logoutDeviceSession } = useAuth();
+  const { t, locale } = useI18n();
+  const theme = useAppTheme();
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [menuSession, setMenuSession] = useState<DeviceSession | null>(null);
+
+  const getSessionTitle = useCallback(
+    (session: DeviceSession) => {
+      if (session.isCurrent) {
+        return session.deviceLabel
+          ? t("security.currentDeviceWithLabel", { label: session.deviceLabel })
+          : t("security.currentDevice");
+      }
+
+      if (session.deviceLabel) {
+        return session.deviceLabel;
+      }
+
+      const suffix = session.deviceId ? session.deviceId.slice(-6) : "other";
+      return t("security.deviceFallback", { suffix });
+    },
+    [t]
+  );
 
   const loadSessions = useCallback(async () => {
     if (!token) {
@@ -74,13 +80,13 @@ export default function SecurityScreen() {
       setSessions(nextSessions);
     } catch (error: any) {
       MessageBoxService.error(
-        "Không tải được thiết bị",
-        error?.message || "Vui lòng thử lại sau."
+        t("security.loadSessionsFailed"),
+        error?.message || t("common.close")
       );
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [t, token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -97,12 +103,12 @@ export default function SecurityScreen() {
   const confirmLogoutDevice = (session: DeviceSession) => {
     setMenuSession(null);
     MessageBoxService.confirm({
-      title: "Đăng xuất thiết bị",
+      title: t("security.logoutDeviceTitle"),
       content: session.isCurrent
-        ? "Thiết bị hiện tại sẽ bị đăng xuất hoàn toàn và cần đăng nhập lại."
-        : "Thiết bị này sẽ bị đăng xuất và phải đăng nhập lại ở lần sau.",
-      cancelText: "Huỷ",
-      confirmText: "Đăng xuất",
+        ? t("security.logoutCurrentDeviceMessage")
+        : t("security.logoutOtherDeviceMessage"),
+      cancelText: t("common.cancel"),
+      confirmText: t("security.logoutDeviceAction"),
       onConfirm: async () => {
         try {
           setSubmitting(true);
@@ -117,8 +123,8 @@ export default function SecurityScreen() {
           await loadSessions();
         } catch (error: any) {
           MessageBoxService.error(
-            "Không thể đăng xuất thiết bị",
-            error?.message || "Vui lòng thử lại sau."
+            t("security.logoutDeviceFailed"),
+            error?.message || t("common.close")
           );
         } finally {
           setSubmitting(false);
@@ -129,11 +135,10 @@ export default function SecurityScreen() {
 
   const handleLogoutAll = () => {
     MessageBoxService.confirm({
-      title: "Đăng xuất mọi thiết bị",
-      content:
-        "Tất cả thiết bị đã đăng nhập sẽ bị đăng xuất. Bạn sẽ cần đăng nhập lại ở thiết bị này.",
-      cancelText: "Huỷ",
-      confirmText: "Đăng xuất",
+      title: t("security.logoutAllTitle"),
+      content: t("security.logoutAllMessage"),
+      cancelText: t("common.cancel"),
+      confirmText: t("security.logoutAll"),
       onConfirm: async () => {
         try {
           setSubmitting(true);
@@ -144,8 +149,8 @@ export default function SecurityScreen() {
           });
         } catch (error: any) {
           MessageBoxService.error(
-            "Không thể đăng xuất mọi thiết bị",
-            error?.message || "Vui lòng thử lại sau."
+            t("security.logoutAllFailed"),
+            error?.message || t("common.close")
           );
         } finally {
           setSubmitting(false);
@@ -155,21 +160,38 @@ export default function SecurityScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <AppHeader variant="hero" title="Bảo mật" onBack={() => navigation.goBack()} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenBackground }]}>
+      <AppHeader
+        variant="compact"
+        style={{ backgroundColor: theme.semantic.screenBackground }}
+        title={t("security.title")}
+        onBack={() => navigation.goBack()}
+      />
 
       <FlatList
         data={sessions}
         keyExtractor={(item) => item.sessionId}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: theme.layout.detailPadding,
+            paddingBottom: 24,
+            gap: theme.spacing.lg,
+          },
+        ]}
         ListHeaderComponent={
-          <View style={styles.headerBlock}>
+          <View style={{ marginTop: 16 }}>
             <SectionCard style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Thiết bị đã đăng nhập</Text>
-              <Text style={styles.summaryText}>
+              <Text style={[styles.summaryTitle, { color: theme.semantic.textPrimary }]}>
+                {t("security.sessionsTitle")}
+              </Text>
+              <Text style={[styles.summaryText, { color: theme.semantic.textSecondary }]}>
                 {loading
-                  ? "Đang tải danh sách thiết bị..."
-                  : `${sessions.length} thiết bị đang hoạt động, ${currentSessionCount} thiết bị hiện tại.`}
+                  ? t("security.loadingSessions")
+                  : t("security.sessionsSummary", {
+                      total: sessions.length,
+                      current: currentSessionCount,
+                    })}
               </Text>
             </SectionCard>
           </View>
@@ -177,9 +199,11 @@ export default function SecurityScreen() {
         ListEmptyComponent={
           !loading ? (
             <SectionCard style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Chưa có thiết bị nào</Text>
-              <Text style={styles.emptyText}>
-                Danh sách sẽ xuất hiện sau khi tài khoản đăng nhập trên thiết bị.
+              <Text style={[styles.emptyTitle, { color: theme.semantic.textPrimary }]}>
+                {t("security.emptyTitle")}
+              </Text>
+              <Text style={[styles.emptyText, { color: theme.semantic.textSecondary }]}>
+                {t("security.emptyDescription")}
               </Text>
             </SectionCard>
           ) : null
@@ -187,7 +211,12 @@ export default function SecurityScreen() {
         renderItem={({ item }) => (
           <SectionCard style={styles.sessionCard}>
             <View style={styles.sessionRow}>
-              <View style={styles.sessionIcon}>
+              <View
+                style={[
+                  styles.sessionIcon,
+                  { backgroundColor: theme.colors.primaryLight },
+                ]}
+              >
                 <Ionicons
                   name={item.isCurrent ? "phone-portrait-outline" : "hardware-chip-outline"}
                   size={20}
@@ -197,18 +226,36 @@ export default function SecurityScreen() {
 
               <View style={styles.sessionContent}>
                 <View style={styles.sessionHeader}>
-                  <Text style={styles.sessionTitle}>{getSessionTitle(item)}</Text>
+                  <Text style={[styles.sessionTitle, { color: theme.semantic.textPrimary }]}>
+                    {getSessionTitle(item)}
+                  </Text>
                   {item.isCurrent ? (
-                    <View style={styles.currentBadge}>
-                      <Text style={styles.currentBadgeText}>Hiện tại</Text>
+                    <View
+                      style={[
+                        styles.currentBadge,
+                        { backgroundColor: theme.colors.primaryLight },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.currentBadgeText,
+                          { color: theme.colors.primary },
+                        ]}
+                      >
+                        {t("common.current")}
+                      </Text>
                     </View>
                   ) : null}
                 </View>
-                <Text style={styles.sessionMeta}>
-                  Hoạt động gần nhất: {formatDateTime(item.lastUsedAt)}
+                <Text style={[styles.sessionMeta, { color: theme.semantic.textSecondary }]}>
+                  {t("security.lastUsed", {
+                    value: formatDateTime(item.lastUsedAt, locale),
+                  })}
                 </Text>
-                <Text style={styles.sessionMeta}>
-                  Đăng nhập từ: {formatDateTime(item.createdAt)}
+                <Text style={[styles.sessionMeta, { color: theme.semantic.textSecondary }]}>
+                  {t("security.signedInFrom", {
+                    value: formatDateTime(item.createdAt, locale),
+                  })}
                 </Text>
               </View>
 
@@ -217,7 +264,11 @@ export default function SecurityScreen() {
                 onPress={() => setMenuSession(item)}
                 hitSlop={10}
               >
-                <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.gray} />
+                <Ionicons
+                  name="ellipsis-vertical"
+                  size={18}
+                  color={theme.semantic.textSecondary}
+                />
               </Pressable>
             </View>
           </SectionCard>
@@ -225,7 +276,7 @@ export default function SecurityScreen() {
         ListFooterComponent={
           <View style={styles.footer}>
             <AppButton
-              title="Đăng xuất mọi thiết bị"
+              title={t("security.logoutAll")}
               onPress={handleLogoutAll}
               loading={submitting}
               disabled={loading || sessions.length === 0}
@@ -240,13 +291,25 @@ export default function SecurityScreen() {
         visible={Boolean(menuSession)}
         onRequestClose={() => setMenuSession(null)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setMenuSession(null)}>
-          <Pressable style={styles.modalCard} onPress={() => undefined}>
-            <Text style={styles.modalTitle}>
+        <Pressable
+          style={[styles.modalOverlay, { backgroundColor: theme.colors.overlay }]}
+          onPress={() => setMenuSession(null)}
+        >
+          <Pressable
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.semantic.screenSurface,
+                borderColor: theme.semantic.divider,
+              },
+            ]}
+            onPress={() => undefined}
+          >
+            <Text style={[styles.modalTitle, { color: theme.semantic.textPrimary }]}>
               {menuSession ? getSessionTitle(menuSession) : ""}
             </Text>
             <Pressable
-              style={styles.modalAction}
+              style={[styles.modalAction, { borderTopColor: theme.semantic.divider }]}
               onPress={() => menuSession && confirmLogoutDevice(menuSession)}
             >
               <Ionicons
@@ -254,7 +317,9 @@ export default function SecurityScreen() {
                 size={18}
                 color={theme.colors.error}
               />
-              <Text style={styles.modalActionText}>Đăng xuất thiết bị này</Text>
+              <Text style={[styles.modalActionText, { color: theme.colors.error }]}>
+                {t("security.logoutDeviceAction")}
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -266,26 +331,30 @@ export default function SecurityScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
-  content: {
-    paddingHorizontal: theme.layout.topLevelPadding,
-    paddingBottom: 24,
-    gap: theme.spacing.lg,
-  },
-  headerBlock: {
-    marginTop: 20,
-  },
+  content: {},
   summaryCard: {
     gap: 8,
   },
   summaryTitle: {
-    ...theme.typography.sectionTitle,
-    color: theme.colors.text,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "800",
   },
   summaryText: {
-    color: theme.colors.gray,
-    fontSize: theme.fontSize.sm,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  emptyCard: {
+    marginTop: 12,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  emptyText: {
+    marginTop: 8,
+    fontSize: 14,
     lineHeight: 20,
   },
   sessionCard: {
@@ -302,7 +371,6 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primaryLight,
   },
   sessionContent: {
     flex: 1,
@@ -315,80 +383,58 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sessionTitle: {
-    fontSize: theme.fontSize.md,
+    fontSize: 16,
     fontWeight: "800",
-    color: theme.colors.text,
   },
   currentBadge: {
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surface,
   },
   currentBadgeText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: "700",
-    color: theme.colors.primary,
+    fontSize: 12,
+    fontWeight: "800",
   },
   sessionMeta: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
+    fontSize: 13,
+    lineHeight: 18,
   },
   menuButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surface,
   },
   footer: {
     marginTop: 20,
-    marginBottom: 12,
-  },
-  emptyCard: {
-    marginTop: 12,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "800",
-    color: theme.colors.text,
-  },
-  emptyText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    lineHeight: 20,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.32)",
     justifyContent: "flex-end",
     padding: 20,
   },
   modalCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    gap: 12,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: "hidden",
   },
   modalTitle: {
-    fontSize: theme.fontSize.md,
+    fontSize: 16,
     fontWeight: "800",
-    color: theme.colors.text,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 12,
   },
   modalAction: {
-    minHeight: 50,
-    borderRadius: theme.radius.lg,
-    paddingHorizontal: 14,
+    minHeight: 56,
+    paddingHorizontal: 18,
+    borderTopWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#fff1f2",
   },
   modalActionText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: theme.colors.error,
+    fontSize: 15,
+    fontWeight: "800",
   },
 });

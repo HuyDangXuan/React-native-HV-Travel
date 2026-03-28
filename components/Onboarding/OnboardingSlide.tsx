@@ -1,5 +1,5 @@
 import { View, Text, Image, StyleSheet } from "react-native";
-import theme from "../../config/theme";
+import { useAppTheme } from "../../context/ThemeModeContext";
 
 type Props = {
   image: any;
@@ -12,11 +12,27 @@ export default function OnboardingSlide({
   title,
   description,
 }: Props) {
+  const theme = useAppTheme();
+
   return (
     <View style={styles.container}>
       <Image source={image} style={styles.image} />
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.desc}>{description}</Text>
+      <Text style={[styles.title, { marginTop: theme.spacing.md }, theme.typography.heroTitle]}>
+        {title}
+      </Text>
+      <Text
+        style={[
+          styles.desc,
+          {
+            marginTop: theme.spacing.sm,
+            paddingHorizontal: theme.spacing.lg,
+            color: theme.semantic.textSecondary,
+          },
+          theme.typography.body,
+        ]}
+      >
+        {description}
+      </Text>
     </View>
   );
 }
@@ -31,14 +47,9 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   title: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: "bold",
-    marginTop: theme.spacing.md,
+    textAlign: "center",
   },
   desc: {
     textAlign: "center",
-    marginTop: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    color: theme.colors.gray,
   },
 });

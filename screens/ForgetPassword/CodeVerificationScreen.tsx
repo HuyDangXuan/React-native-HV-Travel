@@ -6,7 +6,8 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import AppButton from "../../components/Button";
 import AppInput from "../../components/TextInput";
 import AppHeader from "../../components/ui/AppHeader";
-import theme from "../../config/theme";
+import { useI18n } from "../../context/I18nContext";
+import { useAppTheme } from "../../context/ThemeModeContext";
 import { AuthService } from "../../services/AuthService";
 import { verifyOtpSchema } from "../../validators/authSchema";
 import { MessageBoxService } from "../MessageBox/MessageBoxService";
@@ -26,6 +27,8 @@ export default function CodeVerificationScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { email, otpId } = route.params as { email: string; otpId: string };
+  const { t } = useI18n();
+  const theme = useAppTheme();
 
   useEffect(() => {
     setCurrentOtpId(otpId);
@@ -91,9 +94,9 @@ export default function CodeVerificationScreen() {
       }
     } catch (error: any) {
       MessageBoxService.error(
-        "Lỗi",
-        error?.message || "Không thể gửi lại mã xác nhận.",
-        "OK"
+        t("common.close"),
+        error?.message || t("forgotPassword.genericFailed"),
+        t("common.ok")
       );
     } finally {
       setLoading(false);
@@ -116,34 +119,42 @@ export default function CodeVerificationScreen() {
         });
       }
     } catch (error: any) {
-      MessageBoxService.error("Lỗi", error?.message || "Mã xác nhận không hợp lệ.", "OK");
+      MessageBoxService.error(
+        t("common.close"),
+        error?.message || t("forgotPassword.invalidCode"),
+        t("common.ok")
+      );
     } finally {
       setLoading(false);
     }
-  }, [code, currentOtpId, navigation, otpId]);
+  }, [code, currentOtpId, navigation, otpId, t]);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <AppHeader
-        variant="compact"
-        title="Xác nhận mã"
-        onBack={() => navigation.goBack()}
-      />
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
+      <AppHeader variant="compact" title={t("forgotPassword.verifyTitle")} onBack={() => navigation.goBack()} />
 
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { padding: theme.spacing.lg }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         automaticallyAdjustKeyboardInsets
         contentInsetAdjustmentBehavior="automatic"
       >
-        <Text style={styles.desc}>
-          Chúng tôi đã gửi một mã xác nhận đến email của bạn. Vui lòng kiểm tra
-          hộp thư đến và nhập mã để tiếp tục.
+        <Text
+          style={[
+            styles.desc,
+            {
+              fontSize: theme.fontSize.md,
+              color: theme.semantic.textPrimary,
+              marginBottom: theme.spacing.xl,
+            },
+          ]}
+        >
+          {t("forgotPassword.verifyDescription")}
         </Text>
 
         <AppInput
-          placeholder="Mã xác nhận"
+          placeholder={t("forgotPassword.verifyPlaceholder")}
           value={code}
           keyboardType="number-pad"
           onChangeText={(text) => {
@@ -160,14 +171,20 @@ export default function CodeVerificationScreen() {
           <Text
             style={[
               styles.resendCode,
-              { color: resendDisabled || loading ? theme.colors.gray : theme.colors.primary },
+              {
+                color:
+                  resendDisabled || loading ? theme.colors.gray : theme.colors.primary,
+                marginBottom: theme.spacing.md,
+              },
             ]}
           >
-            {resendDisabled ? `Gửi lại mã (${resendTimer}s)` : "Gửi lại mã"}
+            {resendDisabled
+              ? t("forgotPassword.resendCountdown", { seconds: resendTimer })
+              : t("forgotPassword.resend")}
           </Text>
         </Pressable>
 
-        <AppButton title="Xác nhận" onPress={handleVerifyCode} loading={loading} />
+        <AppButton title={t("forgotPassword.verify")} onPress={handleVerifyCode} loading={loading} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -176,21 +193,15 @@ export default function CodeVerificationScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.white,
   },
   container: {
     flexGrow: 1,
-    padding: theme.spacing.lg,
     justifyContent: "flex-start",
   },
   desc: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xl,
     textAlign: "center",
   },
   resendCode: {
     fontWeight: "600",
-    marginBottom: theme.spacing.md,
   },
 });

@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import theme from "../../config/theme";
+import { useAppTheme } from "../../context/ThemeModeContext";
 
 type Props = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -18,16 +18,54 @@ export default function EmptyState({
   actionLabel,
   onAction,
 }: Props) {
+  const theme = useAppTheme();
+
   return (
     <View style={styles.container}>
-      <View style={styles.iconCircle}>
+      <View
+        style={[
+          styles.iconCircle,
+          {
+            width: theme.semantic.emptyState.iconSize,
+            height: theme.semantic.emptyState.iconSize,
+            borderRadius: theme.semantic.emptyState.iconSize / 2,
+            backgroundColor: theme.colors.primaryLight,
+            marginBottom: theme.spacing.lg,
+          },
+        ]}
+      >
         <Ionicons name={icon} size={56} color={theme.colors.primary} />
       </View>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.description}>{description}</Text>
+      <Text style={[styles.title, { color: theme.semantic.textPrimary }, theme.typography.pageTitle]}>
+        {title}
+      </Text>
+      <Text
+        style={[
+          styles.description,
+          {
+            marginTop: theme.spacing.sm,
+            color: theme.semantic.textSecondary,
+          },
+          theme.typography.body,
+        ]}
+      >
+        {description}
+      </Text>
       {actionLabel && onAction ? (
-        <Pressable style={styles.action} onPress={onAction}>
-          <Text style={styles.actionText}>{actionLabel}</Text>
+        <Pressable
+          style={[
+            styles.action,
+            {
+              marginTop: theme.spacing.lg,
+              borderRadius: theme.radius.lg,
+              backgroundColor: theme.colors.primary,
+            },
+          ]}
+          onPress={onAction}
+        >
+          <Text style={[styles.actionText, { color: theme.colors.white, fontSize: theme.fontSize.sm }]}>
+            {actionLabel}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -38,39 +76,24 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: theme.semantic.emptyState.paddingHorizontal,
-    paddingVertical: theme.semantic.emptyState.paddingVertical,
+    paddingHorizontal: 32,
+    paddingVertical: 64,
   },
   iconCircle: {
-    width: theme.semantic.emptyState.iconSize,
-    height: theme.semantic.emptyState.iconSize,
-    borderRadius: theme.semantic.emptyState.iconSize / 2,
-    backgroundColor: theme.colors.primaryLight,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: theme.spacing.lg,
   },
   title: {
-    ...theme.typography.pageTitle,
-    color: theme.semantic.textPrimary,
     textAlign: "center",
   },
   description: {
-    marginTop: theme.spacing.sm,
-    ...theme.typography.body,
-    color: theme.semantic.textSecondary,
     textAlign: "center",
   },
   action: {
-    marginTop: theme.spacing.lg,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary,
   },
   actionText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.sm,
     fontWeight: "800",
   },
 });

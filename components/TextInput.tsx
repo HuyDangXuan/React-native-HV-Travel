@@ -1,14 +1,15 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
-  View,
-  TextInput,
-  TouchableOpacity,
   Image,
+  KeyboardTypeOptions,
   StyleSheet,
   Text,
-  KeyboardTypeOptions,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import theme from "../config/theme";
+
+import { useAppTheme } from "../context/ThemeModeContext";
 
 type Props = {
   value: string;
@@ -31,15 +32,33 @@ export default function AppInput({
 }: Props) {
   const [secure, setSecure] = useState(true);
   const [isFocused, setIsFocused] = useState(false);
+  const theme = useAppTheme();
 
   return (
-    <View style={styles.wrapper}>
-      {placeholder ? <Text style={styles.label}>{placeholder}</Text> : null}
+    <View style={[styles.wrapper, { marginBottom: theme.spacing.md }]}>
+      {placeholder ? (
+        <Text
+          style={[
+            styles.label,
+            { marginBottom: theme.spacing.xs, color: theme.semantic.textPrimary },
+          ]}
+        >
+          {placeholder}
+        </Text>
+      ) : null}
       <View
         style={[
           styles.container,
-          isFocused && styles.containerFocused,
-          error && styles.containerError,
+          {
+            borderColor: error
+              ? theme.colors.error
+              : isFocused
+                ? theme.colors.primary
+                : theme.semantic.divider,
+            borderRadius: theme.radius.lg,
+            paddingHorizontal: theme.spacing.md,
+            backgroundColor: theme.semantic.screenSurface,
+          },
         ]}
       >
         <TextInput
@@ -48,7 +67,14 @@ export default function AppInput({
           placeholder={placeholder}
           placeholderTextColor={error ? theme.colors.error : theme.colors.placeholder}
           secureTextEntry={isPassword && secure}
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              paddingVertical: theme.spacing.md,
+              color: theme.semantic.textPrimary,
+              fontSize: theme.fontSize.md,
+            },
+          ]}
           keyboardType={keyboardType}
           onFocus={() => setIsFocused(true)}
           onBlur={() => {
@@ -60,60 +86,48 @@ export default function AppInput({
           <TouchableOpacity onPress={() => setSecure(!secure)}>
             <Image
               source={secure ? theme.icon.eye : theme.icon.hidden}
-              style={[styles.icon, error && styles.iconError]}
+              style={[
+                styles.icon,
+                { tintColor: error ? theme.colors.error : theme.colors.icon },
+              ]}
             />
           </TouchableOpacity>
         ) : null}
       </View>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? (
+        <Text
+          style={[
+            styles.errorText,
+            { color: theme.colors.error, marginTop: 4, marginLeft: 4 },
+          ]}
+        >
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: theme.spacing.md,
-  },
+  wrapper: {},
   label: {
-    marginBottom: theme.spacing.xs,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
+    fontSize: 14,
     fontWeight: "700",
   },
   container: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.lg,
-    paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.white,
     minHeight: 56,
-  },
-  containerFocused: {
-    borderColor: theme.colors.primary,
-  },
-  containerError: {
-    borderColor: theme.colors.error,
   },
   input: {
     flex: 1,
-    paddingVertical: theme.spacing.md,
-    color: theme.colors.text,
-    fontSize: theme.fontSize.md,
   },
   icon: {
     width: 24,
     height: 24,
-    tintColor: theme.colors.icon || theme.colors.text,
-  },
-  iconError: {
-    tintColor: theme.colors.error,
   },
   errorText: {
-    color: theme.colors.error,
     fontSize: 12,
-    marginTop: 4,
-    marginLeft: 4,
   },
 });

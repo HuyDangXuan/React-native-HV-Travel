@@ -2,19 +2,19 @@ export const onboardingData = [
   {
     id: 1,
     image: require("../assets/onboarding1.png"),
-    title: "Khám phá tour",
-    description: "Hàng trăm tour chất lượng",
+    titleKey: "onboarding.slide1Title",
+    descriptionKey: "onboarding.slide1Description",
   },
   {
     id: 2,
     image: require("../assets/onboarding2.png"),
-    title: "Đặt vé nhanh",
-    description: "Chỉ vài bước là xong",
+    titleKey: "onboarding.slide2Title",
+    descriptionKey: "onboarding.slide2Description",
   },
   {
     id: 3,
     image: require("../assets/onboarding3.png"),
-    title: "Test",
-    description: "Test",
-  }
-];
+    titleKey: "onboarding.slide3Title",
+    descriptionKey: "onboarding.slide3Description",
+  },
+] as const;

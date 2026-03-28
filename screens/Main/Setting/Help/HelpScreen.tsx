@@ -17,14 +17,20 @@ export default function HelpScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenBackground }]}>
       <AppHeader
-        variant="hero"
+        variant="compact"
+        style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("help.title")}
-        subtitle={t("help.subtitle")}
         onBack={() => navigation.goBack()}
       />
 
-      <View style={[styles.content, { paddingHorizontal: theme.layout.topLevelPadding }]}>
+      <View style={[styles.content, { paddingHorizontal: theme.layout.detailPadding }]}>
         <SectionCard padded={false} style={{ marginTop: 20 }}>
+          <SettingRow
+            icon="information-circle-outline"
+            title={t("help.subtitle")}
+            trailing={<View />}
+            showBorder
+          />
           <SettingRow
             icon="help-buoy-outline"
             title={t("help.faqTitle")}

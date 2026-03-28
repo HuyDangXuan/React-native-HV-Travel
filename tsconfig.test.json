@@ -11,6 +11,7 @@
   },
   "include": [
     "config/api.ts",
+    "i18n/index.ts",
     "models/Booking.ts",
     "models/Customer.ts",
     "models/Review.ts",
@@ -18,6 +19,7 @@
     "models/Notification.ts",
     "utils/inboxNotifications.ts",
     "utils/loadingState.ts",
+    "utils/chatbot.ts",
     "utils/pullToRefresh.ts",
     "utils/tourSearch.ts",
     "utils/tourDetail.ts",

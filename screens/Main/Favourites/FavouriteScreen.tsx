@@ -12,12 +12,15 @@ import {
   NativeSyntheticEvent,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { StatusBar } from "expo-status-bar";
 import theme from "../../../config/theme";
 import { useNavigation } from "@react-navigation/native";
+import { useI18n } from "../../../context/I18nContext";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { FavouriteService } from "../../../services/FavouriteService";
 import { useAuth } from "../../../context/AuthContext";
+import { useAppTheme, useThemeMode } from "../../../context/ThemeModeContext";
 import { extractNumber } from "../../../utils/PriceUtils";
 import { Tour } from "../../../models/Tour";
 import { FavouriteItem } from "../../../services/dataAdapters";
@@ -60,7 +63,25 @@ const UI = {
 
 export default function FavouriteScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const { token } = useAuth();
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+  const ui = useMemo(
+    () => ({
+      bg: appTheme.semantic.screenBackground,
+      surface: appTheme.semantic.screenSurface,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      primary: appTheme.colors.primary,
+      placeholder: appTheme.colors.placeholder,
+      onPrimary: appTheme.colors.white,
+      error: appTheme.colors.error,
+    }),
+    [appTheme]
+  );
   const hasLoadedRef = useRef(false);
   const pullOffsetRef = useRef(0);
 
@@ -80,7 +101,7 @@ export default function FavouriteScreen() {
     if (showLoader) setLoading(true);
     try {
       if (!token) {
-        MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+        MessageBoxService.error(t("favourites.invalidSession"));
         navigation.replace("Login");
         return;
       }
@@ -99,7 +120,7 @@ export default function FavouriteScreen() {
           return {
             favouriteId: item.id,
             tourId: tour.id,
-            name: tour?.name ?? "Tour không xác định",
+            name: tour?.name ?? t("favourites.unknownTour"),
             rating: extractNumber(tour?.rating),
             price: tour?.price ?? { adult: 0, child: 0, infant: 0 },
             displayPrice,
@@ -118,13 +139,13 @@ export default function FavouriteScreen() {
       console.error("Fetch favourites error:", error);
       MessageBoxService.error(
         "Lỗi",
-        error?.message || "Không thể tải danh sách yêu thích",
+        error?.message || t("favourites.loadFailed"),
         "OK"
       );
     } finally {
       if (showLoader) setLoading(false);
     }
-  }, [navigation, token]);
+  }, [navigation, t, token]);
 
   useEffect(() => {
     if (hasLoadedRef.current) return;
@@ -170,27 +191,27 @@ export default function FavouriteScreen() {
     (tourId: string) => {
       MessageBoxService.confirm({
         title: "Xác nhận",
-        content: "Bạn có chắc muốn xóa tour này khỏi danh sách yêu thích?",
+        content: t("favourites.removeConfirm"),
         confirmText: "Xóa",
         cancelText: "Hủy",
         onConfirm: async () => {
           try {
             if (!token) {
-              MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+              MessageBoxService.error(t("favourites.invalidSession"));
               navigation.replace("Login");
               return;
             }
 
             await FavouriteService.deleteByTourId(token, tourId);
             setFavourites((prev) => prev.filter((item) => item.tourId !== tourId));
-            MessageBoxService.success("Thành công", "Đã xóa khỏi danh sách yêu thích", "OK");
+            MessageBoxService.success("Thành công", t("favourites.removed"), "OK");
           } catch (error: any) {
-            MessageBoxService.error("Lỗi", error?.message || "Không thể xóa", "OK");
+            MessageBoxService.error("Lỗi", error?.message || t("favourites.removeFailed"), "OK");
           }
         },
       });
     },
-    [navigation, token]
+    [navigation, t, token]
   );
 
   const filteredFavourites = useMemo(() => {
@@ -207,15 +228,18 @@ export default function FavouriteScreen() {
     }).format(price);
 
   const renderHeader = () => (
-    <View style={styles.headerContainer}>
+    <View style={[styles.headerContainer, { backgroundColor: ui.bg }]}>
       <View style={styles.headerTop}>
-        <Text style={styles.headerTitle}>{"Y\u00eau th\u00edch"}</Text>
+        <Text style={[styles.headerTitle, { color: ui.textPrimary }]}>{t("favourites.title")}</Text>
         {favourites.length > 0 ? (
-          <Pressable style={styles.filterToggleBtn} onPress={() => setShowFilters((prev) => !prev)}>
+          <Pressable
+            style={[styles.filterToggleBtn, { backgroundColor: ui.surface, borderColor: ui.border }]}
+            onPress={() => setShowFilters((prev) => !prev)}
+          >
             <MaterialCommunityIcons
               name={showFilters ? "filter-off-outline" : "filter-outline"}
               size={20}
-              color={UI.text}
+              color={ui.textPrimary}
             />
             {hasActiveFilter ? (
               <View style={styles.filterCountPill}>
@@ -225,12 +249,12 @@ export default function FavouriteScreen() {
           </Pressable>
         ) : null}
       </View>
-      <Text style={styles.headerSubtitle}>
+      <Text style={[styles.headerSubtitle, { color: ui.textSecondary }]}>
         {favourites.length === 0
-          ? "L\u01b0u l\u1ea1i c\u00e1c tour b\u1ea1n mu\u1ed1n quay l\u1ea1i sau"
-          : `${favourites.length} tour \u0111\u00e3 l\u01b0u`}
+          ? t("favourites.subtitleEmpty")
+          : t("favourites.subtitleCount", { count: favourites.length })}
       </Text>
-      <View style={styles.headerDivider} />
+      <View style={[styles.headerDivider, { borderBottomColor: ui.border }]} />
     </View>
   );
 
@@ -240,10 +264,10 @@ export default function FavouriteScreen() {
     return (
       <View style={styles.filterSection}>
         <View style={styles.filterSectionHead}>
-          <Text style={styles.filterSectionTitle}>Danh mục</Text>
+          <Text style={[styles.filterSectionTitle, { color: ui.textPrimary }]}>{t("favourites.categoryTitle")}</Text>
           {hasActiveFilter ? (
             <Pressable onPress={() => setSelectedCategory(null)}>
-              <Text style={styles.clearFilterText}>Xóa bộ lọc</Text>
+              <Text style={[styles.clearFilterText, { color: ui.primary }]}>{t("favourites.clearFilter")}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -254,11 +278,23 @@ export default function FavouriteScreen() {
           contentContainerStyle={styles.categoriesRow}
         >
           <Pressable
-            style={[styles.categoryChip, !selectedCategory && styles.categoryChipActive]}
+            style={[
+              styles.categoryChip,
+              { backgroundColor: ui.mutedSurface, borderColor: ui.border },
+              !selectedCategory && styles.categoryChipActive,
+              !selectedCategory && { backgroundColor: ui.primary, borderColor: ui.primary },
+            ]}
             onPress={() => setSelectedCategory(null)}
           >
-            <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextActive]}>
-              Tất cả
+            <Text
+              style={[
+                styles.categoryChipText,
+                { color: ui.textPrimary },
+                !selectedCategory && styles.categoryChipTextActive,
+                !selectedCategory && { color: ui.onPrimary },
+              ]}
+            >
+              {t("favourites.all")}
             </Text>
           </Pressable>
 
@@ -267,10 +303,22 @@ export default function FavouriteScreen() {
             return (
               <Pressable
                 key={category}
-                style={[styles.categoryChip, active && styles.categoryChipActive]}
+                style={[
+                  styles.categoryChip,
+                  { backgroundColor: ui.mutedSurface, borderColor: ui.border },
+                  active && styles.categoryChipActive,
+                  active && { backgroundColor: ui.primary, borderColor: ui.primary },
+                ]}
                 onPress={() => setSelectedCategory(active ? null : category)}
               >
-                <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    { color: ui.textPrimary },
+                    active && styles.categoryChipTextActive,
+                    active && { color: ui.onPrimary },
+                  ]}
+                >
                   {category}
                 </Text>
               </Pressable>
@@ -283,41 +331,37 @@ export default function FavouriteScreen() {
 
   const renderMainEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconCircle}>
-        <Ionicons name="heart-outline" size={60} color={UI.primary} />
+      <View style={[styles.emptyIconCircle, { backgroundColor: ui.mutedSurface }]}>
+        <Ionicons name="heart-outline" size={60} color={ui.primary} />
       </View>
-      <Text style={styles.emptyTitle}>Chưa có tour yêu thích</Text>
-      <Text style={styles.emptyDesc}>
-        Khi bạn lưu tour, chúng sẽ xuất hiện ở đây để tiện theo dõi và đặt lại sau.
-      </Text>
-      <Pressable style={styles.exploreButton} onPress={() => navigation.navigate("Home")}>
-        <Text style={styles.exploreButtonText}>Khám phá tour</Text>
-        <Ionicons name="arrow-forward" size={18} color={UI.white} />
+      <Text style={[styles.emptyTitle, { color: ui.textPrimary }]}>{t("favourites.emptyTitle")}</Text>
+      <Text style={[styles.emptyDesc, { color: ui.textSecondary }]}>{t("favourites.emptyDescription")}</Text>
+      <Pressable style={[styles.exploreButton, { backgroundColor: ui.primary }]} onPress={() => navigation.navigate("Home")}>
+        <Text style={[styles.exploreButtonText, { color: ui.onPrimary }]}>{t("favourites.exploreAction")}</Text>
+        <Ionicons name="arrow-forward" size={18} color={ui.onPrimary} />
       </Pressable>
     </View>
   );
 
   const renderFilterEmptyState = () => (
     <View style={styles.filterEmptyState}>
-      <View style={styles.filterEmptyIcon}>
-        <Ionicons name="filter-outline" size={26} color={UI.primary} />
+      <View style={[styles.filterEmptyIcon, { backgroundColor: ui.mutedSurface }]}>
+        <Ionicons name="filter-outline" size={26} color={ui.primary} />
       </View>
-      <Text style={styles.filterEmptyTitle}>Không có tour phù hợp bộ lọc</Text>
-      <Text style={styles.filterEmptyDesc}>
-        Thử xóa bộ lọc hiện tại để xem lại toàn bộ danh sách tour yêu thích.
-      </Text>
-      <Pressable style={styles.filterResetBtn} onPress={() => setSelectedCategory(null)}>
-        <Text style={styles.filterResetBtnText}>Xóa bộ lọc</Text>
+      <Text style={[styles.filterEmptyTitle, { color: ui.textPrimary }]}>{t("favourites.filteredEmptyTitle")}</Text>
+      <Text style={[styles.filterEmptyDesc, { color: ui.textSecondary }]}>{t("favourites.filteredEmptyDescription")}</Text>
+      <Pressable style={[styles.filterResetBtn, { backgroundColor: ui.mutedSurface }]} onPress={() => setSelectedCategory(null)}>
+        <Text style={[styles.filterResetBtnText, { color: ui.textPrimary }]}>{t("favourites.clearFilter")}</Text>
       </Pressable>
     </View>
   );
 
   const renderTourCard = ({ item }: { item: FavouriteTour }) => (
     <Pressable
-      style={styles.tourCard}
+      style={[styles.tourCard, { backgroundColor: ui.surface, borderColor: ui.border }]}
       onPress={() => navigation.navigate("TourDetailScreen", { id: item.tourId })}
     >
-      <View style={styles.imageWrap}>
+      <View style={[styles.imageWrap, { backgroundColor: ui.mutedSurface }]}>
         <Image source={{ uri: item.thumbnail }} style={styles.tourImage} resizeMode="cover" />
 
         {(item.discountPercent ?? 0) > 0 ? (
@@ -327,43 +371,43 @@ export default function FavouriteScreen() {
         ) : null}
 
         <Pressable
-          style={styles.removeFavouriteButton}
+          style={[styles.removeFavouriteButton, { backgroundColor: ui.surface, borderColor: ui.border }]}
           onPress={() => handleRemoveFavourite(item.tourId)}
         >
-          <Ionicons name="heart" size={18} color={UI.error} />
+          <Ionicons name="heart" size={18} color={ui.error} />
         </Pressable>
       </View>
 
       <View style={styles.tourContent}>
         <View style={styles.cardHeader}>
-          <Text style={styles.tourTitle} numberOfLines={1}>
+          <Text style={[styles.tourTitle, { color: ui.textPrimary }]} numberOfLines={1}>
             {item.name}
           </Text>
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={12} color="#F59E0B" />
-            <Text style={styles.ratingText}>{item.rating || "4.9"}</Text>
+            <Text style={[styles.ratingText, { color: ui.textPrimary }]}>{item.rating || "4.9"}</Text>
           </View>
         </View>
 
-        <Text style={styles.metaTextSingle} numberOfLines={1}>
-          {item.destinationCity || "Việt Nam"}
+        <Text style={[styles.metaTextSingle, { color: ui.textSecondary }]} numberOfLines={1}>
+          {item.destinationCity || t("favourites.defaultDestination")}
         </Text>
-        <Text style={styles.metaTextSingle} numberOfLines={1}>
+        <Text style={[styles.metaTextSingle, { color: ui.textSecondary }]} numberOfLines={1}>
           {item.durationText}
         </Text>
         {item.category ? (
-          <Text style={styles.metaCategory} numberOfLines={1}>
+          <Text style={[styles.metaCategory, { color: ui.textSecondary, backgroundColor: ui.mutedSurface }]} numberOfLines={1}>
             {item.category}
           </Text>
         ) : null}
 
         <View style={styles.priceRow}>
           {item.originalPrice ? (
-            <Text style={styles.oldPrice}>{formatPrice(item.originalPrice)}</Text>
+            <Text style={[styles.oldPrice, { color: ui.placeholder }]}>{formatPrice(item.originalPrice)}</Text>
           ) : null}
           <View style={styles.priceCurrentRow}>
             <Text style={styles.newPrice}>{formatPrice(item.displayPrice)}</Text>
-            <Text style={styles.priceUnit}>/ người</Text>
+            <Text style={[styles.priceUnit, { color: ui.textSecondary }]}>{t("favourites.perPerson")}</Text>
           </View>
         </View>
       </View>
@@ -371,7 +415,8 @@ export default function FavouriteScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: ui.bg }]} edges={["top"]}>
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} />
       {renderHeader()}
       {renderFilters()}
 

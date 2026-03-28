@@ -3,14 +3,15 @@ import { useNavigation } from "@react-navigation/native";
 import { useEffect } from "react";
 import { Image, StyleSheet, View } from "react-native";
 
-import theme from "../../config/theme";
 import { useAuth } from "../../context/AuthContext";
+import { useAppTheme } from "../../context/ThemeModeContext";
 import { useUser } from "../../context/UserContext";
 
 export default function SplashScreen() {
   const navigation = useNavigation<any>();
   const { loading, token } = useAuth();
   const { user } = useUser();
+  const theme = useAppTheme();
 
   useEffect(() => {
     if (loading) {
@@ -31,8 +32,17 @@ export default function SplashScreen() {
   }, [loading, navigation, token, user]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.logoWrap}>
+    <View style={[styles.container, { backgroundColor: theme.semantic.screenBackground }]}>
+      <View
+        style={[
+          styles.logoWrap,
+          {
+            backgroundColor: theme.semantic.screenSurface,
+            borderColor: theme.semantic.divider,
+          },
+          theme.shadow.md,
+        ]}
+      >
         <Image source={theme.icon.favicon} style={styles.logo} />
       </View>
     </View>
@@ -44,7 +54,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.background,
   },
   logoWrap: {
     width: 176,
@@ -52,10 +61,7 @@ const styles = StyleSheet.create({
     borderRadius: 88,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.white,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    ...theme.shadow.md,
   },
   logo: {
     width: 96,

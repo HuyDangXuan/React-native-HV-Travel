@@ -1,24 +1,19 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Image,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  FlatList,
-  Alert,
-} from "react-native";
+import { View, Image, Text, StyleSheet, ScrollView, Pressable, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import theme from "../../config/theme";
 import { useNavigation } from "@react-navigation/native";
+
+import AppHeader from "../../components/ui/AppHeader";
+import { useI18n } from "../../context/I18nContext";
+import { useAppTheme } from "../../context/ThemeModeContext";
 import { AccountStorageService, StoredAccount } from "../../services/AccountStorageService";
 import { MessageBoxService } from "../MessageBox/MessageBoxService";
 
 export default function AccountManager() {
   const navigation = useNavigation<any>();
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
+  const { t } = useI18n();
+  const theme = useAppTheme();
 
   useEffect(() => {
     loadAccounts();
@@ -26,56 +21,73 @@ export default function AccountManager() {
 
   const loadAccounts = async () => {
     const list = await AccountStorageService.getAccounts();
-    console.log("Danh sách tài khoản: ", list);
     setAccounts(list);
   };
 
   const handleRemove = (account: StoredAccount) => {
-
     MessageBoxService.confirm({
-      title: `Gỡ ${account.fullName}?`,
-      content: "Bạn sẽ cần nhập email và mật khẩu vào lần đăng nhập tiếp theo.",
-      confirmText: "Gỡ",
-      cancelText: "Huỷ",
-      onConfirm: async ()=>{
-        console.log("gỡ r");
+      title: t("accountManager.removeTitle", { name: account.fullName }),
+      content: t("accountManager.removeMessage"),
+      confirmText: t("accountManager.removeAction"),
+      cancelText: t("common.cancel"),
+      onConfirm: async () => {
         await AccountStorageService.removeAccount(account.id);
         loadAccounts();
-      }
-    })
+      },
+    });
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* HEADER */}
-        <View style={styles.containerHeader}>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </Pressable>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
+      <AppHeader
+        variant="compact"
+        title={t("accountManager.title")}
+        onBack={() => navigation.goBack()}
+      />
 
-          <Text style={styles.title}>Gỡ trang cá nhân khỏi thiết bị này</Text>
-        </View>
-
-        {/* ACCOUNT LIST */}
+      <ScrollView
+        contentContainerStyle={[styles.container, { padding: theme.layout.detailPadding }]}
+      >
         <FlatList
           data={accounts}
           keyExtractor={(item) => item.id}
           scrollEnabled={false}
           contentContainerStyle={{ gap: 12 }}
           renderItem={({ item }) => (
-            <View style={stylesAccount.card}>
+            <View
+              style={[
+                stylesAccount.card,
+                {
+                  backgroundColor: theme.semantic.screenSurface,
+                  borderColor: theme.semantic.divider,
+                },
+              ]}
+            >
               <Image source={item.avatar || theme.image.testAvatar} style={stylesAccount.avatar} />
 
-              <Text numberOfLines={1} style={stylesAccount.username}>
+              <Text
+                numberOfLines={1}
+                style={[
+                  stylesAccount.username,
+                  { color: theme.semantic.textPrimary, fontSize: theme.fontSize.sm },
+                ]}
+              >
                 {item.email}
               </Text>
 
               <Pressable
                 onPress={() => handleRemove(item)}
-                style={stylesAccount.removeBtn}
+                style={[
+                  stylesAccount.removeBtn,
+                  {
+                    borderColor: theme.semantic.divider,
+                    backgroundColor: theme.semantic.screenMutedSurface,
+                  },
+                ]}
               >
-                <Text style={stylesAccount.removeText}>Gỡ</Text>
+                <Text style={[stylesAccount.removeText, { color: theme.semantic.textPrimary }]}>
+                  {t("common.remove")}
+                </Text>
               </Pressable>
             </View>
           )}
@@ -85,38 +97,12 @@ export default function AccountManager() {
   );
 }
 
-
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.white,
   },
   container: {
     flexGrow: 1,
-    padding: 16,
-  },
-  containerHeader: {
-    marginBottom: theme.spacing.lg,
-    alignItems: "flex-start",
-    justifyContent: "center",
-    fontWeight: "bold",
-  },
-  moreBtn: {
-    top: 0,
-    right: 10,
-    padding: 8,
-    zIndex: 10,
-  },
-  image: {
-    width: 100,
-    height: 100,
-    margin: theme.spacing.xl,
-  },
-  title: {
-    marginTop: theme.spacing.md,
-    fontSize: theme.fontSize.md,
-    fontWeight: "bold",
-    textAlign: "center",
   },
 });
 
@@ -126,9 +112,7 @@ const stylesAccount = StyleSheet.create({
     alignItems: "center",
     padding: 12,
     borderRadius: 12,
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
   },
   avatar: {
     width: 56,
@@ -138,20 +122,16 @@ const stylesAccount = StyleSheet.create({
   },
   username: {
     flex: 1,
-    fontSize: 14,
     fontWeight: "600",
-    color: "#111",
   },
   removeBtn: {
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
   },
   removeText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#374151",
   },
 });

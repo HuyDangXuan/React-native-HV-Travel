@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import theme from "../../config/theme";
+import { StatusBar } from "expo-status-bar";
+
 import ScreenContainer from "./ScreenContainer";
 import SectionCard from "./SectionCard";
+import { useAppTheme, useThemeMode } from "../../context/ThemeModeContext";
 
 type Tone = "success" | "error" | "info";
 
@@ -22,12 +24,6 @@ type Props = {
   footerActions?: Action[];
 };
 
-const toneToColor: Record<Tone, string> = {
-  success: theme.colors.success,
-  error: theme.colors.error,
-  info: theme.colors.primary,
-};
-
 export default function ResultScreenLayout({
   tone = "info",
   icon,
@@ -36,14 +32,39 @@ export default function ResultScreenLayout({
   children,
   footerActions = [],
 }: Props) {
-  const accent = toneToColor[tone];
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+
+  const accent = useMemo(() => {
+    if (tone === "success") return appTheme.colors.success;
+    if (tone === "error") return appTheme.colors.error;
+    return appTheme.colors.primary;
+  }, [appTheme, tone]);
+
+  const ui = useMemo(
+    () => ({
+      bg: appTheme.semantic.screenSurface,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      divider: appTheme.semantic.divider,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      onPrimary: appTheme.colors.white,
+      accent,
+      accentSoft: `${accent}14`,
+    }),
+    [accent, appTheme]
+  );
+
+  const styles = useMemo(() => createStyles(appTheme, ui), [appTheme, ui]);
 
   return (
     <ScreenContainer variant="detail" edges={["top"]}>
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} backgroundColor={ui.bg} />
+
       <View style={styles.safe}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={[styles.heroCircle, { backgroundColor: `${accent}14` }]}>
-            <Ionicons name={icon} size={56} color={accent} />
+          <View style={[styles.heroCircle, { backgroundColor: ui.accentSoft }]}>
+            <Ionicons name={icon} size={56} color={ui.accent} />
           </View>
 
           <Text style={styles.title}>{title}</Text>
@@ -62,15 +83,15 @@ export default function ResultScreenLayout({
                 style={[
                   styles.action,
                   action.variant === "secondary"
-                    ? [styles.secondaryAction, { borderColor: accent }]
-                    : [styles.primaryAction, { backgroundColor: accent }],
+                    ? [styles.secondaryAction, { borderColor: ui.accent }]
+                    : [styles.primaryAction, { backgroundColor: ui.accent }],
                 ]}
               >
                 <Text
                   style={[
                     styles.actionText,
                     action.variant === "secondary"
-                      ? { color: accent }
+                      ? { color: ui.accent }
                       : styles.primaryActionText,
                   ]}
                 >
@@ -92,77 +113,87 @@ export function ResultCard({
   children: React.ReactNode;
   style?: any;
 }) {
-  return (
-    <SectionCard style={[styles.card, style]}>
-      {children}
-    </SectionCard>
-  );
+  const appTheme = useAppTheme();
+
+  return <SectionCard style={[{ padding: appTheme.spacing.lg }, style]}>{children}</SectionCard>;
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: theme.layout.detailPadding,
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.lg,
-  },
-  heroCircle: {
-    width: 116,
-    height: 116,
-    borderRadius: 58,
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "center",
-  },
-  title: {
-    marginTop: theme.spacing.lg,
-    ...theme.typography.heroTitle,
-    color: theme.semantic.textPrimary,
-    textAlign: "center",
-  },
-  subtitle: {
-    marginTop: theme.spacing.sm,
-    ...theme.typography.body,
-    color: theme.semantic.textSecondary,
-    textAlign: "center",
-  },
-  body: {
-    marginTop: theme.spacing.xl,
-    gap: theme.spacing.md,
-  },
-  card: {
-    padding: theme.spacing.lg,
-  },
-  bottomBar: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    padding: theme.layout.bottomBarPadding,
-    borderTopWidth: 1,
-    borderTopColor: theme.semantic.divider,
-    backgroundColor: theme.semantic.screenSurface,
-  },
-  action: {
-    minHeight: 54,
-    borderRadius: theme.radius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: theme.spacing.md,
-  },
-  primaryAction: {
-    flex: 1,
-  },
-  secondaryAction: {
-    flex: 1,
-    borderWidth: 1,
-    backgroundColor: theme.semantic.screenSurface,
-  },
-  actionText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "800",
-  },
-  primaryActionText: {
-    color: theme.colors.white,
-  },
-});
+function createStyles(
+  appTheme: ReturnType<typeof useAppTheme>,
+  ui: {
+    bg: string;
+    textPrimary: string;
+    textSecondary: string;
+    divider: string;
+    mutedSurface: string;
+    onPrimary: string;
+    accent: string;
+    accentSoft: string;
+  }
+) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: ui.bg,
+    },
+    scrollContent: {
+      paddingHorizontal: appTheme.layout.detailPadding,
+      paddingTop: appTheme.spacing.xl,
+      paddingBottom: appTheme.spacing.lg,
+    },
+    heroCircle: {
+      width: 116,
+      height: 116,
+      borderRadius: 58,
+      alignItems: "center",
+      justifyContent: "center",
+      alignSelf: "center",
+    },
+    title: {
+      marginTop: appTheme.spacing.lg,
+      ...appTheme.typography.heroTitle,
+      color: ui.textPrimary,
+      textAlign: "center",
+    },
+    subtitle: {
+      marginTop: appTheme.spacing.sm,
+      ...appTheme.typography.body,
+      color: ui.textSecondary,
+      textAlign: "center",
+    },
+    body: {
+      marginTop: appTheme.spacing.xl,
+      gap: appTheme.spacing.md,
+    },
+    bottomBar: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+      padding: appTheme.layout.bottomBarPadding,
+      borderTopWidth: 1,
+      borderTopColor: ui.divider,
+      backgroundColor: ui.bg,
+    },
+    action: {
+      minHeight: 54,
+      borderRadius: appTheme.radius.lg,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: appTheme.spacing.md,
+    },
+    primaryAction: {
+      flex: 1,
+    },
+    secondaryAction: {
+      flex: 1,
+      borderWidth: 1,
+      backgroundColor: ui.mutedSurface,
+    },
+    actionText: {
+      fontSize: appTheme.fontSize.md,
+      fontWeight: "800",
+    },
+    primaryActionText: {
+      color: ui.onPrimary,
+    },
+  });
+}

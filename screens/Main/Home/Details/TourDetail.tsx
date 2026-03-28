@@ -15,11 +15,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { StatusBar } from "expo-status-bar";
 
 import ChatbotButton from "../../../../components/Chatbot/ChatbotButton";
 import ChatbotModal from "../../../../components/Chatbot/ChatbotModal";
 import SkeletonBlock from "../../../../components/skeleton/SkeletonBlock";
-import theme from "../../../../config/theme";
+import { useAppTheme, useThemeMode } from "../../../../context/ThemeModeContext";
+import { useI18n } from "../../../../context/I18nContext";
 import { useAuth } from "../../../../context/AuthContext";
 import { FavouriteService } from "../../../../services/FavouriteService";
 import { TourService } from "../../../../services/TourService";
@@ -38,8 +40,13 @@ import ReviewTab from "./TourDetailTabs/ReviewTab";
 const { height, width } = Dimensions.get("window");
 const HERO_HEIGHT = height * 0.35;
 
-export type TabKey = "Tổng quan" | "Lịch trình" | "Đánh giá & Xếp hạng";
-const TAB_LABELS: TabKey[] = ["Tổng quan", "Lịch trình", "Đánh giá & Xếp hạng"];
+type TabKey = "overview" | "itinerary" | "reviews";
+
+const TAB_ITEMS: Array<{ key: TabKey; labelKey: string }> = [
+  { key: "overview", labelKey: "tourDetail.tabOverview" },
+  { key: "itinerary", labelKey: "tourDetail.tabItinerary" },
+  { key: "reviews", labelKey: "tourDetail.tabReviews" },
+];
 
 type TourDetailData = {
   id: string;
@@ -62,12 +69,67 @@ type TourDetailData = {
   status?: "Active" | "Inactive" | "SoldOut" | "ComingSoon";
 };
 
+const SYSTEM_ERROR_PATTERNS = [
+  /network request failed/i,
+  /failed to fetch/i,
+  /fetch failed/i,
+  /timeout/i,
+  /timed out/i,
+  /could not connect/i,
+  /connection lost/i,
+  /server error/i,
+  /unexpected token/i,
+];
+
+function isSystemErrorMessage(message: string) {
+  return SYSTEM_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  const message =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message ?? "").trim()
+      : "";
+
+  if (!message) return fallback;
+  return isSystemErrorMessage(message) ? fallback : message;
+}
+
+function getCurrencyLocale(locale: string) {
+  return locale === "vi" ? "vi-VN" : "en-US";
+}
+
 export default function TourDetail() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const tourId: string | undefined = route?.params?.id;
 
-  const [tab, setTab] = useState<TabKey>("Tổng quan");
+  const { t, locale } = useI18n();
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+  const ui = useMemo(
+    () => ({
+      bg: appTheme.semantic.screenBackground,
+      surface: appTheme.semantic.screenSurface,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      elevated: appTheme.semantic.screenElevated,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      primary: appTheme.colors.primary,
+      placeholder: appTheme.colors.placeholder,
+      onPrimary: appTheme.colors.white,
+      overlay: appTheme.colors.overlay,
+      error: appTheme.colors.error,
+      success: appTheme.colors.success,
+      overlayForeground: "#f8fafc",
+      overlayMuted: "rgba(248, 250, 252, 0.34)",
+    }),
+    [appTheme]
+  );
+  const styles = useMemo(() => createStyles(ui), [ui]);
+
+  const [tab, setTab] = useState<TabKey>("overview");
   const [openInEx, setOpenInEx] = useState(false);
   const [openFAQ, setOpenFAQ] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -81,9 +143,23 @@ export default function TourDetail() {
   const { token } = useAuth();
   const galleryRef = useRef<FlatList<string>>(null);
 
+  const currencyLocale = useMemo(() => getCurrencyLocale(locale), [locale]);
+
+  const formatVND = useCallback(
+    (value: number) =>
+      new Intl.NumberFormat(currencyLocale, { style: "currency", currency: "VND" }).format(
+        value || 0
+      ),
+    [currencyLocale]
+  );
+
   const fetchTourDetail = useCallback(async () => {
     if (!tourId) {
-      MessageBoxService.error("Lỗi", "Thiếu id tour.", "OK");
+      MessageBoxService.error(
+        t("tourDetail.errorTitle"),
+        t("tourDetail.missingTourId"),
+        t("common.ok")
+      );
       return;
     }
 
@@ -104,11 +180,15 @@ export default function TourDetail() {
       setTour(detail);
     } catch (error: any) {
       console.log("Fetch tour detail error:", error);
-      MessageBoxService.error("Lỗi", error?.message || "Không lấy được chi tiết tour.", "OK");
+      MessageBoxService.error(
+        t("tourDetail.errorTitle"),
+        getErrorMessage(error, t("tourDetail.loadFailed")),
+        t("common.ok")
+      );
     } finally {
       setLoading(false);
     }
-  }, [tourId]);
+  }, [t, tourId]);
 
   useEffect(() => {
     fetchTourDetail();
@@ -116,7 +196,11 @@ export default function TourDetail() {
 
   const handleToggleFavourite = useCallback(async () => {
     if (!tourId) {
-      MessageBoxService.error("Lỗi", "Thiếu id tour.", "OK");
+      MessageBoxService.error(
+        t("tourDetail.errorTitle"),
+        t("tourDetail.missingTourId"),
+        t("common.ok")
+      );
       return;
     }
 
@@ -126,31 +210,42 @@ export default function TourDetail() {
 
     try {
       if (!token) {
-        MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
-        navigation.replace("Login");
+        MessageBoxService.error(t("tourDetail.sessionExpired"));
+        navigation.replace("LoginScreen");
         return;
       }
 
       if (next) {
         await FavouriteService.addByTourId(token, tourId);
-        MessageBoxService.success("Thành công", "Đã thêm vào yêu thích", "OK");
+        MessageBoxService.success(
+          t("tourDetail.successTitle"),
+          t("tourDetail.favouriteAdded"),
+          t("common.ok")
+        );
       } else {
         await FavouriteService.deleteByTourId(token, tourId);
-        MessageBoxService.success("Thành công", "Đã xoá khỏi yêu thích", "OK");
+        MessageBoxService.success(
+          t("tourDetail.successTitle"),
+          t("tourDetail.favouriteRemoved"),
+          t("common.ok")
+        );
       }
     } catch (error: any) {
       setIsFavourite(!next);
-      MessageBoxService.error("Lỗi", error?.message || "Không thể cập nhật yêu thích", "OK");
+      MessageBoxService.error(
+        t("tourDetail.errorTitle"),
+        getErrorMessage(error, t("tourDetail.updateFavouriteFailed")),
+        t("common.ok")
+      );
     } finally {
       setFavLoading(false);
     }
-  }, [isFavourite, navigation, token, tourId]);
+  }, [isFavourite, navigation, t, token, tourId]);
 
   const checkIsFavourite = useCallback(async () => {
     if (!tourId) return;
     if (!token) {
-      MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
-      navigation.replace("Login");
+      setIsFavourite(false);
       return;
     }
 
@@ -161,7 +256,7 @@ export default function TourDetail() {
     } catch {
       // ignore favourite preload failures here
     }
-  }, [navigation, token, tourId]);
+  }, [token, tourId]);
 
   useEffect(() => {
     checkIsFavourite();
@@ -176,9 +271,11 @@ export default function TourDetail() {
   const heroImage = useMemo(() => galleryImages[0], [galleryImages]);
 
   const categoryText = useMemo(() => {
-    const category = tour?.category;
-    return category ? `Category: ${category}` : "Chưa rõ danh mục";
-  }, [tour?.category]);
+    const category = tour?.category?.trim();
+    return category
+      ? t("tourDetail.categoryLabel", { category })
+      : t("tourDetail.categoryFallback");
+  }, [t, tour?.category]);
 
   const priceAdult = useMemo(() => {
     const base = tour?.price?.adult ?? 0;
@@ -186,33 +283,9 @@ export default function TourDetail() {
     return discount > 0 ? Math.round(base * (1 - discount / 100)) : base;
   }, [tour]);
 
-  const formatVND = (value: number) =>
-    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(value || 0);
-
-  const tabContent = useMemo(() => {
-    switch (tab) {
-      case "Tổng quan":
-        return (
-          <OverviewTab
-            tour={tour}
-            openInEx={openInEx}
-            setOpenInEx={setOpenInEx}
-            openFAQ={openFAQ}
-            setOpenFAQ={setOpenFAQ}
-          />
-        );
-      case "Lịch trình":
-        return <ItineraryTab tour={tour} />;
-      case "Đánh giá & Xếp hạng":
-        return <ReviewTab tour={tour} />;
-      default:
-        return null;
-    }
-  }, [openFAQ, openInEx, tab, tour]);
-
   const openGallery = useCallback(
     (index = 0) => {
-      if (showContentSkeleton) return;
+      if (showContentSkeleton || galleryImages.length === 0) return;
 
       const nextIndex = clampGalleryIndex(index, galleryImages.length);
       setActiveImageIndex(nextIndex);
@@ -220,6 +293,29 @@ export default function TourDetail() {
     },
     [galleryImages.length, showContentSkeleton]
   );
+
+  const tabContent = useMemo(() => {
+    switch (tab) {
+      case "overview":
+        return (
+          <OverviewTab
+            tour={tour}
+            galleryImages={galleryImages}
+            onOpenGallery={openGallery}
+            openInEx={openInEx}
+            setOpenInEx={setOpenInEx}
+            openFAQ={openFAQ}
+            setOpenFAQ={setOpenFAQ}
+          />
+        );
+      case "itinerary":
+        return <ItineraryTab tour={tour} />;
+      case "reviews":
+        return <ReviewTab tour={tour} />;
+      default:
+        return null;
+    }
+  }, [galleryImages, openFAQ, openGallery, openInEx, tab, tour]);
 
   const closeGallery = useCallback(() => {
     setGalleryVisible(false);
@@ -248,6 +344,10 @@ export default function TourDetail() {
 
   return (
     <View style={styles.container}>
+      <StatusBar
+        style={themeName === "dark" ? "light" : "dark"}
+        backgroundColor={ui.bg}
+      />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.heroWrap}>
           {showContentSkeleton ? (
@@ -256,7 +356,7 @@ export default function TourDetail() {
             <Pressable style={styles.heroPressable} onPress={() => openGallery(0)}>
               <Image source={{ uri: heroImage }} style={styles.heroImg} resizeMode="cover" />
               <View style={styles.galleryBadge}>
-                <Ionicons name="images-outline" size={14} color={theme.colors.white} />
+                <Ionicons name="images-outline" size={14} color={ui.onPrimary} />
                 <Text style={styles.galleryBadgeText}>{galleryImages.length}</Text>
               </View>
             </Pressable>
@@ -265,7 +365,7 @@ export default function TourDetail() {
           <SafeAreaView style={styles.headerButtons} edges={["top"]}>
             <View style={styles.headerInner}>
               <Pressable style={styles.iconBtn} onPress={() => navigation.goBack()}>
-                <Ionicons name="arrow-back" size={28} color={theme.colors.text} />
+                <Ionicons name="arrow-back" size={28} color={ui.textPrimary} />
               </Pressable>
 
               <Pressable
@@ -279,7 +379,7 @@ export default function TourDetail() {
                 <Ionicons
                   name={isFavourite ? "heart" : "heart-outline"}
                   size={22}
-                  color={theme.colors.error}
+                  color={ui.error}
                 />
               </Pressable>
             </View>
@@ -288,7 +388,7 @@ export default function TourDetail() {
 
         <View style={styles.infoCard}>
           <View style={styles.locationRow}>
-            <Ionicons name="pricetag" size={16} color={theme.colors.primary} />
+            <Ionicons name="pricetag" size={16} color={ui.primary} />
             {showContentSkeleton ? (
               <SkeletonBlock style={styles.locationSkeleton} />
             ) : (
@@ -312,12 +412,12 @@ export default function TourDetail() {
             ) : (
               <>
                 <Text style={styles.packageTitle} numberOfLines={2}>
-                  {tour?.name || "Đang tải..."}
+                  {tour?.name || t("tourDetail.loadingTitle")}
                 </Text>
 
                 <View style={styles.priceGroup}>
                   <Text style={styles.priceText}>{formatVND(priceAdult)}</Text>
-                  <Text style={styles.estimatedText}>Giá người lớn</Text>
+                  <Text style={styles.estimatedText}>{t("tourDetail.adultPriceLabel")}</Text>
                 </View>
               </>
             )}
@@ -331,13 +431,15 @@ export default function TourDetail() {
           ) : (
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={16} color={theme.colors.gray} />
-                <Text style={styles.metaText}>{tour?.duration?.text || "N/A"}</Text>
+                <Ionicons name="time-outline" size={16} color={ui.textSecondary} />
+                <Text style={styles.metaText}>
+                  {tour?.duration?.text || t("tourDetail.unavailable")}
+                </Text>
               </View>
 
               {tour?.destination?.city && (
                 <View style={styles.metaItem}>
-                  <Ionicons name="location-outline" size={16} color={theme.colors.gray} />
+                  <Ionicons name="location-outline" size={16} color={ui.textSecondary} />
                   <Text style={styles.metaText}>{tour.destination.city}</Text>
                 </View>
               )}
@@ -346,17 +448,24 @@ export default function TourDetail() {
 
           {showContentSkeleton ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
-              {TAB_LABELS.map((label, index) => (
+              {TAB_ITEMS.map((item, index) => (
                 <SkeletonBlock
-                  key={label}
-                  style={[styles.tabSkeleton, index === TAB_LABELS.length - 1 && styles.tabSkeletonWide]}
+                  key={item.key}
+                  style={[styles.tabSkeleton, index === TAB_ITEMS.length - 1 && styles.tabSkeletonWide]}
                 />
               ))}
             </ScrollView>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
-              {TAB_LABELS.map((label) => (
-                <TabButton key={label} label={label} active={tab === label} onPress={() => setTab(label)} />
+              {TAB_ITEMS.map((item) => (
+                <TabButton
+                  key={item.key}
+                  label={t(item.labelKey)}
+                  active={tab === item.key}
+                  onPress={() => setTab(item.key)}
+                  styles={styles}
+                  ui={ui}
+                />
               ))}
             </ScrollView>
           )}
@@ -390,7 +499,7 @@ export default function TourDetail() {
           onPress={() => navigation.navigate("BookingScreen", { id: tour?.id || tourId })}
           disabled={showContentSkeleton || (!tour?.id && !tourId)}
         >
-          <Text style={styles.bookBtnText}>Đặt vé ngay</Text>
+          <Text style={styles.bookBtnText}>{t("tourDetail.bookNow")}</Text>
         </Pressable>
       </View>
 
@@ -433,27 +542,29 @@ export default function TourDetail() {
                 style={styles.galleryCloseBtn}
                 onPress={closeGallery}
                 accessibilityRole="button"
-                accessibilityLabel="Đóng xem ảnh"
+                accessibilityLabel={t("tourDetail.closeGallery")}
               >
-                <Ionicons name="close" size={28} color={theme.colors.white} />
+                <Ionicons name="close" size={28} color={ui.overlayForeground} />
               </Pressable>
 
               <Text style={styles.galleryCounter}>
                 {activeImageIndex + 1}/{galleryImages.length}
               </Text>
 
-              <View style={styles.galleryHeaderSpacer} />
+              <View style={styles.iconBtnSpacer} />
             </View>
           </SafeAreaView>
 
           <SafeAreaView style={styles.galleryFooterSafe} edges={["bottom"]} pointerEvents="box-none">
-            <View style={styles.galleryDots}>
-              {galleryImages.map((_, index) => (
-                <View
-                  key={index}
-                  style={[styles.galleryDot, index === activeImageIndex && styles.galleryDotActive]}
-                />
-              ))}
+            <View style={styles.galleryDotsWrap}>
+              <View style={styles.galleryDots}>
+                {galleryImages.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[styles.galleryDot, index === activeImageIndex && styles.galleryDotActive]}
+                  />
+                ))}
+              </View>
             </View>
           </SafeAreaView>
         </View>
@@ -466,385 +577,429 @@ function TabButton({
   label,
   active,
   onPress,
+  styles,
+  ui,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+  ui: {
+    surface: string;
+    mutedSurface: string;
+    textPrimary: string;
+    textSecondary: string;
+    primary: string;
+    onPrimary: string;
+  };
 }) {
   return (
-    <Pressable onPress={onPress} style={[styles.tabBtn, active && styles.tabBtnActive]}>
-      <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.tabBtn,
+        { backgroundColor: active ? ui.primary : ui.mutedSurface },
+        active && styles.tabBtnActive,
+      ]}
+    >
+      <Text style={[styles.tabText, { color: active ? ui.onPrimary : ui.textSecondary }]} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  heroWrap: {
-    width: "100%",
-    height: HERO_HEIGHT,
-    minHeight: 220,
-    maxHeight: 380,
-    position: "relative",
-  },
-  heroPressable: {
-    flex: 1,
-  },
-  heroImg: {
-    width: "100%",
-    height: "100%",
-  },
-  heroSkeleton: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 0,
-  },
-  galleryBadge: {
-    position: "absolute",
-    right: theme.spacing.md,
-    bottom: theme.spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: theme.radius.pill,
-    backgroundColor: "rgba(15, 23, 42, 0.58)",
-  },
-  galleryBadgeText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.xs,
-    fontWeight: "700",
-  },
-  headerButtons: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-  },
-  headerInner: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.7)",
-  },
-  favouriteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  infoCard: {
-    marginHorizontal: theme.spacing.md,
-    marginTop: -40,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.xs,
-    marginBottom: theme.spacing.sm,
-  },
-  locationText: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    fontWeight: "500",
-  },
-  locationSkeleton: {
-    width: 140,
-    height: 14,
-    borderRadius: 8,
-  },
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: theme.spacing.md,
-    gap: theme.spacing.md,
-  },
-  packageTitle: {
-    flex: 1,
-    paddingRight: theme.spacing.md,
-    fontSize: theme.fontSize.xl,
-    fontWeight: "700",
-    color: theme.colors.text,
-  },
-  titleSkeletonGroup: {
-    flex: 1,
-    gap: 10,
-    paddingRight: theme.spacing.md,
-  },
-  titleSkeleton: {
-    width: "92%",
-    height: 22,
-    borderRadius: 10,
-  },
-  titleSkeletonShort: {
-    width: "70%",
-    height: 18,
-    borderRadius: 10,
-  },
-  priceGroup: {
-    alignItems: "flex-end",
-  },
-  priceText: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: "700",
-    color: theme.colors.primary,
-  },
-  estimatedText: {
-    marginTop: 2,
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    fontWeight: "500",
-  },
-  priceSkeletonGroup: {
-    alignItems: "flex-end",
-    gap: 8,
-  },
-  priceSkeleton: {
-    width: 110,
-    height: 24,
-    borderRadius: 10,
-  },
-  priceLabelSkeleton: {
-    width: 74,
-    height: 12,
-    borderRadius: 6,
-  },
-  metaRow: {
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    flexWrap: "wrap",
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  metaText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
-  },
-  metaSkeleton: {
-    width: 120,
-    height: 18,
-    borderRadius: 9,
-  },
-  tabRow: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    paddingVertical: 2,
-  },
-  tabBtn: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: 999,
-    backgroundColor: theme.colors.surface,
-  },
-  tabBtnActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  tabText: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: "600",
-    color: theme.colors.gray,
-    maxWidth: 180,
-  },
-  tabTextActive: {
-    color: theme.colors.white,
-  },
-  tabSkeleton: {
-    width: 88,
-    height: 36,
-    borderRadius: 999,
-  },
-  tabSkeletonWide: {
-    width: 144,
-  },
-  contentWrap: {
-    paddingHorizontal: theme.spacing.md,
-  },
-  contentSkeletonWrap: {
-    gap: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-  },
-  contentTitleSkeleton: {
-    width: 180,
-    height: 24,
-    borderRadius: 10,
-  },
-  contentLineSkeleton: {
-    width: "100%",
-    height: 16,
-    borderRadius: 8,
-  },
-  contentLineShortSkeleton: {
-    width: "78%",
-    height: 16,
-    borderRadius: 8,
-  },
-  contentCardSkeleton: {
-    gap: 12,
-    padding: theme.spacing.lg,
-    borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.white,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  contentCardLine: {
-    width: "100%",
-    height: 16,
-    borderRadius: 8,
-  },
-  contentCardLineShort: {
-    width: "66%",
-    height: 16,
-    borderRadius: 8,
-  },
-  contentBottomSpacer: {
-    height: 90,
-  },
-  bottomBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.white,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: -2 },
-    elevation: 8,
-  },
-  bookBtn: {
-    height: 54,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  disabledBookBtn: {
-    opacity: 0.7,
-  },
-  bookBtnText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
-  galleryModal: {
-    flex: 1,
-    backgroundColor: "#050816",
-  },
-  galleryHeaderButtons: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 200,
-    elevation: 200,
-  },
-  galleryHeaderInner: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-  },
-  galleryCloseBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.68)",
-    zIndex: 220,
-    elevation: 220,
-  },
-  galleryHeaderSpacer: {
-    width: 40,
-    height: 40,
-  },
-  galleryCounter: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.sm,
-    fontWeight: "700",
-  },
-  gallerySlide: {
-    width,
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.md,
-  },
-  galleryImage: {
-    width: width - theme.spacing.lg * 2,
-    height: "72%",
-  },
-  galleryFooterSafe: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  galleryDots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    paddingBottom: theme.spacing.lg,
-  },
-  galleryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.28)",
-  },
-  galleryDotActive: {
-    width: 18,
-    backgroundColor: theme.colors.white,
-  },
-});
+function createStyles(ui: {
+  bg: string;
+  surface: string;
+  mutedSurface: string;
+  elevated: string;
+  textPrimary: string;
+  textSecondary: string;
+  border: string;
+  primary: string;
+  placeholder: string;
+  onPrimary: string;
+  overlay: string;
+  error: string;
+  success: string;
+  overlayForeground: string;
+  overlayMuted: string;
+}) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: ui.bg,
+    },
+    scrollContent: {
+      paddingBottom: 20,
+    },
+    heroWrap: {
+      width: "100%",
+      height: HERO_HEIGHT,
+      minHeight: 220,
+      maxHeight: 380,
+      position: "relative",
+    },
+    heroPressable: {
+      flex: 1,
+    },
+    heroImg: {
+      width: "100%",
+      height: "100%",
+    },
+    heroSkeleton: {
+      width: "100%",
+      height: "100%",
+      borderRadius: 0,
+    },
+    galleryBadge: {
+      position: "absolute",
+      right: 16,
+      bottom: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: ui.overlay,
+    },
+    galleryBadgeText: {
+      color: ui.onPrimary,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    headerButtons: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 100,
+    },
+    headerInner: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    iconBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: ui.surface,
+    },
+    iconBtnSpacer: {
+      width: 40,
+      height: 40,
+    },
+    favouriteButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: ui.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
+    infoCard: {
+      marginHorizontal: 16,
+      marginTop: -40,
+      backgroundColor: ui.surface,
+      borderRadius: 24,
+      padding: 24,
+      shadowColor: "#000",
+      shadowOpacity: 0.08,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    locationRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 8,
+    },
+    locationText: {
+      fontSize: 12,
+      color: ui.textSecondary,
+      fontWeight: "500",
+    },
+    locationSkeleton: {
+      width: 140,
+      height: 14,
+      borderRadius: 8,
+    },
+    rowBetween: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 16,
+      gap: 16,
+    },
+    packageTitle: {
+      flex: 1,
+      paddingRight: 16,
+      fontSize: 22,
+      fontWeight: "700",
+      color: ui.textPrimary,
+    },
+    titleSkeletonGroup: {
+      flex: 1,
+      gap: 10,
+      paddingRight: 16,
+    },
+    titleSkeleton: {
+      width: "92%",
+      height: 22,
+      borderRadius: 10,
+    },
+    titleSkeletonShort: {
+      width: "70%",
+      height: 18,
+      borderRadius: 10,
+    },
+    priceGroup: {
+      alignItems: "flex-end",
+    },
+    priceText: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: ui.primary,
+    },
+    estimatedText: {
+      marginTop: 2,
+      fontSize: 12,
+      color: ui.textSecondary,
+      fontWeight: "500",
+    },
+    priceSkeletonGroup: {
+      alignItems: "flex-end",
+      gap: 8,
+    },
+    priceSkeleton: {
+      width: 110,
+      height: 24,
+      borderRadius: 10,
+    },
+    priceLabelSkeleton: {
+      width: 74,
+      height: 12,
+      borderRadius: 6,
+    },
+    metaRow: {
+      flexDirection: "row",
+      gap: 16,
+      marginBottom: 16,
+      flexWrap: "wrap",
+    },
+    metaItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    metaText: {
+      fontSize: 14,
+      color: ui.textSecondary,
+      fontWeight: "600",
+    },
+    metaSkeleton: {
+      width: 120,
+      height: 18,
+      borderRadius: 9,
+    },
+    tabRow: {
+      flexDirection: "row",
+      gap: 8,
+      paddingVertical: 2,
+    },
+    tabBtn: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 999,
+    },
+    tabBtnActive: {
+      // color is driven inline from runtime theme
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: "600",
+      maxWidth: 180,
+    },
+    tabTextActive: {},
+    tabSkeleton: {
+      width: 88,
+      height: 36,
+      borderRadius: 999,
+    },
+    tabSkeletonWide: {
+      width: 144,
+    },
+    contentWrap: {
+      paddingHorizontal: 16,
+    },
+    contentSkeletonWrap: {
+      gap: 16,
+      paddingTop: 16,
+    },
+    contentTitleSkeleton: {
+      width: 180,
+      height: 24,
+      borderRadius: 10,
+    },
+    contentLineSkeleton: {
+      width: "100%",
+      height: 16,
+      borderRadius: 8,
+    },
+    contentLineShortSkeleton: {
+      width: "78%",
+      height: 16,
+      borderRadius: 8,
+    },
+    contentCardSkeleton: {
+      gap: 12,
+      padding: 24,
+      borderRadius: 24,
+      backgroundColor: ui.surface,
+      shadowColor: "#000",
+      shadowOpacity: 0.05,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    contentCardLine: {
+      width: "100%",
+      height: 16,
+      borderRadius: 8,
+    },
+    contentCardLineShort: {
+      width: "66%",
+      height: 16,
+      borderRadius: 8,
+    },
+    contentBottomSpacer: {
+      height: 90,
+    },
+    bottomBar: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      padding: 16,
+      backgroundColor: ui.surface,
+      borderTopWidth: 1,
+      borderTopColor: ui.border,
+      shadowColor: "#000",
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: -2 },
+      elevation: 8,
+    },
+    bookBtn: {
+      height: 54,
+      borderRadius: 16,
+      backgroundColor: ui.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    disabledBookBtn: {
+      opacity: 0.7,
+    },
+    bookBtnText: {
+      color: ui.onPrimary,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    galleryModal: {
+      flex: 1,
+      backgroundColor: ui.bg,
+    },
+    galleryHeaderButtons: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 200,
+      elevation: 200,
+    },
+    galleryHeaderInner: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 8,
+    },
+    galleryCloseBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: ui.overlay,
+      zIndex: 220,
+      elevation: 220,
+    },
+    galleryCounter: {
+      color: ui.overlayForeground,
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    gallerySlide: {
+      width,
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 16,
+    },
+    galleryImage: {
+      width: width - 32,
+      height: "72%",
+    },
+    galleryFooterSafe: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 210,
+      elevation: 210,
+    },
+    galleryDotsWrap: {
+      alignItems: "center",
+      paddingBottom: 24,
+    },
+    galleryDots: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 999,
+      backgroundColor: "rgba(15, 23, 42, 0.48)",
+    },
+    galleryDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: ui.overlayMuted,
+      opacity: 1,
+    },
+    galleryDotActive: {
+      width: 22,
+      backgroundColor: ui.overlayForeground,
+      opacity: 1,
+    },
+  });
+}

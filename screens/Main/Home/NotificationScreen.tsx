@@ -1,182 +1,206 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-} from "react-native";
+import React, { useMemo, useState } from "react";
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import theme from "../../../config/theme";
 import { useNavigation } from "@react-navigation/native";
 
-const TABS = ["Your Trips", "Campaigns"];
+import AppHeader from "../../../components/ui/AppHeader";
+import { useI18n } from "../../../context/I18nContext";
+import { useAppTheme } from "../../../context/ThemeModeContext";
 
-const DATA = [
-  {
-    id: "1",
-    icon: "bag",
-    title: "Your purchased 2 days Bandarban package waits for payment.",
-    time: "Apr 9, 8:30 PM",
-  },
-  {
-    id: "2",
-    icon: "sparkles",
-    title: "Congratulations! You've been assigned as a Cercle sponsor.",
-    time: "Apr 9, 8:30 PM",
-  },
-  {
-    id: "3",
-    icon: "star",
-    title: "Thank you for your rating, We'd love your feedback!",
-    time: "Apr 9, 8:30 PM",
-  },
-  {
-    id: "4",
-    icon: "trophy",
-    title: "You successfully finished your 2 days Cox-Bazar tour.",
-    time: "Mar 9, 8:30 PM",
-  },
-];
+type NotificationTab = "trips" | "campaigns";
+
+type NotificationItem = {
+  id: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  time: string;
+};
+
+function createStyles(theme: ReturnType<typeof useAppTheme>) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.semantic.screenBackground,
+    },
+    header: {
+      backgroundColor: theme.semantic.screenBackground,
+    },
+    tabs: {
+      flexDirection: "row",
+      marginHorizontal: theme.layout.detailPadding,
+      marginBottom: theme.spacing.md,
+      padding: 4,
+      borderRadius: theme.radius.pill,
+      backgroundColor: theme.semantic.screenMutedSurface,
+      marginTop: theme.spacing.md,
+    },
+    tab: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: theme.radius.pill,
+      gap: 6,
+    },
+    activeTab: {
+      backgroundColor: theme.semantic.screenSurface,
+    },
+    tabText: {
+      fontSize: 14,
+      color: theme.semantic.textSecondary,
+      fontWeight: "600",
+    },
+    activeText: {
+      color: theme.semantic.textPrimary,
+      fontWeight: "800",
+    },
+    badge: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      backgroundColor: theme.colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: theme.name === "dark" ? theme.semantic.screenBackground : "#ffffff",
+    },
+    item: {
+      flexDirection: "row",
+      paddingHorizontal: theme.layout.detailPadding,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.semantic.divider,
+      backgroundColor: theme.semantic.screenSurface,
+    },
+    iconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.colors.primaryLight,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
+    itemBody: {
+      flex: 1,
+    },
+    title: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.semantic.textPrimary,
+      marginBottom: 4,
+      fontWeight: "600",
+    },
+    time: {
+      fontSize: 12,
+      color: theme.semantic.textSecondary,
+    },
+  });
+}
 
 export default function NotificationScreen() {
-    const [activeTab, setActiveTab] = useState(0);
-    const navigation = useNavigation<any>();
+  const [activeTab, setActiveTab] = useState<NotificationTab>("trips");
+  const navigation = useNavigation<any>();
+  const { t } = useI18n();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const renderItem = ({ item }: any) => (
-    <View style={styles.item}>
-      <View style={styles.iconWrap}>
-        <Ionicons name={item.icon} size={20} color="#1E90FF" />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.time}>{item.time}</Text>
-      </View>
-    </View>
+  const tabs = useMemo(
+    () => [
+      { key: "trips" as const, label: t("notifications.yourTrips") },
+      { key: "campaigns" as const, label: t("notifications.campaigns") },
+    ],
+    [t]
+  );
+
+  const data = useMemo<NotificationItem[]>(
+    () => [
+      {
+        id: "1",
+        icon: "bag-outline",
+        title: t("notifications.item1"),
+        time: t("notifications.item1Time"),
+      },
+      {
+        id: "2",
+        icon: "sparkles-outline",
+        title: t("notifications.item2"),
+        time: t("notifications.item2Time"),
+      },
+      {
+        id: "3",
+        icon: "star-outline",
+        title: t("notifications.item3"),
+        time: t("notifications.item3Time"),
+      },
+      {
+        id: "4",
+        icon: "trophy-outline",
+        title: t("notifications.item4"),
+        time: t("notifications.item4Time"),
+      },
+    ],
+    [t]
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={()=> navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Thông báo</Text>
-        <View style={{ width: 22 }} />
-      </View>
+      <StatusBar
+        style={theme.name === "dark" ? "light" : "dark"}
+        backgroundColor={theme.semantic.screenBackground}
+      />
 
-      {/* Tabs */}
+      <AppHeader
+        variant="compact"
+        style={styles.header}
+        title={t("notifications.title")}
+        onBack={() => navigation.goBack()}
+      />
+
       <View style={styles.tabs}>
-        {TABS.map((tab, index) => (
-          <TouchableOpacity
-            key={tab}
-            style={[
-              styles.tab,
-              activeTab === index && styles.activeTab,
-            ]}
-            onPress={() => setActiveTab(index)}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === index && styles.activeText,
-              ]}
+        {tabs.map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, active && styles.activeTab]}
+              onPress={() => setActiveTab(tab.key)}
             >
-              {tab}
-            </Text>
-            {tab === "Campaigns" && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>4</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+              <Text style={[styles.tabText, active && styles.activeText]}>{tab.label}</Text>
+              {tab.key === "campaigns" ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>4</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* List */}
       <FlatList
-        data={DATA}
+        data={data}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => (
+          <View style={styles.item}>
+            <View style={styles.iconWrap}>
+              <Ionicons name={item.icon} size={20} color={theme.colors.primary} />
+            </View>
+            <View style={styles.itemBody}>
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.time}>{item.time}</Text>
+            </View>
+          </View>
+        )}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
     </SafeAreaView>
   );
 }
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    justifyContent: "space-between",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    
-  },
-  tabs: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderColor: "#eee",
-    marginLeft: theme.spacing.md,
-  },
-  tab: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderColor: "#1E90FF",
-  },
-  tabText: {
-    fontSize: 14,
-    color: "#888",
-  },
-  activeText: {
-    color: "#1E90FF",
-    fontWeight: "600",
-  },
-  badge: {
-    backgroundColor: "#1E90FF",
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    marginLeft: 6,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 12,
-  },
-  item: {
-    flexDirection: "row",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderColor: "#f0f0f0",
-  },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#EAF4FF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  title: {
-    fontSize: 14,
-    color: "#333",
-    marginBottom: 4,
-  },
-  time: {
-    fontSize: 12,
-    color: "#999",
-  },
-});

@@ -1,9 +1,10 @@
-import { NavigationContainer } from "@react-navigation/native";
+import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 
 import { I18nProvider } from "./context/I18nContext";
-import { ThemeModeProvider } from "./context/ThemeModeContext";
+import { ThemeModeProvider, useThemeMode } from "./context/ThemeModeContext";
 import { MessageBoxProvider } from "./screens/MessageBox/MessageBoxContext";
 import MessageBoxBridge from "./screens/MessageBox/MessageBoxBridge";
 
@@ -48,6 +49,123 @@ import TourSearchScreen from "./screens/Main/Home/Search/TourSearchScreen";
 
 const Stack = createNativeStackNavigator();
 
+function AppShell() {
+  const { theme, themeName } = useThemeMode();
+  const navigationTheme =
+    themeName === "dark"
+      ? {
+          ...DarkTheme,
+          colors: {
+            ...DarkTheme.colors,
+            background: theme.semantic.screenBackground,
+            card: theme.semantic.screenSurface,
+            text: theme.semantic.textPrimary,
+            border: theme.semantic.divider,
+            primary: theme.colors.primary,
+            notification: theme.colors.primary,
+          },
+        }
+      : {
+          ...DefaultTheme,
+          colors: {
+            ...DefaultTheme.colors,
+            background: theme.semantic.screenBackground,
+            card: theme.semantic.screenSurface,
+            text: theme.semantic.textPrimary,
+            border: theme.semantic.divider,
+            primary: theme.colors.primary,
+            notification: theme.colors.primary,
+          },
+        };
+
+  return (
+    <>
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} />
+      <NavigationContainer theme={navigationTheme}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="SplashScreen" component={SplashScreen} />
+          <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />
+          <Stack.Screen
+            name="LoginScreen"
+            component={LoginScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="AccountManager"
+            component={AccountManager}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="SignUpScreen"
+            component={SignUpScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="ForgetPasswordScreen"
+            component={ForgetPasswordScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="CodeVerificationScreen"
+            component={CodeVerificationScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="CreateNewPasswordScreen"
+            component={CreateNewPasswordScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="MainTabs"
+            component={MainTabs}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen name="ChatScreen" component={ChatScreen} />
+          <Stack.Screen name="UserProfileScreen" component={UserProfileScreen} />
+          <Stack.Screen name="TourDetailScreen" component={TourDetailScreen} />
+          <Stack.Screen name="BookingScreen" component={BookingScreen} />
+          <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
+          <Stack.Screen name="ZaloPayScreen" component={ZaloPayScreen} />
+          <Stack.Screen name="VNPayScreen" component={VNPayScreen} />
+          <Stack.Screen name="MoMoScreen" component={MoMoScreen} />
+          <Stack.Screen
+            name="PaymentSuccessScreen"
+            component={PaymentSuccessScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="PaymentFailedScreen"
+            component={PaymentFailedScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen name="MyBookingScreen" component={MyBookingScreen} />
+          <Stack.Screen name="SecurityScreen" component={SecurityScreen} />
+          <Stack.Screen name="LanguageScreen" component={LanguageScreen} />
+          <Stack.Screen name="AppearanceScreen" component={AppearanceScreen} />
+          <Stack.Screen name="HelpScreen" component={HelpScreen} />
+          <Stack.Screen name="TermsScreen" component={TermsScreen} />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
+          <Stack.Screen
+            name="BankTransferScreen"
+            component={BankTransferScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="CashPaymentScreen"
+            component={CashPaymentScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen name="Explore" component={ExploreScreen} />
+          <Stack.Screen name="TourMapScreen" component={TourMapScreen} />
+          <Stack.Screen name="NotificationScreen" component={NotificationScreen} />
+          <Stack.Screen name="TourSearchScreen" component={TourSearchScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -57,43 +175,7 @@ export default function App() {
             <MessageBoxBridge />
             <UserProvider>
               <AuthProvider>
-                <NavigationContainer>
-                  <Stack.Navigator screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="SplashScreen" component={SplashScreen} />
-                <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />
-                <Stack.Screen name="LoginScreen" component={LoginScreen} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="AccountManager" component={AccountManager} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="SignUpScreen" component={SignUpScreen} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="ForgetPasswordScreen" component={ForgetPasswordScreen} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="CodeVerificationScreen" component={CodeVerificationScreen} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="CreateNewPasswordScreen" component={CreateNewPasswordScreen} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="MainTabs" component={MainTabs} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="ChatScreen" component={ChatScreen} />
-                <Stack.Screen name="UserProfileScreen" component={UserProfileScreen} />
-                <Stack.Screen name="TourDetailScreen" component={TourDetailScreen} />
-                <Stack.Screen name="BookingScreen" component={BookingScreen} />
-                <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
-                <Stack.Screen name="ZaloPayScreen" component={ZaloPayScreen} />
-                <Stack.Screen name="VNPayScreen" component={VNPayScreen} />
-                <Stack.Screen name="MoMoScreen" component={MoMoScreen} />
-                <Stack.Screen name="PaymentSuccessScreen" component={PaymentSuccessScreen} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="PaymentFailedScreen" component={PaymentFailedScreen} options={{ gestureEnabled: false }} />
-                    <Stack.Screen name="MyBookingScreen" component={MyBookingScreen} />
-                    <Stack.Screen name="SecurityScreen" component={SecurityScreen} />
-                    <Stack.Screen name="LanguageScreen" component={LanguageScreen} />
-                    <Stack.Screen name="AppearanceScreen" component={AppearanceScreen} />
-                    <Stack.Screen name="HelpScreen" component={HelpScreen} />
-                    <Stack.Screen name="TermsScreen" component={TermsScreen} />
-                    <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-                    <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
-                <Stack.Screen name="BankTransferScreen" component={BankTransferScreen} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="CashPaymentScreen" component={CashPaymentScreen} options={{ gestureEnabled: false }} />
-                <Stack.Screen name="Explore" component={ExploreScreen} />
-                <Stack.Screen name="TourMapScreen" component={TourMapScreen} />
-                <Stack.Screen name="NotificationScreen" component={NotificationScreen} />
-                <Stack.Screen name="TourSearchScreen" component={TourSearchScreen} />
-                  </Stack.Navigator>
-                </NavigationContainer>
+                <AppShell />
               </AuthProvider>
             </UserProvider>
           </MessageBoxProvider>

@@ -12,33 +12,24 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
-import theme from "../../../config/theme";
 import AppHeader from "../../../components/ui/AppHeader";
 import IconButton from "../../../components/ui/IconButton";
 import EmptyState from "../../../components/ui/EmptyState";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { InboxItemSkeletonList } from "../../../components/skeleton/MainTabSkeletons";
 import { useAuth } from "../../../context/AuthContext";
+import { useI18n } from "../../../context/I18nContext";
+import { useAppTheme } from "../../../context/ThemeModeContext";
 import { ChatService } from "../../../services/ChatService";
-import { NotificationService } from "../../../services/NotificationService";
 import { ChatConversationSummary } from "../../../services/dataAdapters";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import { shouldTriggerOverlayRefresh } from "../../../utils/pullToRefresh";
 import { getPullRefreshDisplayState } from "../../../utils/loadingState";
-import {
-  InboxNotificationItem,
-  mapNotificationToInboxItem,
-  normalizeNotificationList,
-} from "../../../utils/inboxNotifications";
-
-type TabKey = "messages" | "notifications";
 
 type ConversationFilters = {
   conversationCode: string;
   customerId: string;
 };
-
-type NotificationItem = InboxNotificationItem;
 
 const EMPTY_FILTERS: ConversationFilters = {
   conversationCode: "",
@@ -74,26 +65,19 @@ const formatInboxTime = (value?: string) => {
 export default function InboxScreen() {
   const navigation = useNavigation<any>();
   const { token } = useAuth();
+  const { t } = useI18n();
+  const theme = useAppTheme();
   const hasLoadedMessagesRef = useRef(false);
-  const hasLoadedNotificationsRef = useRef(false);
   const pullOffsetRef = useRef(0);
 
-  const [activeTab, setActiveTab] = useState<TabKey>("messages");
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [refreshingMessages, setRefreshingMessages] = useState(false);
-  const [refreshingNotifications, setRefreshingNotifications] = useState(false);
   const [appliedFilters] = useState<ConversationFilters>(EMPTY_FILTERS);
 
   const unreadCount = useMemo(
     () => conversations.reduce((sum, item) => sum + item.unreadCount, 0),
     [conversations]
-  );
-  const unreadNotificationCount = useMemo(
-    () => notifications.reduce((sum, item) => sum + (item.isUnread ? 1 : 0), 0),
-    [notifications]
   );
 
   const {
@@ -104,24 +88,8 @@ export default function InboxScreen() {
     isRefreshing: refreshingMessages,
     data: conversations,
   });
-  const {
-    showInitialSkeleton: showInitialNotificationsSkeleton,
-    showRefreshSkeleton: showRefreshingNotificationsSkeleton,
-  } = getPullRefreshDisplayState({
-    isLoading: loadingNotifications,
-    isRefreshing: refreshingNotifications,
-    data: notifications,
-  });
-  const showMessagesSkeleton =
-    activeTab === "messages" &&
-    (showInitialMessagesSkeleton || showRefreshingMessagesSkeleton);
-  const showNotificationsSkeleton =
-    activeTab === "notifications" &&
-    (showInitialNotificationsSkeleton || showRefreshingNotificationsSkeleton);
-  const isCurrentTabBusy =
-    activeTab === "messages"
-      ? loadingMessages || refreshingMessages
-      : loadingNotifications || refreshingNotifications;
+  const showMessagesSkeleton = showInitialMessagesSkeleton || showRefreshingMessagesSkeleton;
+  const isCurrentTabBusy = loadingMessages || refreshingMessages;
 
   const loadConversations = useCallback(
     async ({
@@ -147,64 +115,23 @@ export default function InboxScreen() {
         setConversations([]);
         if (showError) {
           MessageBoxService.error(
-            "Lỗi",
-            error?.message || "Không thể tải danh sách trò chuyện",
-            "OK"
+            t("common.close"),
+            error?.message || t("inbox.emptyMessagesDescription"),
+            t("common.ok")
           );
         }
       } finally {
         if (showSkeleton) setLoadingMessages(false);
       }
     },
-    [appliedFilters, token]
-  );
-
-  const loadNotifications = useCallback(
-    async ({
-      showSkeleton = true,
-      showError = true,
-    }: {
-      showSkeleton?: boolean;
-      showError?: boolean;
-    } = {}) => {
-      if (!token) {
-        setNotifications([]);
-        setLoadingNotifications(false);
-        return;
-      }
-
-      try {
-        if (showSkeleton) setLoadingNotifications(true);
-        const response = await NotificationService.getNotifications(token);
-        const items = normalizeNotificationList(response).map(mapNotificationToInboxItem);
-        setNotifications(items);
-      } catch (error: any) {
-        setNotifications([]);
-        if (showError) {
-          MessageBoxService.error(
-            "Lỗi",
-            error?.message || "Không thể tải thông báo",
-            "OK"
-          );
-        }
-      } finally {
-        if (showSkeleton) setLoadingNotifications(false);
-      }
-    },
-    [token]
+    [appliedFilters, t, token]
   );
 
   useEffect(() => {
-    if (activeTab !== "messages" || hasLoadedMessagesRef.current) return;
+    if (hasLoadedMessagesRef.current) return;
     hasLoadedMessagesRef.current = true;
     loadConversations({ showSkeleton: true, showError: false });
-  }, [activeTab, loadConversations]);
-
-  useEffect(() => {
-    if (activeTab !== "notifications" || hasLoadedNotificationsRef.current) return;
-    hasLoadedNotificationsRef.current = true;
-    loadNotifications({ showSkeleton: true, showError: false });
-  }, [activeTab, loadNotifications]);
+  }, [loadConversations]);
 
   const onRefreshMessages = useCallback(async () => {
     if (refreshingMessages || loadingMessages) return;
@@ -216,24 +143,9 @@ export default function InboxScreen() {
     }
   }, [loadConversations, loadingMessages, refreshingMessages]);
 
-  const onRefreshNotifications = useCallback(async () => {
-    if (refreshingNotifications || loadingNotifications) return;
-    setRefreshingNotifications(true);
-    try {
-      await loadNotifications({ showSkeleton: false, showError: true });
-    } finally {
-      setRefreshingNotifications(false);
-    }
-  }, [loadNotifications, loadingNotifications, refreshingNotifications]);
-
   const onRefresh = useCallback(async () => {
-    if (activeTab === "messages") {
-      await onRefreshMessages();
-      return;
-    }
-
-    await onRefreshNotifications();
-  }, [activeTab, onRefreshMessages, onRefreshNotifications]);
+    await onRefreshMessages();
+  }, [onRefreshMessages]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -263,9 +175,7 @@ export default function InboxScreen() {
     async (item: ChatConversationSummary) => {
       setConversations((prev) =>
         prev.map((conversation) =>
-          conversation.id === item.id
-            ? { ...conversation, unreadCount: 0 }
-            : conversation
+          conversation.id === item.id ? { ...conversation, unreadCount: 0 } : conversation
         )
       );
 
@@ -273,7 +183,7 @@ export default function InboxScreen() {
         try {
           await ChatService.markConversationRead(token, item.id);
         } catch {
-          // ChatScreen will sync the server state again.
+          // Ignore optimistic update sync errors.
         }
       }
 
@@ -287,34 +197,19 @@ export default function InboxScreen() {
     [navigation, token]
   );
 
-  const handlePressNotification = useCallback(
-    async (item: NotificationItem) => {
-      if (!token || !item.isUnread) return;
-
-      setNotifications((prev) =>
-        prev.map((notification) =>
-          notification.id === item.id
-            ? { ...notification, isUnread: false }
-            : notification
-        )
-      );
-
-      try {
-        await NotificationService.markAsRead(token, item.id);
-      } catch {
-        // Keep UI responsive; the next refresh will resync if needed.
-      }
-    },
-    [token]
-  );
-
   const renderConversation = ({ item }: { item: ChatConversationSummary }) => (
     <Pressable
-      style={[styles.messageRow, item.unreadCount > 0 && styles.messageRowUnread]}
+      style={[
+        styles.messageRow,
+        item.unreadCount > 0 && {
+          backgroundColor:
+            theme.name === "dark" ? "rgba(34, 211, 238, 0.08)" : "rgba(18, 181, 164, 0.03)",
+        },
+      ]}
       onPress={() => handlePressConversation(item)}
     >
       <View style={styles.avatarWrap}>
-        <View style={styles.systemAvatar}>
+        <View style={[styles.systemAvatar, { backgroundColor: theme.colors.primaryLight }]}>
           <Ionicons name="chatbubble-ellipses-outline" size={24} color={theme.colors.primary} />
         </View>
       </View>
@@ -322,7 +217,11 @@ export default function InboxScreen() {
       <View style={styles.messageContent}>
         <View style={styles.messageHeader}>
           <Text
-            style={[styles.messageName, item.unreadCount > 0 && styles.messageNameUnread]}
+            style={[
+              styles.messageName,
+              { color: theme.semantic.textPrimary },
+              item.unreadCount > 0 && styles.messageNameUnread,
+            ]}
             numberOfLines={1}
           >
             {item.title}
@@ -330,76 +229,43 @@ export default function InboxScreen() {
 
           <View style={styles.messageHeaderMeta}>
             <Text
-              style={[styles.messageTime, item.unreadCount > 0 && styles.messageTimeUnread]}
+              style={[
+                styles.messageTime,
+                { color: theme.semantic.textSecondary },
+                item.unreadCount > 0 && { color: theme.colors.primary, fontWeight: "700" },
+              ]}
               numberOfLines={1}
             >
               {formatInboxTime(item.lastMessageAt)}
             </Text>
             {item.unreadCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.unreadCount}</Text>
+              <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
+                <Text style={[styles.badgeText, { color: theme.colors.white }]}>
+                  {item.unreadCount}
+                </Text>
               </View>
             ) : null}
           </View>
         </View>
 
-        <Text style={styles.messageStatus} numberOfLines={1}>
+        <Text style={[styles.messageStatus, { color: theme.colors.primary }]} numberOfLines={1}>
           {item.subtitle}
         </Text>
 
-        <Text style={styles.messageMeta} numberOfLines={1}>
-          {item.code ? `Mã: ${item.code}` : "Không có mã"}
-          {item.customerId ? ` • Customer: ${item.customerId}` : ""}
+        <Text style={[styles.messageMeta, { color: theme.semantic.textSecondary }]} numberOfLines={1}>
+          {item.code ? `Code: ${item.code}` : t("inbox.noCode")}
+          {item.customerId ? ` • ${t("inbox.customerLabel")}: ${item.customerId}` : ""}
         </Text>
 
         <Text
-          style={[styles.messagePreview, item.unreadCount > 0 && styles.messagePreviewUnread]}
+          style={[
+            styles.messagePreview,
+            { color: theme.semantic.textSecondary },
+            item.unreadCount > 0 && styles.messagePreviewUnread,
+          ]}
           numberOfLines={2}
         >
-          {item.preview || "Chưa có nội dung hiển thị."}
-        </Text>
-      </View>
-    </Pressable>
-  );
-
-  const renderNotification = ({ item }: { item: NotificationItem }) => (
-    <Pressable
-      style={[styles.messageRow, item.isUnread && styles.messageRowUnread]}
-      onPress={() => handlePressNotification(item)}
-    >
-      <View style={styles.avatarWrap}>
-        <View style={styles.systemAvatar}>
-          <Ionicons
-            name={item.systemIcon as keyof typeof Ionicons.glyphMap}
-            size={24}
-            color={theme.colors.primary}
-          />
-        </View>
-      </View>
-
-      <View style={styles.messageContent}>
-        <View style={styles.messageHeader}>
-          <Text
-            style={[styles.messageName, item.isUnread && styles.messageNameUnread]}
-            numberOfLines={1}
-          >
-            {item.title}
-          </Text>
-
-          <View style={styles.messageHeaderMeta}>
-            <Text style={[styles.messageTime, item.isUnread && styles.messageTimeUnread]}>
-              {item.time}
-            </Text>
-            {item.isUnread ? <View style={styles.notificationDot} /> : null}
-          </View>
-        </View>
-
-        <Text style={styles.notificationLabel}>Cập nhật hệ thống</Text>
-        <Text
-          style={[styles.messagePreview, item.isUnread && styles.messagePreviewUnread]}
-          numberOfLines={2}
-        >
-          {item.preview}
+          {item.preview || t("inbox.noPreview")}
         </Text>
       </View>
     </Pressable>
@@ -410,8 +276,8 @@ export default function InboxScreen() {
       return (
         <EmptyState
           icon="lock-closed-outline"
-          title="Bạn chưa đăng nhập"
-          description="Đăng nhập để xem lịch sử trò chuyện với tư vấn viên."
+          title={t("inbox.guestTitle")}
+          description={t("inbox.guestMessagesDescription")}
         />
       );
     }
@@ -419,34 +285,14 @@ export default function InboxScreen() {
     return (
       <EmptyState
         icon="chatbubbles-outline"
-        title="Chưa có tin nhắn"
-        description="Tin nhắn từ đội ngũ hỗ trợ sẽ hiển thị tại đây khi bạn bắt đầu trò chuyện."
-      />
-    );
-  };
-
-  const renderNotificationsEmptyState = () => {
-    if (!token) {
-      return (
-        <EmptyState
-          icon="lock-closed-outline"
-          title="Bạn chưa đăng nhập"
-          description="Đăng nhập để xem thông báo mới nhất từ hệ thống."
-        />
-      );
-    }
-
-    return (
-      <EmptyState
-        icon="notifications-outline"
-        title="Chưa có thông báo"
-        description="Thông báo về khuyến mãi, đặt vé và nhắc nhở sẽ hiển thị tại đây."
+        title={t("inbox.emptyMessagesTitle")}
+        description={t("inbox.emptyMessagesDescription")}
       />
     );
   };
 
   const renderListSkeleton = () => (
-    <View style={styles.listSkeletonWrap}>
+    <View style={[styles.listSkeletonWrap, { paddingHorizontal: theme.layout.topLevelPadding }]}>
       <InboxItemSkeletonList />
     </View>
   );
@@ -461,10 +307,11 @@ export default function InboxScreen() {
         data={conversations}
         keyExtractor={(item) => item.id}
         renderItem={renderConversation}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: theme.semantic.divider }]} />}
         ListEmptyComponent={renderMessagesEmptyState}
         contentContainerStyle={[
           styles.listContent,
+          { paddingHorizontal: theme.layout.topLevelPadding },
           conversations.length === 0 && styles.listContentEmpty,
         ]}
         onScroll={handleScroll}
@@ -476,79 +323,26 @@ export default function InboxScreen() {
     );
   };
 
-  const renderNotificationsContent = () => {
-    if (showNotificationsSkeleton) {
-      return renderListSkeleton();
-    }
-
-    return (
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id}
-        renderItem={renderNotification}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={renderNotificationsEmptyState}
-        contentContainerStyle={[
-          styles.listContent,
-          notifications.length === 0 && styles.listContentEmpty,
-        ]}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        onScrollEndDrag={handleScrollEndDrag}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-      />
-    );
-  };
-
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenBackground }]}>
+      <View style={[styles.header, { backgroundColor: theme.semantic.screenBackground }]}>
         <AppHeader
           variant="hero"
-          title="Tin nhắn"
+          title={t("inbox.title")}
           subtitle=""
-          right={<IconButton icon="options-outline" />}
+          right={
+            <IconButton
+              icon="notifications-outline"
+              badgeText={0}
+              onPress={() => navigation.navigate("NotificationScreen")}
+            />
+          }
         />
-
-        <View style={styles.tabRow}>
-          <Pressable
-            style={[styles.tab, activeTab === "messages" && styles.tabActive]}
-            onPress={() => setActiveTab("messages")}
-          >
-            <Text style={[styles.tabText, activeTab === "messages" && styles.tabTextActive]}>
-              Tin nhắn
-            </Text>
-            {unreadCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-
-          <Pressable
-            style={[styles.tab, activeTab === "notifications" && styles.tabActive]}
-            onPress={() => setActiveTab("notifications")}
-          >
-            <Text
-              style={[styles.tabText, activeTab === "notifications" && styles.tabTextActive]}
-            >
-              Thông báo
-            </Text>
-            {unreadNotificationCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadNotificationCount}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        </View>
       </View>
 
-      {activeTab === "messages" ? renderMessagesContent() : renderNotificationsContent()}
+      {renderMessagesContent()}
 
-      <LoadingOverlay
-        visible={activeTab === "messages" ? refreshingMessages : refreshingNotifications}
-      />
+      <LoadingOverlay visible={refreshingMessages} />
     </SafeAreaView>
   );
 }
@@ -556,63 +350,21 @@ export default function InboxScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
-  header: {
-    backgroundColor: theme.colors.background,
-  },
-  tabRow: {
-    flexDirection: "row",
-    gap: 24,
-    paddingHorizontal: theme.layout.topLevelPadding,
-    paddingTop: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  tab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingTop: 4,
-    paddingBottom: 14,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  tabActive: {
-    borderBottomColor: theme.colors.text,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: theme.colors.gray,
-  },
-  tabTextActive: {
-    fontWeight: "700",
-    color: theme.colors.text,
-  },
+  header: {},
   badge: {
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 6,
   },
   badgeText: {
-    color: theme.colors.white,
     fontSize: 11,
     fontWeight: "700",
   },
-  notificationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.primary,
-    marginTop: 6,
-  },
   listContent: {
-    paddingHorizontal: theme.layout.topLevelPadding,
     paddingTop: 4,
     paddingBottom: 24,
     flexGrow: 1,
@@ -622,7 +374,6 @@ const styles = StyleSheet.create({
   },
   listSkeletonWrap: {
     flex: 1,
-    paddingHorizontal: theme.layout.topLevelPadding,
     paddingTop: 20,
     paddingBottom: 24,
   },
@@ -630,9 +381,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     paddingVertical: 16,
-  },
-  messageRowUnread: {
-    backgroundColor: "rgba(18, 181, 164, 0.03)",
+    borderRadius: 18,
+    paddingHorizontal: 8,
   },
   avatarWrap: {
     paddingTop: 2,
@@ -641,7 +391,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: theme.colors.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -664,48 +413,31 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: "600",
-    color: theme.colors.text,
   },
   messageNameUnread: {
     fontWeight: "800",
   },
   messageTime: {
     fontSize: 12,
-    color: theme.colors.gray,
     fontWeight: "500",
-  },
-  messageTimeUnread: {
-    color: theme.colors.primary,
-    fontWeight: "700",
   },
   messageStatus: {
     fontSize: 12,
     fontWeight: "700",
-    color: theme.colors.primary,
     marginBottom: 4,
   },
   messageMeta: {
     fontSize: 12,
-    color: theme.colors.gray,
-    marginBottom: 4,
-  },
-  notificationLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: theme.colors.gray,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   messagePreview: {
-    fontSize: 14,
-    color: theme.colors.gray,
+    fontSize: 13,
     lineHeight: 20,
   },
   messagePreviewUnread: {
-    color: theme.colors.text,
     fontWeight: "600",
   },
   separator: {
     height: 1,
-    backgroundColor: theme.colors.surface,
   },
 });

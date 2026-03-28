@@ -6,7 +6,8 @@ import { useNavigation } from "@react-navigation/native";
 import AppButton from "../../components/Button";
 import AppInput from "../../components/TextInput";
 import AppHeader from "../../components/ui/AppHeader";
-import theme from "../../config/theme";
+import { useI18n } from "../../context/I18nContext";
+import { useAppTheme } from "../../context/ThemeModeContext";
 import { AuthService } from "../../services/AuthService";
 import { forgotPasswordSchema } from "../../validators/authSchema";
 import { MessageBoxService } from "../MessageBox/MessageBoxService";
@@ -20,6 +21,8 @@ export default function ForgetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
+  const theme = useAppTheme();
 
   const validateField = (fieldName: keyof FormErrors) => {
     const { error } = forgotPasswordSchema.validate({ email }, { abortEarly: true });
@@ -69,25 +72,25 @@ export default function ForgetPasswordScreen() {
     } catch (error: any) {
       if (error?.status === 404) {
         setErrors({
-          email: error.message || "Email không tồn tại trong hệ thống.",
+          email: error.message || t("forgotPassword.emailNotFound"),
         });
       } else if (error?.message === "Request failed") {
         MessageBoxService.error(
-          "Lỗi kết nối",
-          "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.",
-          "OK"
+          t("login.connectionErrorTitle"),
+          t("login.connectionErrorMessage"),
+          t("common.ok")
         );
       } else if (error?.message === "Request timeout") {
         MessageBoxService.error(
-          "Hết thời gian chờ",
-          "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.",
-          "OK"
+          t("login.timeoutTitle"),
+          t("login.timeoutMessage"),
+          t("common.ok")
         );
       } else {
         MessageBoxService.error(
-          "Lỗi",
-          error?.message || "Đã xảy ra lỗi. Vui lòng thử lại sau.",
-          "OK"
+          t("common.close"),
+          error?.message || t("forgotPassword.genericFailed"),
+          t("common.ok")
         );
       }
     } finally {
@@ -96,26 +99,31 @@ export default function ForgetPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <AppHeader
-        variant="compact"
-        title="Đặt lại mật khẩu"
-        onBack={() => navigation.goBack()}
-      />
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
+      <AppHeader variant="compact" title={t("forgotPassword.title")} onBack={() => navigation.goBack()} />
 
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { padding: theme.spacing.lg }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         automaticallyAdjustKeyboardInsets
         contentInsetAdjustmentBehavior="automatic"
       >
-        <Text style={styles.desc}>
-          Một mã xác nhận sẽ được gửi đến email của bạn để đặt lại mật khẩu.
+        <Text
+          style={[
+            styles.desc,
+            {
+              fontSize: theme.fontSize.md,
+              color: theme.semantic.textPrimary,
+              marginBottom: theme.spacing.xl,
+            },
+          ]}
+        >
+          {t("forgotPassword.description")}
         </Text>
 
         <AppInput
-          placeholder="Email"
+          placeholder={t("login.email")}
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -127,11 +135,7 @@ export default function ForgetPasswordScreen() {
           error={errors.email}
         />
 
-        <AppButton
-          title="Gửi mã xác nhận"
-          onPress={handleSendEmail}
-          loading={loading}
-        />
+        <AppButton title={t("forgotPassword.sendCode")} onPress={handleSendEmail} loading={loading} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -140,17 +144,12 @@ export default function ForgetPasswordScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.white,
   },
   container: {
     flexGrow: 1,
-    padding: theme.spacing.lg,
     justifyContent: "flex-start",
   },
   desc: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xl,
     textAlign: "center",
   },
 });

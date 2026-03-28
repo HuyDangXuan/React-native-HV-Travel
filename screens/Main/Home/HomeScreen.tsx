@@ -16,13 +16,16 @@ import {
 import MultiSlider from "@ptomasroos/react-native-multi-slider";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { StatusBar } from "expo-status-bar";
 import theme from "../../../config/theme";
+import { useI18n } from "../../../context/I18nContext";
 import { TourService } from "../../../services/TourService";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { useUser } from "../../../context/UserContext";
 import { FavouriteService } from "../../../services/FavouriteService";
 import { useAuth } from "../../../context/AuthContext";
+import { useAppTheme, useThemeMode } from "../../../context/ThemeModeContext";
 import { extractNumber } from "../../../utils/PriceUtils";
 import { Tour } from "../../../models/Tour";
 import { HomeContentSkeleton } from "../../../components/skeleton/MainTabSkeletons";
@@ -108,6 +111,39 @@ const DURATION_OPTIONS: { key: DurationOption; label: string }[] = [
 ];
 
 const RATING_OPTIONS = [0, 3, 4, 5];
+
+const getSortLabel = (t: (key: string, params?: Record<string, string | number>) => string, key: SortOption) => {
+  switch (key) {
+    case "price_asc":
+      return t("search.sortPriceAsc");
+    case "price_desc":
+      return t("search.sortPriceDesc");
+    case "rating":
+      return t("search.sortRating");
+    case "popular":
+    default:
+      return t("search.sortPopular");
+  }
+};
+
+const getDurationLabel = (
+  t: (key: string, params?: Record<string, string | number>) => string,
+  key: DurationOption
+) => {
+  switch (key) {
+    case "1":
+      return t("search.duration1");
+    case "2_3":
+      return t("search.duration2to3");
+    case "4_7":
+      return t("search.duration4to7");
+    case "7_plus":
+      return t("search.duration7plus");
+    case "all":
+    default:
+      return t("home.all");
+  }
+};
 
 const getCategoryMaterialIcon = (category: string) => {
   const c = category.toLowerCase();
@@ -388,8 +424,33 @@ const sliderStyles = StyleSheet.create({
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
   const { user } = useUser();
   const { token } = useAuth();
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+  const ui = useMemo(
+    () => ({
+      bg: appTheme.semantic.screenBackground,
+      surface: appTheme.semantic.screenSurface,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      primary: appTheme.colors.primary,
+      placeholder: appTheme.colors.placeholder,
+      onPrimary: appTheme.colors.white,
+      overlay: appTheme.colors.overlay,
+    }),
+    [appTheme]
+  );
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 11) return t("home.greetingMorning");
+    if (hour < 14) return t("home.greetingNoon");
+    if (hour < 18) return t("home.greetingAfternoon");
+    return t("home.greetingEvening");
+  }, [t]);
   const initialFilters = useMemo(() => getDefaultFilters(FALLBACK_PRICE_BOUNDS), []);
   const hasLoadedRef = useRef(false);
   const pullOffsetRef = useRef(0);
@@ -459,11 +520,11 @@ export default function HomeScreen() {
       await fetchFavouriteIds();
     } catch (e: any) {
       console.log("Fetch home error:", e);
-      MessageBoxService.error("Lỗi", e?.message || "Không lấy được dữ liệu.", "OK");
+      MessageBoxService.error("Lỗi", e?.message || t("home.loadFailed"), "OK");
     } finally {
       if (showLoader) setLoading(false);
     }
-  }, [fetchFavouriteIds]);
+  }, [fetchFavouriteIds, t]);
 
   const toggleFavourite = useCallback(
     async (tourId: string) => {
@@ -480,17 +541,17 @@ export default function HomeScreen() {
 
       try {
         if (!token) {
-          MessageBoxService.error("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại");
+          MessageBoxService.error(t("home.invalidSession"));
           navigation.replace("Login");
           return;
         }
 
         if (isFav) {
           await FavouriteService.deleteByTourId(token, tourId);
-          MessageBoxService.success("Thành công", "Đã xóa khỏi yêu thích", "OK");
+          MessageBoxService.success("Thành công", t("home.favouriteRemoved"), "OK");
         } else {
           await FavouriteService.addByTourId(token, tourId);
-          MessageBoxService.success("Thành công", "Đã thêm vào yêu thích", "OK");
+          MessageBoxService.success("Thành công", t("home.favouriteAdded"), "OK");
         }
       } catch (e: any) {
         setFavTourIds((prev) => {
@@ -499,7 +560,7 @@ export default function HomeScreen() {
           else next.delete(tourId);
           return next;
         });
-        MessageBoxService.error("Lỗi", e?.message || "Không thể cập nhật yêu thích", "OK");
+        MessageBoxService.error("Lỗi", e?.message || t("home.favouriteUpdateFailed"), "OK");
       } finally {
         setFavBusy((prev) => {
           const next = new Set(prev);
@@ -508,7 +569,7 @@ export default function HomeScreen() {
         });
       }
     },
-    [favTourIds, navigation, token]
+    [favTourIds, navigation, t, token]
   );
 
   useEffect(() => {
@@ -636,29 +697,30 @@ export default function HomeScreen() {
     }).format(price);
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.headerContainer}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: ui.bg }]} edges={["top"]}>
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} />
+      <View style={[styles.headerContainer, { backgroundColor: ui.bg }]}>
         <View style={styles.headerTop}>
           <View style={styles.greetingWrap}>
             {/* <MaterialCommunityIcons name="compass-outline" size={32} color={NEW_COLORS.primary} /> */}
             <View>
-              <Text style={styles.greetingText}>{getGreetingByHour()}</Text>
-              <Text style={styles.nameText}>{user?.fullName}</Text>
+              <Text style={[styles.greetingText, { color: ui.textSecondary }]}>{greeting}</Text>
+              <Text style={[styles.nameText, { color: ui.textPrimary }]}>{user?.fullName}</Text>
             </View>
           </View>
 
           <View style={styles.headerActions}>
             <Pressable
-              style={styles.notificationBtn}
+              style={[styles.notificationBtn, { backgroundColor: ui.surface, borderColor: ui.border }]}
               onPress={() => navigation.navigate("TourSearchScreen")}
             >
-              <Ionicons name="search-outline" size={22} color={NEW_COLORS.slate900} />
+              <Ionicons name="search-outline" size={22} color={ui.textPrimary} />
             </Pressable>
             <Pressable
-              style={styles.notificationBtn}
+              style={[styles.notificationBtn, { backgroundColor: ui.surface, borderColor: ui.border }]}
               onPress={() => navigation.navigate("NotificationScreen")}
             >
-              <Ionicons name="notifications-outline" size={26} color={NEW_COLORS.slate900} />
+              <Ionicons name="notifications-outline" size={26} color={ui.textPrimary} />
               <View style={styles.redDot} />
             </Pressable>
           </View>
@@ -667,47 +729,61 @@ export default function HomeScreen() {
         <View style={styles.searchWrap}>
           <View style={styles.searchPill}>
             <View style={styles.searchInputWrap}>
-              <Text style={styles.searchLabel}>Địa điểm</Text>
+              <Text style={[styles.searchLabel, { color: ui.textSecondary }]}>{t("home.searchLabel")}</Text>
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Tìm điểm đến"
-                placeholderTextColor={NEW_COLORS.slate400}
-                style={styles.searchInput}
+                placeholder={t("home.searchPlaceholder")}
+                placeholderTextColor={ui.placeholder}
+                style={[styles.searchInput, { color: ui.textPrimary }]}
               />
             </View>
             <Pressable style={styles.searchButton}>
-              <Ionicons name="search" size={20} color={NEW_COLORS.white} />
+              <Ionicons name="search" size={20} color={ui.onPrimary} />
             </Pressable>
           </View>
         </View>
       </View>
 
       {categories.length > 0 ? (
-        <View style={styles.categoriesWrap}>
+        <View style={[styles.categoriesWrap, { backgroundColor: ui.bg }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
             {categories.map((cat, index) => {
               const active = selectedCategory === cat;
               return (
                 <Pressable
                   key={cat || index}
-                  style={[styles.catItem, active && styles.catItemActive]}
+                  style={[
+                    styles.catItem,
+                    { backgroundColor: ui.mutedSurface },
+                    active && styles.catItemActive,
+                    active && { backgroundColor: ui.primary },
+                  ]}
                   onPress={() => setSelectedCategory(active ? null : cat)}
                 >
                   <MaterialCommunityIcons
                     name={getCategoryMaterialIcon(cat) as any}
                     size={20}
-                    color={active ? NEW_COLORS.white : NEW_COLORS.slate500}
+                    color={active ? ui.onPrimary : ui.textSecondary}
                   />
-                  <Text style={[styles.catText, active && styles.catTextActive]}>{cat}</Text>
+                  <Text
+                    style={[
+                      styles.catText,
+                      { color: ui.textSecondary, backgroundColor: "transparent" },
+                      active && styles.catTextActive,
+                      active && { color: ui.onPrimary },
+                    ]}
+                  >
+                    {cat}
+                  </Text>
                 </Pressable>
               );
             })}
           </ScrollView>
-          <View style={styles.headerDivider} />
+          <View style={[styles.headerDivider, { backgroundColor: ui.border }]} />
         </View>
       ) : (
-        <View style={styles.headerDivider} />
+        <View style={[styles.headerDivider, { backgroundColor: ui.border }]} />
       )}
 
       <ScrollView
@@ -724,10 +800,10 @@ export default function HomeScreen() {
           ) : (
             <>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>Gợi ý dành cho bạn</Text>
-            <Pressable style={styles.filterBtn} onPress={openFilterModal}>
-              <Ionicons name="options-outline" size={16} color={NEW_COLORS.slate900} />
-              <Text style={styles.filterText}>Bộ lọc</Text>
+            <Text style={[styles.sectionTitle, { color: ui.textPrimary }]}>{t("home.recommendedTitle")}</Text>
+            <Pressable style={[styles.filterBtn, { borderColor: ui.border, backgroundColor: ui.surface }]} onPress={openFilterModal}>
+              <Ionicons name="options-outline" size={16} color={ui.textPrimary} />
+              <Text style={[styles.filterText, { color: ui.textPrimary }]}>{t("home.filter")}</Text>
               {activeFilterCount > 0 && (
                 <View style={styles.filterCountBadge}>
                   <Text style={styles.filterCountText}>{activeFilterCount}</Text>
@@ -738,21 +814,19 @@ export default function HomeScreen() {
 
           {filteredTours.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="boat-outline" size={64} color={NEW_COLORS.slate400} />
-              <Text style={styles.emptyTitle}>Không tìm thấy tour</Text>
-              <Text style={styles.emptyDesc}>
-                Thử tìm với từ khóa khác hoặc điều chỉnh bộ lọc.
-              </Text>
+              <Ionicons name="boat-outline" size={64} color={ui.placeholder} />
+              <Text style={[styles.emptyTitle, { color: ui.textPrimary }]}>{t("home.noResultsTitle")}</Text>
+              <Text style={[styles.emptyDesc, { color: ui.textSecondary }]}>{t("home.noResultsDescription")}</Text>
             </View>
           ) : (
             <View style={styles.grid}>
               {filteredTours.map((tour) => (
                 <Pressable
                   key={tour.id}
-                  style={styles.card}
+                  style={[styles.card, { backgroundColor: "transparent" }]}
                   onPress={() => navigation.navigate("TourDetailScreen", { id: tour.id })}
                 >
-                  <View style={styles.imageWrap}>
+                  <View style={[styles.imageWrap, { backgroundColor: ui.mutedSurface }]}>
                     <Image source={{ uri: tour.thumbnail }} style={styles.image} />
 
                     <Pressable
@@ -766,7 +840,7 @@ export default function HomeScreen() {
                       <Ionicons
                         name={favTourIds.has(tour.id) ? "heart" : "heart-outline"}
                         size={24}
-                        color={favTourIds.has(tour.id) ? "#ef4444" : NEW_COLORS.white}
+                        color={favTourIds.has(tour.id) ? "#ef4444" : ui.onPrimary}
                         style={styles.favIconShadow}
                       />
                     </Pressable>
@@ -780,27 +854,27 @@ export default function HomeScreen() {
 
                   <View style={styles.cardInfo}>
                     <View style={styles.cardHeader}>
-                      <Text style={styles.cardTitle} numberOfLines={1}>
+                      <Text style={[styles.cardTitle, { color: ui.textPrimary }]} numberOfLines={1}>
                         {tour.name}
                       </Text>
                       <View style={styles.ratingRow}>
                         <Ionicons name="star" size={12} color="#F59E0B" />
-                        <Text style={styles.ratingText}>{tour.rating || "4.9"}</Text>
+                        <Text style={[styles.ratingText, { color: ui.textPrimary }]}>{tour.rating || "4.9"}</Text>
                       </View>
                     </View>
-                    <Text style={styles.cardSub} numberOfLines={1}>
-                      {tour.destinationCity || "Viet Nam"}
+                    <Text style={[styles.cardSub, { color: ui.textSecondary }]} numberOfLines={1}>
+                      {tour.destinationCity || t("home.defaultDestination")}
                     </Text>
-                    <Text style={styles.cardSub} numberOfLines={1}>
+                    <Text style={[styles.cardSub, { color: ui.textSecondary }]} numberOfLines={1}>
                       {tour.durationText}
                     </Text>
                     <View style={styles.priceRow}>
                       {tour.originalPrice ? (
-                        <Text style={styles.oldPrice}>{formatPrice(tour.originalPrice)}</Text>
+                        <Text style={[styles.oldPrice, { color: ui.placeholder }]}>{formatPrice(tour.originalPrice)}</Text>
                       ) : null}
                       <View style={styles.priceCurrentRow}>
                         <Text style={styles.priceVal}>{formatPrice(tour.displayPrice)}</Text>
-                        <Text style={styles.priceUnit}>/ người</Text>
+                        <Text style={[styles.priceUnit, { color: ui.textSecondary }]}>{t("home.perPerson")}</Text>
                       </View>
                     </View>
                   </View>
@@ -813,18 +887,20 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.showMore}>
-          <Text style={styles.showMoreQuery}>
-            Tiếp tục khám phá {selectedCategory ? selectedCategory.toLowerCase() : "các điểm đến"}
+          <Text style={[styles.showMoreQuery, { color: ui.textSecondary }]}>
+            {t("home.continueExplore", {
+              target: selectedCategory ? selectedCategory.toLowerCase() : t("home.destinations"),
+            })}
           </Text>
-          <Pressable style={styles.showMoreBtn}>
-            <Text style={styles.showMoreText}>Xem thêm</Text>
+          <Pressable style={[styles.showMoreBtn, { backgroundColor: ui.textPrimary }]}>
+            <Text style={[styles.showMoreText, { color: ui.onPrimary }]}>{t("home.showMore")}</Text>
           </Pressable>
         </View>
       </ScrollView>
 
       <View style={styles.mapFabContainer}>
         <Pressable
-          style={styles.mapFab}
+          style={[styles.mapFab, { backgroundColor: ui.textPrimary }]}
           onPress={() =>
             navigation.navigate("TourMapScreen", {
               tours: filteredTours.map((tour) => ({
@@ -836,49 +912,56 @@ export default function HomeScreen() {
             })
           }
         >
-          <Text style={styles.mapFabText}>Xem bản đồ</Text>
-          <Ionicons name="map" size={18} color={NEW_COLORS.white} />
+          <Text style={[styles.mapFabText, { color: ui.onPrimary }]}>{t("home.viewMap")}</Text>
+          <Ionicons name="map" size={18} color={ui.onPrimary} />
         </Pressable>
       </View>
       <LoadingOverlay visible={refreshing} />
 
       <Modal visible={filterVisible} transparent animationType="slide" onRequestClose={closeFilterModal}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: ui.overlay }]}>
           <Pressable style={styles.modalBackdrop} onPress={closeFilterModal} />
-          <View style={styles.filterSheet}>
-            <View style={styles.handleBar} />
+          <View style={[styles.filterSheet, { backgroundColor: ui.surface }]}>
+            <View style={[styles.handleBar, { backgroundColor: ui.border }]} />
 
-            <View style={styles.filterHeader}>
+            <View style={[styles.filterHeader, { borderBottomColor: ui.border }]}>
               <View>
-                <Text style={styles.filterSheetTitle}>Lọc & Sắp xếp</Text>
-                <Text style={styles.filterSheetSubtitle}>
-                  Chọn cách sắp xếp và lọc tour theo giá, thời lượng, đánh giá.
+                <Text style={[styles.filterSheetTitle, { color: ui.textPrimary }]}>{t("home.filterTitle")}</Text>
+                <Text style={[styles.filterSheetSubtitle, { color: ui.textSecondary }]}>
+                  {t("home.filterSubtitle")}
                 </Text>
               </View>
-              <Pressable style={styles.closeIconBtn} onPress={closeFilterModal}>
-                <Ionicons name="close" size={18} color={NEW_COLORS.slate900} />
+              <Pressable style={[styles.closeIconBtn, { backgroundColor: ui.mutedSurface }]} onPress={closeFilterModal}>
+                <Ionicons name="close" size={18} color={ui.textPrimary} />
               </Pressable>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
               <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Sắp xếp theo</Text>
+                <Text style={[styles.filterSectionTitle, { color: ui.textPrimary }]}>{t("home.sortBy")}</Text>
                 <View style={styles.optionGrid}>
                   {SORT_OPTIONS.map((option) => {
                     const active = draftFilters.sortBy === option.key;
                     return (
                       <Pressable
                         key={option.key}
-                        style={[styles.optionChip, active && styles.optionChipActive]}
+                        style={[
+                          styles.optionChip,
+                          { backgroundColor: ui.mutedSurface, borderColor: ui.border },
+                          active && styles.optionChipActive,
+                          active && { backgroundColor: ui.primary, borderColor: ui.primary },
+                        ]}
                         onPress={() => setDraftFilters((prev) => ({ ...prev, sortBy: option.key }))}
                       >
-                        <Ionicons
-                          name={option.icon}
-                          size={16}
-                          color={active ? NEW_COLORS.white : NEW_COLORS.slate700}
-                        />
-                        <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>
-                          {option.label}
+                        <Ionicons name={option.icon} size={16} color={active ? ui.onPrimary : ui.textPrimary} />
+                        <Text
+                          style={[
+                            styles.optionChipText,
+                            { color: active ? ui.onPrimary : ui.textPrimary },
+                            active && styles.optionChipTextActive,
+                          ]}
+                        >
+                          {getSortLabel(t, option.key)}
                         </Text>
                       </Pressable>
                     );
@@ -887,16 +970,25 @@ export default function HomeScreen() {
               </View>
 
               <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Khoảng giá</Text>
+                <Text style={[styles.filterSectionTitle, { color: ui.textPrimary }]}>{t("home.priceRange")}</Text>
                 <View style={styles.rangeSummary}>
-                  <View style={styles.rangeBadge}>
-                    <Text style={styles.rangeBadgeLabel}>Tối thiểu</Text>
-                    <Text style={styles.rangeBadgeValue}>{formatCompactPrice(normalizedDraftFilters.minPrice)}</Text>
+                  <View style={[styles.rangeBadge, { backgroundColor: ui.mutedSurface, borderColor: ui.border }]}>
+                    <Text style={[styles.rangeBadgeLabel, { color: ui.textSecondary }]}>{t("home.minPrice")}</Text>
+                    <Text style={[styles.rangeBadgeValue, { color: ui.textPrimary }]}>{formatCompactPrice(normalizedDraftFilters.minPrice)}</Text>
                   </View>
-                  <View style={styles.rangeTrack} />
-                  <View style={[styles.rangeBadge, styles.rangeBadgeHighlight]}>
-                    <Text style={styles.rangeBadgeLabel}>Tối đa</Text>
-                    <Text style={styles.rangeBadgeValue}>{formatCompactPrice(normalizedDraftFilters.maxPrice)}</Text>
+                  <View style={[styles.rangeTrack, { backgroundColor: ui.border }]} />
+                  <View
+                    style={[
+                      styles.rangeBadge,
+                      styles.rangeBadgeHighlight,
+                      {
+                        backgroundColor: themeName === "dark" ? "rgba(34, 211, 238, 0.12)" : ui.mutedSurface,
+                        borderColor: themeName === "dark" ? "rgba(34, 211, 238, 0.35)" : ui.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.rangeBadgeLabel, { color: ui.textSecondary }]}>{t("home.maxPrice")}</Text>
+                    <Text style={[styles.rangeBadgeValue, { color: ui.textPrimary }]}>{formatCompactPrice(normalizedDraftFilters.maxPrice)}</Text>
                   </View>
                 </View>
                 <PriceRangeSlider
@@ -908,37 +1000,40 @@ export default function HomeScreen() {
                   }}
                 />
                 <View style={styles.priceInputsRow}>
-                  <View style={styles.priceInputCard}>
-                    <Text style={styles.priceInputLabel}>Giá tối thiểu</Text>
+                  <View style={[styles.priceInputCard, { backgroundColor: ui.mutedSurface, borderColor: ui.border }]}>
+                    <Text style={[styles.priceInputLabel, { color: ui.textSecondary }]}>{t("home.minPrice")}</Text>
                     <TextInput
                       value={String(draftFilters.minPrice)}
                       onChangeText={(value) => updateDraftPrice("minPrice", value)}
                       keyboardType="numeric"
-                      style={styles.priceInput}
+                      style={[styles.priceInput, { color: ui.textPrimary }]}
                       placeholder={String(draftPriceBounds.minAvailablePrice)}
-                      placeholderTextColor={NEW_COLORS.slate400}
+                      placeholderTextColor={ui.placeholder}
                     />
                   </View>
-                  <View style={styles.priceInputCard}>
-                    <Text style={styles.priceInputLabel}>Giá tối đa</Text>
+                  <View style={[styles.priceInputCard, { backgroundColor: ui.mutedSurface, borderColor: ui.border }]}>
+                    <Text style={[styles.priceInputLabel, { color: ui.textSecondary }]}>{t("home.maxPrice")}</Text>
                     <TextInput
                       value={String(draftFilters.maxPrice)}
                       onChangeText={(value) => updateDraftPrice("maxPrice", value)}
                       keyboardType="numeric"
-                      style={styles.priceInput}
+                      style={[styles.priceInput, { color: ui.textPrimary }]}
                       placeholder={String(draftPriceBounds.sliderMaxPrice)}
-                      placeholderTextColor={NEW_COLORS.slate400}
+                      placeholderTextColor={ui.placeholder}
                     />
                   </View>
                 </View>
-                <Text style={styles.rangeHint}>
-                  Dải giá tour hiện có: {formatCompactPrice(draftPriceBounds.minAvailablePrice)} - {formatCompactPrice(draftPriceBounds.maxAvailablePrice)}.
-                  Nếu nhập mức cao hơn, thanh kéo sẽ tự mở rộng đến {formatCompactPrice(draftPriceBounds.sliderMaxPrice)}.
+                <Text style={[styles.rangeHint, { color: ui.textSecondary }]}>
+                  {t("home.availableRangeExpanded", {
+                    min: formatCompactPrice(draftPriceBounds.minAvailablePrice),
+                    max: formatCompactPrice(draftPriceBounds.maxAvailablePrice),
+                    sliderMax: formatCompactPrice(draftPriceBounds.sliderMaxPrice),
+                  })}
                 </Text>
               </View>
 
               <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Thời lượng</Text>
+                <Text style={[styles.filterSectionTitle, { color: ui.textPrimary }]}>{t("home.duration")}</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -949,11 +1044,23 @@ export default function HomeScreen() {
                     return (
                       <Pressable
                         key={option.key}
-                        style={[styles.durationChip, active && styles.durationChipActive]}
+                        style={[
+                          styles.durationChip,
+                          { backgroundColor: ui.mutedSurface, borderColor: ui.border },
+                          active && styles.durationChipActive,
+                          active && { backgroundColor: ui.primary, borderColor: ui.primary },
+                        ]}
                         onPress={() => setDraftFilters((prev) => ({ ...prev, duration: option.key }))}
                       >
-                        <Text style={[styles.durationChipText, active && styles.durationChipTextActive]}>
-                          {option.label}
+                        <Text
+                          style={[
+                            styles.durationChipText,
+                            { color: ui.textPrimary },
+                            active && styles.durationChipTextActive,
+                            active && { color: ui.onPrimary },
+                          ]}
+                        >
+                          {getDurationLabel(t, option.key)}
                         </Text>
                       </Pressable>
                     );
@@ -962,7 +1069,7 @@ export default function HomeScreen() {
               </View>
 
               <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Đánh giá</Text>
+                <Text style={[styles.filterSectionTitle, { color: ui.textPrimary }]}>{t("home.rating")}</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -973,7 +1080,12 @@ export default function HomeScreen() {
                     return (
                       <Pressable
                         key={String(rating)}
-                        style={[styles.ratingChip, active && styles.ratingChipActive]}
+                        style={[
+                          styles.ratingChip,
+                          { backgroundColor: ui.mutedSurface, borderColor: ui.border },
+                          active && styles.ratingChipActive,
+                          active && { backgroundColor: ui.primary, borderColor: ui.primary },
+                        ]}
                         onPress={() => setDraftFilters((prev) => ({ ...prev, minRating: rating }))}
                       >
                         <Ionicons
@@ -981,8 +1093,15 @@ export default function HomeScreen() {
                           size={15}
                           color={active ? "#fef08a" : "#f59e0b"}
                         />
-                        <Text style={[styles.ratingChipText, active && styles.ratingChipTextActive]}>
-                          {rating === 0 ? "Tất cả" : `${rating}+ sao`}
+                        <Text
+                          style={[
+                            styles.ratingChipText,
+                            { color: ui.textPrimary },
+                            active && styles.ratingChipTextActive,
+                            active && { color: ui.onPrimary },
+                          ]}
+                        >
+                          {rating === 0 ? t("home.all") : t("home.starsPlus", { count: rating })}
                         </Text>
                       </Pressable>
                     );
@@ -991,12 +1110,14 @@ export default function HomeScreen() {
               </View>
             </ScrollView>
 
-            <View style={styles.sheetActionBar}>
-              <Pressable style={styles.resetBtn} onPress={resetDraftFilters}>
-                <Text style={styles.resetBtnText}>Đặt lại</Text>
+            <View style={[styles.sheetActionBar, { borderTopColor: ui.border, backgroundColor: ui.surface }]}>
+              <Pressable style={[styles.resetBtn, { backgroundColor: ui.mutedSurface, borderColor: ui.border }]} onPress={resetDraftFilters}>
+                <Text style={[styles.resetBtnText, { color: ui.textPrimary }]}>{t("home.reset")}</Text>
               </Pressable>
-              <Pressable style={styles.applyBtn} onPress={applyFilters}>
-                <Text style={styles.applyBtnText}>Xem {draftResultCount} kết quả</Text>
+              <Pressable style={[styles.applyBtn, { backgroundColor: ui.primary }]} onPress={applyFilters}>
+                <Text style={[styles.applyBtnText, { color: ui.onPrimary }]}>
+                  {t("home.viewResults", { count: draftResultCount })}
+                </Text>
               </Pressable>
             </View>
           </View>

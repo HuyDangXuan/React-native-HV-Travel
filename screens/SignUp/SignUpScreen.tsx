@@ -1,15 +1,18 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 import React from "react";
-import { StyleSheet, View} from 'react-native';
+import { StyleSheet, View } from "react-native";
+
 import SignUpHeader from "./SignUpHeader";
 import SignUpForm from "./SignUpForm";
 import SignUpFooter from "./SignUpFooter";
-import theme from "../../config/theme";
+import { useAppTheme } from "../../context/ThemeModeContext";
 
 export default function SignUpScreen() {
+  const theme = useAppTheme();
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
+      <View style={[styles.container, { padding: theme.spacing.md }]}>
         <SignUpHeader />
         <SignUpForm />
         <SignUpFooter />
@@ -21,11 +24,9 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.white,
   },
   container: {
     flexGrow: 1,
-    padding: 16,
     justifyContent: "flex-start",
   },
 });

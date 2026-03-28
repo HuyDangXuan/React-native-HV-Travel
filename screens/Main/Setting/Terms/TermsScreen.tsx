@@ -20,7 +20,9 @@ function TermBlock({
   return (
     <View style={styles.termBlock}>
       <Text style={[styles.termTitle, { color: theme.semantic.textPrimary }]}>{title}</Text>
-      <Text style={[styles.termBody, { color: theme.semantic.textSecondary }]}>{body}</Text>
+      {body ? (
+        <Text style={[styles.termBody, { color: theme.semantic.textSecondary }]}>{body}</Text>
+      ) : null}
     </View>
   );
 }
@@ -33,14 +35,15 @@ export default function TermsScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenBackground }]}>
       <AppHeader
-        variant="hero"
+        variant="compact"
+        style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("terms.title")}
-        subtitle={t("terms.subtitle")}
         onBack={() => navigation.goBack()}
       />
 
-      <View style={[styles.content, { paddingHorizontal: theme.layout.topLevelPadding }]}>
-        <SectionCard style={{ marginTop: 20 }}>
+      <View style={[styles.content, { paddingHorizontal: theme.layout.detailPadding }]}>
+        <SectionCard style={{ marginTop: 16 }}>
+          <TermBlock title={t("terms.subtitle")} body="" />
           <TermBlock title={t("terms.bookingTitle")} body={t("terms.bookingBody")} />
           <TermBlock title={t("terms.paymentTitle")} body={t("terms.paymentBody")} />
           <TermBlock title={t("terms.accountTitle")} body={t("terms.accountBody")} />
