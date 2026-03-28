@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-//const base_url = "https://hv-travel-api.vercel.app/api";
-const base_url = "http://192.168.10.4:4000/api";
+const base_url = "https://hv-travel-api.vercel.app/api";
+//const base_url = "http://192.168.10.4:4000/api";
 const api = {
     check_connect_db: base_url + "/test",
     login: base_url + "/auth/login",

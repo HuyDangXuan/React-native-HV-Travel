@@ -16,16 +16,35 @@ export default function OnboardingSlide({
 
   return (
     <View style={styles.container}>
-      <Image source={image} style={styles.image} />
-      <Text style={[styles.title, { marginTop: theme.spacing.md }, theme.typography.heroTitle]}>
+      <View
+        style={[
+          styles.imageStageInner,
+          {
+            backgroundColor: theme.semantic.screenElevated,
+            borderColor: theme.semantic.divider,
+          },
+        ]}
+      >
+        <Image source={image} style={styles.image} />
+      </View>
+      <Text
+        style={[
+          styles.title,
+          {
+            marginTop: theme.spacing.lg,
+            color: theme.semantic.textPrimary,
+          },
+          theme.typography.heroTitle,
+        ]}
+      >
         {title}
       </Text>
       <Text
         style={[
           styles.desc,
           {
-            marginTop: theme.spacing.sm,
-            paddingHorizontal: theme.spacing.lg,
+            marginTop: theme.spacing.md,
+            paddingHorizontal: theme.spacing.md,
             color: theme.semantic.textSecondary,
           },
           theme.typography.body,
@@ -40,6 +59,15 @@ export default function OnboardingSlide({
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
+    width: "100%",
+  },
+  imageStageInner: {
+    width: 290,
+    height: 290,
+    borderRadius: 145,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   image: {
     width: 260,
@@ -48,8 +76,10 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: "center",
+    maxWidth: 300,
   },
   desc: {
     textAlign: "center",
+    maxWidth: 320,
   },
 });

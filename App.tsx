@@ -1,12 +1,21 @@
-import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import {
+  createNavigationContainerRef,
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useEffect, useRef } from "react";
 
+import { AuthSessionService } from "./services/AuthSessionService";
 import { I18nProvider } from "./context/I18nContext";
+import { useI18n } from "./context/I18nContext";
 import { ThemeModeProvider, useThemeMode } from "./context/ThemeModeContext";
 import { MessageBoxProvider } from "./screens/MessageBox/MessageBoxContext";
 import MessageBoxBridge from "./screens/MessageBox/MessageBoxBridge";
+import { MessageBoxService } from "./screens/MessageBox/MessageBoxService";
 
 import SplashScreen from "./screens/Splash/SplashScreen";
 import OnboardingScreen from "./screens/Onboarding/OnboardingScreen";
@@ -48,9 +57,12 @@ import TourSearchScreen from "./screens/Main/Home/Search/TourSearchScreen";
 
 
 const Stack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef();
 
 function AppShell() {
   const { theme, themeName } = useThemeMode();
+  const { t } = useI18n();
+  const sessionExpiredHandledRef = useRef(false);
   const navigationTheme =
     themeName === "dark"
       ? {
@@ -78,10 +90,39 @@ function AppShell() {
           },
         };
 
+  useEffect(() => {
+    const unsubscribe = AuthSessionService.subscribeSessionExpired(() => {
+      if (sessionExpiredHandledRef.current) {
+        return;
+      }
+
+      sessionExpiredHandledRef.current = true;
+      MessageBoxService.error(
+        t("common.error"),
+        t("common.sessionExpired"),
+        t("common.ok"),
+        () => {
+          if (navigationRef.isReady()) {
+            navigationRef.reset({
+              index: 0,
+              routes: [{ name: "MainTabs" as never }],
+            });
+          }
+
+          sessionExpiredHandledRef.current = false;
+        }
+      );
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [t]);
+
   return (
     <>
       <StatusBar style={themeName === "dark" ? "light" : "dark"} />
-      <NavigationContainer theme={navigationTheme}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="SplashScreen" component={SplashScreen} />
           <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />

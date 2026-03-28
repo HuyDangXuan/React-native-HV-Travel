@@ -1,5 +1,5 @@
 import { View, StyleSheet } from "react-native";
-import theme from "../../config/theme";
+import { useAppTheme } from "../../context/ThemeModeContext";
 
 type Props = {
   total: number;
@@ -7,6 +7,8 @@ type Props = {
 };
 
 export default function OnboardingDots({ total, current }: Props) {
+  const theme = useAppTheme();
+
   return (
     <View style={styles.container}>
       {Array.from({ length: total }).map((_, i) => (
@@ -14,6 +16,11 @@ export default function OnboardingDots({ total, current }: Props) {
           key={i}
           style={[
             styles.dot,
+            {
+              borderRadius: theme.radius.xl,
+              backgroundColor:
+                current === i ? theme.colors.primary : theme.semantic.divider,
+            },
             current === i && styles.active,
           ]}
         />
@@ -23,20 +30,17 @@ export default function OnboardingDots({ total, current }: Props) {
 }
 
 const styles = StyleSheet.create({
-    container: 
-    {
-        flexDirection: "row",
-        justifyContent: "center"
-    },
-    dot: {
-        width: 8,
-        height: 8,
-        borderRadius: theme.radius.xl,
-        backgroundColor: theme.colors.gray,
-        margin: theme.spacing.xs,
-    },
-    active: {
-        width: 15,
-        backgroundColor: theme.colors.primary,
-    },
+  container: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+  },
+  active: {
+    width: 22,
+  },
 });

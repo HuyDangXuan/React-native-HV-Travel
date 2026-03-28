@@ -541,17 +541,14 @@ export default function HomeScreen() {
 
       try {
         if (!token) {
-          MessageBoxService.error(t("home.invalidSession"));
-          navigation.replace("Login");
+          navigation.replace("LoginScreen");
           return;
         }
 
         if (isFav) {
           await FavouriteService.deleteByTourId(token, tourId);
-          MessageBoxService.success("Thành công", t("home.favouriteRemoved"), "OK");
         } else {
           await FavouriteService.addByTourId(token, tourId);
-          MessageBoxService.success("Thành công", t("home.favouriteAdded"), "OK");
         }
       } catch (e: any) {
         setFavTourIds((prev) => {
@@ -560,7 +557,7 @@ export default function HomeScreen() {
           else next.delete(tourId);
           return next;
         });
-        MessageBoxService.error("Lỗi", e?.message || t("home.favouriteUpdateFailed"), "OK");
+        console.warn("Update favourite failed:", e?.message || e);
       } finally {
         setFavBusy((prev) => {
           const next = new Set(prev);

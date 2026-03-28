@@ -24,6 +24,7 @@ type RestoreSessionResult = {
 };
 
 type SessionListener = (session: AuthSession | null) => void;
+type SessionExpiredListener = () => void;
 
 const SESSION_KEY = "auth_session_v1";
 const DEVICE_ID_KEY = "auth_device_id_v1";
@@ -34,6 +35,8 @@ const LEGACY_ASYNC_KEYS = ["token"];
 
 let refreshPromise: Promise<AuthSession> | null = null;
 const listeners = new Set<SessionListener>();
+const sessionExpiredListeners = new Set<SessionExpiredListener>();
+let hasEmittedSessionExpired = false;
 
 const parseJson = async <T>(response: Response): Promise<T | null> => {
   try {
@@ -51,6 +54,15 @@ const toError = (status: number, fallbackMessage: string, body?: any) => ({
 
 const emitSessionChanged = (session: AuthSession | null) => {
   listeners.forEach((listener) => listener(session));
+};
+
+const emitSessionExpired = () => {
+  if (hasEmittedSessionExpired) {
+    return;
+  }
+
+  hasEmittedSessionExpired = true;
+  sessionExpiredListeners.forEach((listener) => listener());
 };
 
 const isSoftLoggedOut = async () => {
@@ -203,6 +215,11 @@ export class AuthSessionService {
     return () => listeners.delete(listener);
   }
 
+  static subscribeSessionExpired(listener: SessionExpiredListener) {
+    sessionExpiredListeners.add(listener);
+    return () => sessionExpiredListeners.delete(listener);
+  }
+
   static async getSession(): Promise<AuthSession | null> {
     return readSessionFromStorage();
   }
@@ -250,6 +267,7 @@ export class AuthSessionService {
     const session = extractAuthSession(response);
     await persistSession(session);
     await setSoftLogoutFlag(false);
+    hasEmittedSessionExpired = false;
     emitSessionChanged(session);
     return session;
   }
@@ -261,6 +279,7 @@ export class AuthSessionService {
     const updatedSession = { ...session, customer };
     await persistSession(updatedSession);
     await setSoftLogoutFlag(false);
+    hasEmittedSessionExpired = false;
     emitSessionChanged(updatedSession);
     return updatedSession;
   }
@@ -325,11 +344,13 @@ export class AuthSessionService {
         const refreshedSession = await requestFreshSession(session);
         await persistSession(refreshedSession);
         await setSoftLogoutFlag(false);
+        hasEmittedSessionExpired = false;
         emitSessionChanged(refreshedSession);
         return refreshedSession;
       } catch (error: any) {
         if (error?.status === 401) {
           await this.clearSession();
+          emitSessionExpired();
         }
         throw error;
       } finally {

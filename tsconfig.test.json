@@ -20,6 +20,7 @@
     "utils/inboxNotifications.ts",
     "utils/loadingState.ts",
     "utils/chatbot.ts",
+    "utils/onboarding.ts",
     "utils/pullToRefresh.ts",
     "utils/tourSearch.ts",
     "utils/tourDetail.ts",

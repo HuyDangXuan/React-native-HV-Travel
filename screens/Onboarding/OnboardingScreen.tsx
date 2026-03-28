@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from "react-native";
+import { useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 
@@ -8,20 +8,40 @@ import OnboardingSlide from "../../components/Onboarding/OnboardingSlide";
 import OnboardingDots from "../../components/Onboarding/OnboardingDots";
 import AppButton from "../../components/Button";
 import ScreenContainer from "../../components/ui/ScreenContainer";
+import { useAuth } from "../../context/AuthContext";
 import { useI18n } from "../../context/I18nContext";
 import { useAppTheme } from "../../context/ThemeModeContext";
+import { useUser } from "../../context/UserContext";
+import {
+  getOnboardingStorageValue,
+  ONBOARDING_STORAGE_KEY,
+} from "../../utils/onboarding";
 
 export default function OnboardingScreen() {
   const [index, setIndex] = useState(0);
-  const slide = onboardingData[index];
+  const [sliderWidth, setSliderWidth] = useState(0);
   const isLast = index === onboardingData.length - 1;
+  const listRef = useRef<FlatList<(typeof onboardingData)[number]>>(null);
   const navigation = useNavigation<any>();
+  const { token } = useAuth();
   const { t } = useI18n();
   const theme = useAppTheme();
+  const { user } = useUser();
 
   const completeOnboarding = async () => {
-    await AsyncStorage.setItem("has_seen_onboarding", "true");
-    navigation.replace("LoginScreen");
+    await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, getOnboardingStorageValue());
+    navigation.replace(token && user ? "MainTabs" : "LoginScreen");
+  };
+
+  const handleNext = () => {
+    if (isLast) {
+      completeOnboarding();
+      return;
+    }
+
+    const nextIndex = index + 1;
+    setIndex(nextIndex);
+    listRef.current?.scrollToIndex({ index: nextIndex, animated: true });
   };
 
   return (
@@ -31,7 +51,7 @@ export default function OnboardingScreen() {
           styles.container,
           {
             padding: theme.layout.topLevelPadding,
-            paddingTop: theme.spacing.xl,
+            paddingTop: theme.spacing.lg,
           },
         ]}
       >
@@ -40,9 +60,10 @@ export default function OnboardingScreen() {
             styles.skip,
             {
               borderRadius: theme.radius.pill,
-              backgroundColor: theme.semantic.screenSurface,
+              backgroundColor: theme.semantic.screenElevated,
               borderColor: theme.semantic.divider,
             },
+            theme.shadow.sm,
           ]}
           onPress={completeOnboarding}
         >
@@ -56,9 +77,10 @@ export default function OnboardingScreen() {
             styles.heroCard,
             {
               marginTop: theme.spacing.lg,
-              marginBottom: theme.spacing.xl,
-              paddingHorizontal: theme.spacing.md,
-              paddingVertical: theme.spacing.xl,
+              marginBottom: theme.spacing.lg,
+              paddingHorizontal: theme.spacing.lg,
+              paddingTop: theme.spacing.xl,
+              paddingBottom: theme.spacing.lg,
               borderRadius: theme.radius.xxl,
               backgroundColor: theme.semantic.screenSurface,
               borderColor: theme.semantic.divider,
@@ -66,23 +88,63 @@ export default function OnboardingScreen() {
             theme.shadow.md,
           ]}
         >
-          <View style={styles.center}>
-            <OnboardingSlide
-              image={slide.image}
-              title={t(slide.titleKey)}
-              description={t(slide.descriptionKey)}
+          <View
+            style={styles.center}
+            onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
+          >
+            <FlatList
+              ref={listRef}
+              data={onboardingData}
+              keyExtractor={(item) => `${item.id}`}
+              horizontal
+              pagingEnabled
+              bounces={false}
+              showsHorizontalScrollIndicator={false}
+              snapToAlignment="center"
+              decelerationRate="fast"
+              onMomentumScrollEnd={(event) => {
+                const nextIndex = Math.round(
+                  event.nativeEvent.contentOffset.x / Math.max(sliderWidth, 1)
+                );
+                setIndex(nextIndex);
+              }}
+              renderItem={({ item }) => (
+                <View style={[styles.slidePage, { width: Math.max(sliderWidth, 1) }]}>
+                  <OnboardingSlide
+                    image={item.image}
+                    title={t(item.titleKey)}
+                    description={t(item.descriptionKey)}
+                  />
+                </View>
+              )}
             />
           </View>
 
-          <View style={[styles.dotsWrapper, { marginTop: theme.spacing.lg }]}>
-            <OnboardingDots total={onboardingData.length} current={index} />
+          <View
+            style={[
+              styles.progressWrap,
+              {
+                marginTop: theme.spacing.lg,
+                paddingTop: theme.spacing.md,
+                borderTopColor: theme.semantic.divider,
+              },
+            ]}
+          >
+            <Text style={[styles.progressLabel, { color: theme.semantic.textSecondary }]}>
+              {`${index + 1}/${onboardingData.length}`}
+            </Text>
+            <View style={styles.dotsWrapper}>
+              <OnboardingDots total={onboardingData.length} current={index} />
+            </View>
           </View>
         </View>
 
-        <AppButton
-          title={isLast ? t("onboarding.start") : t("onboarding.next")}
-          onPress={() => (isLast ? completeOnboarding() : setIndex(index + 1))}
-        />
+        <View style={[styles.footer, { paddingBottom: theme.spacing.lg }]}>
+          <AppButton
+            title={isLast ? t("onboarding.start") : t("onboarding.next")}
+            onPress={handleNext}
+          />
+        </View>
       </View>
     </ScreenContainer>
   );
@@ -108,9 +170,25 @@ const styles = StyleSheet.create({
   center: {
     flex: 1,
     justifyContent: "center",
+  },
+  slidePage: {
+    justifyContent: "center",
     alignItems: "center",
+  },
+  progressWrap: {
+    borderTopWidth: 1,
+  },
+  progressLabel: {
+    textAlign: "center",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+    marginBottom: 10,
   },
   dotsWrapper: {
     alignItems: "center",
+  },
+  footer: {
+    justifyContent: "flex-end",
   },
 });

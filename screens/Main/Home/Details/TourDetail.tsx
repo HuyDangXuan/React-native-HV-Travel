@@ -210,32 +210,20 @@ export default function TourDetail() {
 
     try {
       if (!token) {
-        MessageBoxService.error(t("tourDetail.sessionExpired"));
         navigation.replace("LoginScreen");
         return;
       }
 
       if (next) {
         await FavouriteService.addByTourId(token, tourId);
-        MessageBoxService.success(
-          t("tourDetail.successTitle"),
-          t("tourDetail.favouriteAdded"),
-          t("common.ok")
-        );
       } else {
         await FavouriteService.deleteByTourId(token, tourId);
-        MessageBoxService.success(
-          t("tourDetail.successTitle"),
-          t("tourDetail.favouriteRemoved"),
-          t("common.ok")
-        );
       }
     } catch (error: any) {
       setIsFavourite(!next);
-      MessageBoxService.error(
-        t("tourDetail.errorTitle"),
-        getErrorMessage(error, t("tourDetail.updateFavouriteFailed")),
-        t("common.ok")
+      console.warn(
+        "Update favourite failed:",
+        getErrorMessage(error, t("tourDetail.updateFavouriteFailed"))
       );
     } finally {
       setFavLoading(false);

@@ -1,5 +1,6 @@
 const vi = {
   common: {
+    error: "Lỗi",
     continue: "Tiếp tục",
     cancel: "Hủy",
     close: "Đóng",
@@ -10,6 +11,7 @@ const vi = {
     later: "Lúc khác",
     save: "Lưu",
     details: "Chi tiết",
+    sessionExpired: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
   },
   tabs: {
     home: "Trang chủ",

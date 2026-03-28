@@ -50,6 +50,8 @@ const LEGACY_SECURE_KEYS = ["access_token", "SecureStore"];
 const LEGACY_ASYNC_KEYS = ["token"];
 let refreshPromise = null;
 const listeners = new Set();
+const sessionExpiredListeners = new Set();
+let hasEmittedSessionExpired = false;
 const parseJson = async (response) => {
     try {
         return (await response.json());
@@ -65,6 +67,13 @@ const toError = (status, fallbackMessage, body) => ({
 });
 const emitSessionChanged = (session) => {
     listeners.forEach((listener) => listener(session));
+};
+const emitSessionExpired = () => {
+    if (hasEmittedSessionExpired) {
+        return;
+    }
+    hasEmittedSessionExpired = true;
+    sessionExpiredListeners.forEach((listener) => listener());
 };
 const isSoftLoggedOut = async () => {
     return (await async_storage_1.default.getItem(SOFT_LOGOUT_KEY)) === "1";
@@ -186,6 +195,10 @@ class AuthSessionService {
         listeners.add(listener);
         return () => listeners.delete(listener);
     }
+    static subscribeSessionExpired(listener) {
+        sessionExpiredListeners.add(listener);
+        return () => sessionExpiredListeners.delete(listener);
+    }
     static async getSession() {
         return readSessionFromStorage();
     }
@@ -226,6 +239,7 @@ class AuthSessionService {
         const session = extractAuthSession(response);
         await persistSession(session);
         await setSoftLogoutFlag(false);
+        hasEmittedSessionExpired = false;
         emitSessionChanged(session);
         return session;
     }
@@ -236,6 +250,7 @@ class AuthSessionService {
         const updatedSession = { ...session, customer };
         await persistSession(updatedSession);
         await setSoftLogoutFlag(false);
+        hasEmittedSessionExpired = false;
         emitSessionChanged(updatedSession);
         return updatedSession;
     }
@@ -288,12 +303,14 @@ class AuthSessionService {
                 const refreshedSession = await requestFreshSession(session);
                 await persistSession(refreshedSession);
                 await setSoftLogoutFlag(false);
+                hasEmittedSessionExpired = false;
                 emitSessionChanged(refreshedSession);
                 return refreshedSession;
             }
             catch (error) {
                 if (error?.status === 401) {
                     await this.clearSession();
+                    emitSessionExpired();
                 }
                 throw error;
             }
