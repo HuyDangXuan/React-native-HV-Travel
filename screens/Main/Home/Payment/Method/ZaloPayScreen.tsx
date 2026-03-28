@@ -1,43 +1,89 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
+  ActivityIndicator,
   Pressable,
   ScrollView,
-  ActivityIndicator} from 'react-native';
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import theme from "../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { StatusBar } from "expo-status-bar";
+
+import { useI18n } from "../../../../../context/I18nContext";
+import { useAppTheme, useThemeMode } from "../../../../../context/ThemeModeContext";
 
 type RouteParams = {
-  id?: string;          // tourId
-  total?: number;       // số tiền dạng number
-  amountText?: string;  // text hiển thị (đã format)
+  id?: string;
+  total?: number;
+  amountText?: string;
   orderId?: string;
 };
 
-const formatVND = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-    Number.isFinite(v) ? v : 0
-  );
+type UiTokens = {
+  screenBackground: string;
+  screenSurface: string;
+  screenMutedSurface: string;
+  textPrimary: string;
+  textSecondary: string;
+  border: string;
+  accent: string;
+  accentSoft: string;
+  icon: string;
+  white: string;
+  shadow: {
+    shadowColor: string;
+    shadowOffset: { width: number; height: number };
+    shadowOpacity: number;
+    shadowRadius: number;
+    elevation: number;
+  };
+};
+
+const formatVND = (locale: string, value: number) =>
+  new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US", {
+    style: "currency",
+    currency: "VND",
+  }).format(Number.isFinite(value) ? value : 0);
 
 export default function ZaloPayScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { locale, t } = useI18n();
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+
+  const ui = useMemo<UiTokens>(
+    () => ({
+      screenBackground: appTheme.semantic.screenBackground,
+      screenSurface: appTheme.semantic.screenSurface,
+      screenMutedSurface: appTheme.semantic.screenMutedSurface,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      accent: "#0ea5e9",
+      accentSoft: "#0ea5e914",
+      icon: appTheme.colors.icon,
+      white: appTheme.colors.white,
+      shadow: appTheme.shadow.md,
+    }),
+    [appTheme]
+  );
+  const styles = useMemo(() => createStyles(ui), [ui]);
 
   const params: RouteParams = route?.params ?? {};
   const tourId = params?.id;
-
   const total = typeof params?.total === "number" ? params.total : 0;
-  const orderId = params?.orderId || "DL" + Date.now();
+  const orderId = params?.orderId || `DL${Date.now()}`;
 
-  const amountText = useMemo(() => {
-    return params?.amountText || formatVND(total);
-  }, [params?.amountText, total]);
+  const amountText = useMemo(
+    () => params?.amountText || formatVND(locale, total),
+    [locale, params?.amountText, total]
+  );
 
-  const [timeLeft, setTimeLeft] = useState(600); // 10 phút = 600 giây
+  const [timeLeft, setTimeLeft] = useState(600);
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
@@ -45,7 +91,14 @@ export default function ZaloPayScreen() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigation.replace("PaymentFailed", { reason: "timeout", orderId, id: tourId });
+          navigation.replace("PaymentFailedScreen", {
+            reason: "timeout",
+            method: "ZaloPay",
+            orderId,
+            id: tourId,
+            total,
+            amountText,
+          });
           return 0;
         }
         return prev - 1;
@@ -53,28 +106,28 @@ export default function ZaloPayScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [navigation, orderId, tourId]);
+  }, [amountText, navigation, orderId, total, tourId]);
+
+  const createdAt = useMemo(
+    () => new Date().toLocaleString(locale === "vi" ? "vi-VN" : "en-US"),
+    [locale]
+  );
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleOpenZaloPayApp = () => {
-    // TODO: deep link ZaloPay (sau này)
     console.log("Opening ZaloPay app...");
   };
 
   const handleCheckPayment = () => {
     setIsProcessing(true);
 
-    // Giả lập kiểm tra thanh toán
     setTimeout(() => {
       setIsProcessing(false);
-      // Giả sử thanh toán thành công
       navigation.replace("PaymentSuccessScreen", {
         method: "ZaloPay",
         orderId,
@@ -87,118 +140,104 @@ export default function ZaloPayScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} backgroundColor={ui.screenBackground} />
+
       <View style={styles.header}>
-        <Pressable
-          style={styles.headerIcon}
-          onPress={() => navigation.goBack()}
-          hitSlop={10}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        <Pressable style={styles.headerIcon} onPress={() => navigation.goBack()} hitSlop={10}>
+          <Ionicons name="arrow-back" size={24} color={ui.textPrimary} />
         </Pressable>
 
-        <Text style={styles.headerTitle}>Thanh toán ZaloPay</Text>
+        <Text style={styles.headerTitle}>{t("paymentFlow.zalopay.title")}</Text>
         <View style={styles.headerIcon} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Timer */}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.timerBox}>
-          <Ionicons name="time-outline" size={20} color={theme.colors.primary} />
-          <Text style={styles.timerText}>Thời gian còn lại: </Text>
+          <Ionicons name="time-outline" size={20} color={ui.accent} />
+          <Text style={styles.timerText}>{t("paymentFlow.common.remainingTime")}</Text>
           <Text style={styles.timerValue}>{formatTime(timeLeft)}</Text>
         </View>
 
-        {/* Amount */}
         <View style={styles.amountBox}>
-          <Text style={styles.amountLabel}>Số tiền thanh toán</Text>
+          <Text style={styles.amountLabel}>{t("paymentFlow.common.amountLabel")}</Text>
           <Text style={styles.amountValue}>{amountText}</Text>
-          {!!tourId && <Text style={styles.subInfo}>Mã tour: {tourId}</Text>}
-          <Text style={styles.subInfo}>Mã đơn: {orderId}</Text>
+          {!!tourId && <Text style={styles.subInfo}>{t("paymentFlow.common.tourCode", { code: tourId })}</Text>}
+          <Text style={styles.subInfo}>{t("paymentFlow.common.orderCode", { code: orderId })}</Text>
         </View>
 
-        {/* QR Code */}
         <View style={styles.qrSection}>
-          <Text style={styles.sectionTitle}>Quét mã QR để thanh toán</Text>
+          <Text style={styles.sectionTitle}>{t("paymentFlow.zalopay.qrTitle")}</Text>
           <View style={styles.qrBox}>
             <View style={styles.qrPlaceholder}>
-              <Ionicons name="qr-code" size={120} color={theme.colors.gray} />
+              <Ionicons name="qr-code" size={120} color={ui.icon} />
             </View>
-            <Text style={styles.qrHint}>
-              Mở ứng dụng ZaloPay và quét mã QR
-            </Text>
+            <Text style={styles.qrHint}>{t("paymentFlow.zalopay.qrHint")}</Text>
           </View>
         </View>
 
-        {/* Or Divider */}
         <View style={styles.orDivider}>
           <View style={styles.line} />
-          <Text style={styles.orText}>HOẶC</Text>
+          <Text style={styles.orText}>{t("paymentFlow.common.or")}</Text>
           <View style={styles.line} />
         </View>
 
-        {/* Quick Action */}
         <Pressable style={styles.quickActionBtn} onPress={handleOpenZaloPayApp}>
           <View style={styles.quickActionIcon}>
-            <Ionicons
-              name="phone-portrait-outline"
-              size={32}
-              color={theme.colors.primary}
-            />
+            <Ionicons name="phone-portrait-outline" size={32} color={ui.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.quickActionTitle}>Mở ứng dụng ZaloPay</Text>
-            <Text style={styles.quickActionDesc}>
-              Thanh toán nhanh chóng và bảo mật
-            </Text>
+            <Text style={styles.quickActionTitle}>{t("paymentFlow.zalopay.openAppTitle")}</Text>
+            <Text style={styles.quickActionDesc}>{t("paymentFlow.zalopay.openAppDescription")}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={24} color={theme.colors.gray} />
+          <Ionicons name="chevron-forward" size={24} color={ui.icon} />
         </Pressable>
 
-        {/* Order Info */}
         <View style={styles.infoBox}>
           <InfoRow
             icon="document-text-outline"
-            label="Mã đơn hàng"
+            label={t("paymentFlow.common.orderCodeLabel")}
             value={orderId}
+            ui={ui}
+            styles={styles}
           />
-          <Divider />
-          <InfoRow icon="card-outline" label="Phương thức" value="ZaloPay" />
-          <Divider />
+          <Divider styles={styles} />
+          <InfoRow
+            icon="wallet-outline"
+            label={t("paymentFlow.common.methodLabel")}
+            value={t("paymentFlow.zalopay.methodValue")}
+            ui={ui}
+            styles={styles}
+          />
+          <Divider styles={styles} />
           <InfoRow
             icon="time-outline"
-            label="Thời gian tạo"
-            value={new Date().toLocaleString("vi-VN")}
+            label={t("paymentFlow.common.createdTime")}
+            value={createdAt}
+            ui={ui}
+            styles={styles}
           />
         </View>
 
-        {/* Instructions */}
         <View style={styles.instructionBox}>
-          <Text style={styles.instructionTitle}>Hướng dẫn thanh toán</Text>
-
-          <Step n={1} text="Mở ứng dụng ZaloPay trên điện thoại" />
-          <Step n={2} text='Chọn "Quét mã QR" hoặc biểu tượng máy ảnh' />
-          <Step n={3} text="Quét mã QR hiển thị trên màn hình" />
-          <Step n={4} text="Xác nhận thanh toán trong ứng dụng ZaloPay" />
-          <Step n={5} text="Chờ xác nhận từ hệ thống" />
+          <Text style={styles.instructionTitle}>{t("paymentFlow.zalopay.instructionTitle")}</Text>
+          <Step n={1} text={t("paymentFlow.zalopay.step1")} color={ui.accent} styles={styles} />
+          <Step n={2} text={t("paymentFlow.zalopay.step2")} color={ui.accent} styles={styles} />
+          <Step n={3} text={t("paymentFlow.zalopay.step3")} color={ui.accent} styles={styles} />
+          <Step n={4} text={t("paymentFlow.zalopay.step4")} color={ui.accent} styles={styles} />
+          <Step n={5} text={t("paymentFlow.zalopay.step5")} color={ui.accent} styles={styles} />
         </View>
 
-        {/* Note */}
         <View style={styles.noteBox}>
-          <Ionicons name="information-circle" size={20} color="#3B82F6" />
-          <Text style={styles.noteText}>
-            Sau khi thanh toán thành công trên ZaloPay, vui lòng nhấn "Kiểm tra
-            thanh toán" để xác nhận.
-          </Text>
+          <Ionicons name="information-circle" size={20} color={ui.accent} />
+          <Text style={styles.noteText}>{t("paymentFlow.zalopay.note")}</Text>
         </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Bottom Actions */}
       <View style={styles.bottomBar}>
         <Pressable style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => navigation.goBack()}>
-          <Text style={styles.secondaryBtnText}>Hủy</Text>
+          <Text style={styles.secondaryBtnText}>{t("paymentFlow.common.cancel")}</Text>
         </Pressable>
 
         <Pressable
@@ -207,9 +246,9 @@ export default function ZaloPayScreen() {
           disabled={isProcessing}
         >
           {isProcessing ? (
-            <ActivityIndicator color={theme.colors.white} />
+            <ActivityIndicator color={ui.white} />
           ) : (
-            <Text style={styles.primaryBtnText}>Kiểm tra thanh toán</Text>
+            <Text style={styles.primaryBtnText}>{t("paymentFlow.common.checkPayment")}</Text>
           )}
         </Pressable>
       </View>
@@ -217,10 +256,20 @@ export default function ZaloPayScreen() {
   );
 }
 
-function Step({ n, text }: { n: number; text: string }) {
+function Step({
+  n,
+  text,
+  color,
+  styles,
+}: {
+  n: number;
+  text: string;
+  color: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.stepRow}>
-      <View style={styles.stepNumber}>
+      <View style={[styles.stepNumber, { backgroundColor: color }]}>
         <Text style={styles.stepNumberText}>{n}</Text>
       </View>
       <Text style={styles.stepText}>{text}</Text>
@@ -228,10 +277,22 @@ function Step({ n, text }: { n: number; text: string }) {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+function InfoRow({
+  icon,
+  label,
+  value,
+  ui,
+  styles,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  ui: UiTokens;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.infoRow}>
-      <Ionicons name={icon} size={20} color={theme.colors.primary} />
+      <Ionicons name={icon} size={20} color={ui.accent} />
       <View style={{ flex: 1 }}>
         <Text style={styles.infoLabel}>{label}</Text>
         <Text style={styles.infoValue}>{value}</Text>
@@ -240,181 +301,167 @@ function InfoRow({ icon, label, value }: { icon: any; label: string; value: stri
   );
 }
 
-function Divider() {
+function Divider({ styles }: { styles: ReturnType<typeof createStyles> }) {
   return <View style={styles.divider} />;
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.white },
-
-  header: {
-    height: 54,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  headerIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: theme.fontSize.lg, fontWeight: "800", color: theme.colors.text },
-
-  content: { padding: theme.spacing.md },
-
-  timerBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: theme.spacing.md,
-    backgroundColor: "#EFF6FF",
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.lg,
-    gap: theme.spacing.xs,
-  },
-  timerText: { fontSize: theme.fontSize.sm, color: theme.colors.text, fontWeight: "600" },
-  timerValue: { fontSize: theme.fontSize.lg, color: theme.colors.primary, fontWeight: "800" },
-
-  amountBox: {
-    alignItems: "center",
-    padding: theme.spacing.lg,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.lg,
-    gap: 6,
-  },
-  amountLabel: { fontSize: theme.fontSize.sm, color: theme.colors.gray, fontWeight: "600" },
-  amountValue: { fontSize: 32, fontWeight: "800", color: theme.colors.primary },
-  subInfo: { fontSize: theme.fontSize.xs, color: theme.colors.gray, fontWeight: "600" },
-
-  qrSection: { marginBottom: theme.spacing.lg },
-  sectionTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-    textAlign: "center",
-  },
-  qrBox: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.xl,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  qrPlaceholder: {
-    width: 200,
-    height: 200,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: theme.spacing.md,
-  },
-  qrHint: { fontSize: theme.fontSize.sm, color: theme.colors.gray, textAlign: "center" },
-
-  orDivider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: theme.spacing.lg,
-    gap: theme.spacing.md,
-  },
-  line: { flex: 1, height: 1, backgroundColor: theme.colors.border },
-  orText: { fontSize: theme.fontSize.sm, color: theme.colors.gray, fontWeight: "600" },
-
-  quickActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: theme.spacing.md,
-    backgroundColor: "#FDF2F8",
-    borderRadius: theme.radius.lg,
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-  },
-  quickActionIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.white,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionTitle: { fontSize: theme.fontSize.md, fontWeight: "700", color: theme.colors.primary },
-  quickActionDesc: { fontSize: theme.fontSize.sm, color: theme.colors.gray, marginTop: 2 },
-
-  infoBox: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-  },
-  infoRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, paddingVertical: theme.spacing.xs },
-  infoLabel: { fontSize: theme.fontSize.sm, color: theme.colors.gray, fontWeight: "600" },
-  infoValue: { fontSize: theme.fontSize.sm, color: theme.colors.text, fontWeight: "700", marginTop: 2 },
-  divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.sm },
-
-  instructionBox: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-  },
-  instructionTitle: { fontSize: theme.fontSize.md, fontWeight: "700", color: theme.colors.text, marginBottom: theme.spacing.md },
-  stepRow: { flexDirection: "row", alignItems: "flex-start", gap: theme.spacing.sm, marginBottom: theme.spacing.sm },
-  stepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepNumberText: { color: theme.colors.white, fontSize: theme.fontSize.xs, fontWeight: "700" },
-  stepText: { flex: 1, fontSize: theme.fontSize.sm, color: theme.colors.text, lineHeight: 20, paddingTop: 2 },
-
-  noteBox: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    padding: theme.spacing.md,
-    backgroundColor: "#DBEAFE",
-    borderRadius: theme.radius.lg,
-    alignItems: "flex-start",
-  },
-  noteText: { flex: 1, fontSize: theme.fontSize.sm, color: "#1E40AF", lineHeight: 20 },
-
-  bottomBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.white,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-  },
-  primaryBtn: {
-    height: 54,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryBtnText: { color: theme.colors.white, fontSize: theme.fontSize.md, fontWeight: "700" },
-  secondaryBtn: {
-    height: 54,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.white,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryBtnText: { color: theme.colors.text, fontSize: theme.fontSize.md, fontWeight: "700" },
-});
+const createStyles = (ui: UiTokens) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: ui.screenBackground },
+    header: {
+      height: 54,
+      paddingHorizontal: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: ui.screenSurface,
+      borderBottomWidth: 1,
+      borderBottomColor: ui.border,
+    },
+    headerIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+    headerTitle: { fontSize: 18, fontWeight: "800", color: ui.textPrimary },
+    content: { padding: 16 },
+    timerBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      backgroundColor: ui.accentSoft,
+      borderRadius: 16,
+      paddingVertical: 12,
+      marginBottom: 16,
+    },
+    timerText: { fontSize: 14, color: ui.textSecondary, fontWeight: "600" },
+    timerValue: { fontSize: 16, fontWeight: "800", color: ui.accent },
+    amountBox: {
+      backgroundColor: ui.screenSurface,
+      borderRadius: 20,
+      padding: 24,
+      alignItems: "center",
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: ui.border,
+      gap: 6,
+      ...ui.shadow,
+    },
+    amountLabel: { fontSize: 13, color: ui.textSecondary, fontWeight: "700" },
+    amountValue: { fontSize: 28, fontWeight: "800", color: ui.accent },
+    subInfo: { fontSize: 12, color: ui.textSecondary, fontWeight: "600" },
+    qrSection: { marginBottom: 16 },
+    sectionTitle: { fontSize: 16, fontWeight: "800", color: ui.textPrimary, marginBottom: 12 },
+    qrBox: {
+      backgroundColor: ui.screenSurface,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: ui.border,
+      padding: 20,
+      alignItems: "center",
+      ...ui.shadow,
+    },
+    qrPlaceholder: {
+      width: 220,
+      height: 220,
+      borderRadius: 20,
+      backgroundColor: ui.screenMutedSurface,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+    qrHint: { fontSize: 14, color: ui.textSecondary, textAlign: "center" },
+    orDivider: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      marginVertical: 16,
+    },
+    line: { flex: 1, height: 1, backgroundColor: ui.border },
+    orText: { fontSize: 12, fontWeight: "800", color: ui.textSecondary },
+    quickActionBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 16,
+      borderRadius: 18,
+      backgroundColor: ui.screenSurface,
+      borderWidth: 1,
+      borderColor: ui.border,
+      marginBottom: 16,
+    },
+    quickActionIcon: {
+      width: 54,
+      height: 54,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: ui.accentSoft,
+    },
+    quickActionTitle: { fontSize: 16, fontWeight: "700", color: ui.textPrimary },
+    quickActionDesc: { fontSize: 14, color: ui.textSecondary, marginTop: 2 },
+    infoBox: {
+      backgroundColor: ui.screenSurface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: ui.border,
+      padding: 16,
+      marginBottom: 16,
+    },
+    infoRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+    infoLabel: { fontSize: 13, color: ui.textSecondary, fontWeight: "700" },
+    infoValue: { fontSize: 15, color: ui.textPrimary, fontWeight: "700", marginTop: 2 },
+    divider: { height: 1, backgroundColor: ui.border, marginVertical: 14 },
+    instructionBox: {
+      backgroundColor: ui.screenSurface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: ui.border,
+      padding: 16,
+      marginBottom: 16,
+    },
+    instructionTitle: { fontSize: 16, fontWeight: "800", color: ui.textPrimary, marginBottom: 12 },
+    stepRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+    stepNumber: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    stepNumberText: { color: ui.white, fontSize: 13, fontWeight: "800" },
+    stepText: { flex: 1, fontSize: 14, lineHeight: 20, color: ui.textSecondary },
+    noteBox: {
+      flexDirection: "row",
+      gap: 10,
+      padding: 16,
+      borderRadius: 18,
+      backgroundColor: ui.accentSoft,
+    },
+    noteText: { flex: 1, fontSize: 14, lineHeight: 20, color: ui.textSecondary },
+    bottomBar: {
+      flexDirection: "row",
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 24,
+      backgroundColor: ui.screenSurface,
+      borderTopWidth: 1,
+      borderTopColor: ui.border,
+    },
+    secondaryBtn: {
+      height: 52,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: ui.border,
+      backgroundColor: ui.screenMutedSurface,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    secondaryBtnText: { fontSize: 15, fontWeight: "700", color: ui.textPrimary },
+    primaryBtn: {
+      height: 52,
+      borderRadius: 16,
+      backgroundColor: ui.accent,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    primaryBtnText: { fontSize: 15, fontWeight: "800", color: ui.white },
+  });

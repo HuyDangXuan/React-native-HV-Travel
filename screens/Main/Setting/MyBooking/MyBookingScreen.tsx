@@ -18,8 +18,9 @@ import { BookingCardSkeletonList } from "../../../../components/skeleton/MainTab
 import AppHeader from "../../../../components/ui/AppHeader";
 import EmptyState from "../../../../components/ui/EmptyState";
 import SectionCard from "../../../../components/ui/SectionCard";
-import theme from "../../../../config/theme";
 import { useAuth } from "../../../../context/AuthContext";
+import { useI18n } from "../../../../context/I18nContext";
+import { useAppTheme } from "../../../../context/ThemeModeContext";
 import { Booking, BookingStatus } from "../../../../models/Booking";
 import { BookingService } from "../../../../services/BookingService";
 import { getPullRefreshDisplayState } from "../../../../utils/loadingState";
@@ -28,25 +29,27 @@ import LoadingOverlay from "../../../Loading/LoadingOverlay";
 
 const PULL_REFRESH_THRESHOLD = 72;
 
-type SegKey = "Chưa đi" | "Đã đi";
+type SegKey = "upcoming" | "past";
 
 const UPCOMING_STATUSES: BookingStatus[] = ["Pending", "Paid", "Confirmed"];
 const PAST_STATUSES: BookingStatus[] = ["Completed", "Cancelled", "Refunded"];
 
-const STATUS_MAP: Record<BookingStatus, { label: string; color: string; bg: string }> = {
-  Pending: { label: "Chờ xử lý", color: "#92400E", bg: "#FEF3C7" },
-  Paid: { label: "Đã thanh toán", color: "#065F46", bg: "#D1FAE5" },
-  Confirmed: { label: "Đã xác nhận", color: "#1E40AF", bg: "#DBEAFE" },
-  Completed: { label: "Hoàn thành", color: "#065F46", bg: "#D1FAE5" },
-  Cancelled: { label: "Đã hủy", color: "#991B1B", bg: "#FEE2E2" },
-  Refunded: { label: "Hoàn tiền", color: "#6B21A8", bg: "#F3E8FF" },
-};
-
 export default function MyBookingScreen() {
   const navigation = useNavigation<any>();
   const { token } = useAuth();
+  const { t } = useI18n();
+  const theme = useAppTheme();
 
-  const [seg, setSeg] = useState<SegKey>("Chưa đi");
+  const statusMap: Record<BookingStatus, { label: string; color: string; bg: string }> = {
+    Pending: { label: t("bookings.statusPending"), color: "#92400E", bg: "#FEF3C7" },
+    Paid: { label: t("bookings.statusPaid"), color: "#065F46", bg: "#D1FAE5" },
+    Confirmed: { label: t("bookings.statusConfirmed"), color: "#1E40AF", bg: "#DBEAFE" },
+    Completed: { label: t("bookings.statusCompleted"), color: "#065F46", bg: "#D1FAE5" },
+    Cancelled: { label: t("bookings.statusCancelled"), color: "#991B1B", bg: "#FEE2E2" },
+    Refunded: { label: t("bookings.statusRefunded"), color: "#6B21A8", bg: "#F3E8FF" },
+  };
+
+  const [seg, setSeg] = useState<SegKey>("upcoming");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,7 +66,7 @@ export default function MyBookingScreen() {
   const fetchBookings = useCallback(
     async (silent = false) => {
       if (!token) {
-        setRequestError("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
+        setRequestError(t("bookings.invalidSession"));
         setLoading(false);
         setRefreshing(false);
         return;
@@ -75,16 +78,15 @@ export default function MyBookingScreen() {
         const result = await BookingService.getBookings(token, { limit: 50 });
         setBookings(result.bookings);
       } catch (error: any) {
-        console.log("Fetch bookings error:", error);
-        const message = error?.message || "Không thể tải danh sách chuyến đi đã đặt.";
+        const message = error?.message || t("bookings.loadFailedMessage");
         setRequestError(message);
-        Alert.alert("Không tải được chuyến đi", message);
+        Alert.alert(t("bookings.loadFailedTitle"), message);
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [token]
+    [t, token]
   );
 
   useEffect(() => {
@@ -118,7 +120,7 @@ export default function MyBookingScreen() {
   }, [loading, onRefresh, refreshing]);
 
   const list = useMemo(() => {
-    const statuses = seg === "Chưa đi" ? UPCOMING_STATUSES : PAST_STATUSES;
+    const statuses = seg === "upcoming" ? UPCOMING_STATUSES : PAST_STATUSES;
     return bookings.filter((booking) => statuses.includes(booking.status));
   }, [bookings, seg]);
 
@@ -133,12 +135,14 @@ export default function MyBookingScreen() {
   const handleCancel = useCallback(
     (booking: Booking) => {
       Alert.alert(
-        "Hủy booking",
-        `Bạn có chắc muốn hủy booking "${booking.tourSnapshot?.name || booking.bookingCode}"?`,
+        t("bookings.cancelTitle"),
+        t("bookings.cancelMessage", {
+          name: booking.tourSnapshot?.name || booking.bookingCode,
+        }),
         [
-          { text: "Không", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Hủy booking",
+            text: t("bookings.cancelAction"),
             style: "destructive",
             onPress: async () => {
               if (!token) return;
@@ -148,7 +152,7 @@ export default function MyBookingScreen() {
                 const updated = await BookingService.cancelBooking(token, booking.id);
                 setBookings((prev) => prev.map((item) => (item.id === booking.id ? updated : item)));
               } catch (error: any) {
-                Alert.alert("Lỗi", error?.message || "Không thể hủy booking.");
+                Alert.alert(t("common.close"), error?.message || t("bookings.loadFailedMessage"));
               } finally {
                 setCancellingId(null);
               }
@@ -157,16 +161,16 @@ export default function MyBookingScreen() {
         ]
       );
     },
-    [token]
+    [t, token]
   );
 
   const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "N/A";
+    if (!dateStr) return t("bookings.unknownDate");
     return new Date(dateStr).toLocaleDateString("vi-VN");
   };
 
   const renderItem = ({ item }: { item: Booking }) => {
-    const statusInfo = STATUS_MAP[item.status] || STATUS_MAP.Pending;
+    const statusInfo = statusMap[item.status] || statusMap.Pending;
     const isCancelling = cancellingId === item.id;
     const canCancel = item.status === "Pending";
 
@@ -174,7 +178,10 @@ export default function MyBookingScreen() {
       <SectionCard style={styles.card} elevated>
         <View style={styles.cardBody}>
           <View style={styles.topRow}>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text
+              style={[styles.title, { color: theme.semantic.textPrimary }]}
+              numberOfLines={1}
+            >
               {item.tourSnapshot?.name || item.bookingCode}
             </Text>
 
@@ -183,47 +190,73 @@ export default function MyBookingScreen() {
             </View>
           </View>
 
-          <Text style={styles.bookingCode}>Mã: {item.bookingCode}</Text>
+          <Text style={[styles.bookingCode, { color: theme.semantic.textSecondary }]}>
+            {t("bookings.code", { code: item.bookingCode })}
+          </Text>
 
           <View style={styles.metaRow}>
             {!!item.tourSnapshot?.duration && (
               <View style={styles.metaItem}>
                 <Ionicons name="time-outline" size={14} color={theme.colors.gray} />
-                <Text style={styles.sub}>{item.tourSnapshot.duration}</Text>
+                <Text style={[styles.sub, { color: theme.semantic.textSecondary }]}>
+                  {item.tourSnapshot.duration}
+                </Text>
               </View>
             )}
 
             <View style={styles.metaItem}>
               <Ionicons name="people-outline" size={14} color={theme.colors.gray} />
-              <Text style={styles.sub}>{item.participantsCount} khách</Text>
+              <Text style={[styles.sub, { color: theme.semantic.textSecondary }]}>
+                {t("bookings.guests", { count: item.participantsCount })}
+              </Text>
             </View>
           </View>
 
           <View style={styles.bottomRow}>
             <View style={styles.dateRow}>
               <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
-              <Text style={styles.dateText}>{formatDate(item.bookingDate)}</Text>
+              <Text style={[styles.dateText, { color: theme.semantic.textPrimary }]}>
+                {formatDate(item.bookingDate)}
+              </Text>
             </View>
 
             <View style={styles.actionsRow}>
-              {canCancel && (
-                <Pressable onPress={() => handleCancel(item)} style={styles.cancelBtn} disabled={isCancelling}>
+              {canCancel ? (
+                <Pressable
+                  onPress={() => handleCancel(item)}
+                  style={[
+                    styles.cancelBtn,
+                    {
+                      borderColor: "#FECACA",
+                      backgroundColor: "#FEF2F2",
+                    },
+                  ]}
+                  disabled={isCancelling}
+                >
                   {isCancelling ? (
                     <ActivityIndicator size="small" color="#DC2626" />
                   ) : (
                     <>
                       <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
-                      <Text style={styles.cancelText}>Hủy</Text>
+                      <Text style={styles.cancelText}>{t("common.cancel")}</Text>
                     </>
                   )}
                 </Pressable>
-              )}
+              ) : null}
 
               <Pressable
                 onPress={() => navigation.navigate("TourDetailScreen", { id: item.tourId })}
-                style={styles.detailsBtn}
+                style={[
+                  styles.detailsBtn,
+                  {
+                    borderColor: theme.colors.primaryLight,
+                    backgroundColor: theme.colors.primaryLight,
+                  },
+                ]}
               >
-                <Text style={styles.detailsText}>Chi tiết</Text>
+                <Text style={[styles.detailsText, { color: theme.colors.primary }]}>
+                  {t("common.details")}
+                </Text>
                 <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
               </Pressable>
             </View>
@@ -234,32 +267,57 @@ export default function MyBookingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenBackground }]}>
       <AppHeader
         variant="compact"
-        style={styles.header}
-        title="Chuyến đi đã đặt"
+        style={{ backgroundColor: theme.semantic.screenBackground }}
+        title={t("bookings.title")}
         onBack={() => navigation.goBack()}
       />
 
-      <View style={styles.segmentWrap}>
-        {(["Chưa đi", "Đã đi"] as SegKey[]).map((item) => {
-          const active = seg === item;
-          const count = item === "Chưa đi" ? bookingCounts.upcoming : bookingCounts.past;
+      <View
+        style={[
+          styles.segmentWrap,
+          {
+            marginHorizontal: theme.layout.detailPadding,
+            marginBottom: theme.spacing.md,
+            padding: 4,
+            borderRadius: theme.radius.pill,
+            backgroundColor: theme.semantic.screenMutedSurface,
+          },
+        ]}
+      >
+        {([
+          { key: "upcoming" as const, label: t("bookings.upcoming"), count: bookingCounts.upcoming },
+          { key: "past" as const, label: t("bookings.past"), count: bookingCounts.past },
+        ]).map((item) => {
+          const active = seg === item.key;
 
           return (
             <Pressable
-              key={item}
-              onPress={() => setSeg(item)}
+              key={item.key}
+              onPress={() => setSeg(item.key)}
               style={[
                 styles.segBtn,
-                active && styles.segBtnActive,
+                active && {
+                  backgroundColor: theme.semantic.screenSurface,
+                  borderRadius: theme.radius.pill,
+                },
                 (showInitialSkeleton || showRefreshSkeleton) && styles.segBtnDisabled,
               ]}
               disabled={showInitialSkeleton || showRefreshSkeleton}
             >
-              <Text style={[styles.segText, active && styles.segTextActive]}>
-                {showInitialSkeleton || showRefreshSkeleton ? item : `${item} (${count})`}
+              <Text
+                style={[
+                  styles.segText,
+                  {
+                    color: active ? theme.semantic.textPrimary : theme.semantic.textSecondary,
+                  },
+                ]}
+              >
+                {showInitialSkeleton || showRefreshSkeleton
+                  ? item.label
+                  : `${item.label} (${item.count})`}
               </Text>
             </Pressable>
           );
@@ -274,9 +332,9 @@ export default function MyBookingScreen() {
         <View style={styles.errorContent}>
           <EmptyState
             icon="alert-circle-outline"
-            title="Không tải được chuyến đi đã đặt"
+            title={t("bookings.loadFailedTitle")}
             description={requestError}
-            actionLabel="Thử lại"
+            actionLabel={t("bookings.retryAction")}
             onAction={() => fetchBookings()}
           />
         </View>
@@ -287,6 +345,7 @@ export default function MyBookingScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.list,
+            { paddingHorizontal: theme.layout.detailPadding, paddingBottom: theme.spacing.xl },
             list.length === 0 && { flexGrow: 1, justifyContent: "center" },
           ]}
           onScroll={handleScroll}
@@ -297,13 +356,17 @@ export default function MyBookingScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="calendar-clear-outline"
-              title={seg === "Chưa đi" ? "Bạn chưa có chuyến đi nào" : "Chưa có lịch sử chuyến đi"}
-              description={
-                seg === "Chưa đi"
-                  ? "Hãy chọn một tour phù hợp và đặt ngay để bắt đầu hành trình."
-                  : "Khi bạn hoàn thành chuyến đi, lịch sử sẽ hiển thị ở đây."
+              title={
+                seg === "upcoming"
+                  ? t("bookings.emptyUpcomingTitle")
+                  : t("bookings.emptyPastTitle")
               }
-              actionLabel="Khám phá tour"
+              description={
+                seg === "upcoming"
+                  ? t("bookings.emptyUpcomingDescription")
+                  : t("bookings.emptyPastDescription")
+              }
+              actionLabel={t("bookings.exploreAction")}
               onAction={() => navigation.replace("MainTabs")}
             />
           }
@@ -318,149 +381,120 @@ export default function MyBookingScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    backgroundColor: theme.colors.background,
-  },
-  loadingContent: {
-    flex: 1,
-    paddingHorizontal: theme.layout.detailPadding,
-    paddingTop: 12,
-  },
-  errorContent: {
-    flex: 1,
-    paddingHorizontal: theme.layout.detailPadding,
   },
   segmentWrap: {
-    marginTop: 14,
-    marginHorizontal: theme.layout.detailPadding,
-    marginBottom: 6,
     flexDirection: "row",
-    gap: 10,
   },
   segBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: theme.radius.pill,
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.surface,
-  },
-  segBtnActive: {
-    backgroundColor: theme.colors.primary,
+    paddingVertical: 12,
   },
   segBtnDisabled: {
-    opacity: 0.72,
+    opacity: 0.7,
   },
   segText: {
     fontSize: 14,
     fontWeight: "700",
-    color: theme.colors.gray,
   },
-  segTextActive: {
-    color: theme.colors.white,
+  loadingContent: {
+    flex: 1,
+  },
+  errorContent: {
+    flex: 1,
+    justifyContent: "center",
   },
   list: {
-    paddingHorizontal: theme.layout.detailPadding,
-    paddingTop: 12,
-    paddingBottom: 24,
-    gap: 14,
+    gap: 12,
   },
-  card: {
-    padding: 14,
-  },
+  card: {},
   cardBody: {
-    flex: 1,
+    gap: 10,
   },
   topRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "space-between",
+    gap: 12,
   },
   title: {
     flex: 1,
-    fontSize: theme.fontSize.md,
+    fontSize: 16,
     fontWeight: "800",
-    color: theme.colors.text,
   },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: theme.radius.pill,
+    borderRadius: 999,
   },
   badgeText: {
-    fontSize: theme.fontSize.xs,
+    fontSize: 12,
     fontWeight: "800",
   },
   bookingCode: {
-    marginTop: 6,
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
+    fontSize: 13,
     fontWeight: "600",
   },
   metaRow: {
     flexDirection: "row",
     gap: 16,
-    marginTop: 8,
+    flexWrap: "wrap",
   },
   metaItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
   sub: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "600",
   },
   bottomRow: {
-    marginTop: 14,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
   },
   dateRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     flex: 1,
   },
   dateText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
   },
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
   cancelBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: theme.radius.md,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#FCA5A5",
-    backgroundColor: "#FEF2F2",
   },
   cancelText: {
-    fontSize: theme.fontSize.sm,
+    fontSize: 13,
+    fontWeight: "800",
     color: "#DC2626",
-    fontWeight: "700",
   },
   detailsBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   detailsText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.primary,
+    fontSize: 13,
     fontWeight: "800",
   },
 });

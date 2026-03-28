@@ -16,6 +16,7 @@ import {
 import MultiSlider from "@ptomasroos/react-native-multi-slider";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { StatusBar } from "expo-status-bar";
 
 import {
   ExploreTourSkeletonList,
@@ -23,7 +24,8 @@ import {
 } from "../../../../components/skeleton/MainTabSkeletons";
 import AppHeader from "../../../../components/ui/AppHeader";
 import EmptyState from "../../../../components/ui/EmptyState";
-import theme from "../../../../config/theme";
+import { useI18n } from "../../../../context/I18nContext";
+import { useAppTheme, useThemeMode } from "../../../../context/ThemeModeContext";
 import { Tour } from "../../../../models/Tour";
 import { TourService } from "../../../../services/TourService";
 import { extractNumber } from "../../../../utils/PriceUtils";
@@ -60,34 +62,37 @@ type SearchTourCard = TourSearchCard & {
   durationText: string;
 };
 
-const UI = {
-  primary: theme.colors.primary,
-  bgLight: theme.colors.background,
-  slate900: theme.colors.text,
-  slate700: "#334155",
-  slate500: theme.colors.gray,
-  slate400: theme.colors.placeholder,
-  slate200: theme.colors.border,
-  slate100: theme.colors.surface,
-  white: theme.colors.white,
-};
-
-const SORT_OPTIONS: { key: TourSearchSortOption; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: "popular", label: "Phổ biến", icon: "flame-outline" },
-  { key: "price_asc", label: "Giá tăng dần", icon: "trending-up-outline" },
-  { key: "price_desc", label: "Giá giảm dần", icon: "trending-down-outline" },
-  { key: "rating", label: "Đánh giá cao", icon: "star-outline" },
+const SORT_OPTION_DEFS: { key: TourSearchSortOption; labelKey: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: "popular", labelKey: "search.sortPopular", icon: "flame-outline" },
+  { key: "price_asc", labelKey: "search.sortPriceAsc", icon: "trending-up-outline" },
+  { key: "price_desc", labelKey: "search.sortPriceDesc", icon: "trending-down-outline" },
+  { key: "rating", labelKey: "search.sortRating", icon: "star-outline" },
 ];
 
-const DURATION_OPTIONS: { key: TourSearchDurationOption; label: string }[] = [
-  { key: "all", label: "Tất cả" },
-  { key: "1", label: "1 ngày" },
-  { key: "2_3", label: "2-3 ngày" },
-  { key: "4_7", label: "4-7 ngày" },
-  { key: "7_plus", label: "7+ ngày" },
+const DURATION_OPTION_DEFS: { key: TourSearchDurationOption; labelKey: string }[] = [
+  { key: "all", labelKey: "search.all" },
+  { key: "1", labelKey: "search.duration1" },
+  { key: "2_3", labelKey: "search.duration2to3" },
+  { key: "4_7", labelKey: "search.duration4to7" },
+  { key: "7_plus", labelKey: "search.duration7plus" },
 ];
 
 const RATING_OPTIONS = [0, 3, 4, 5];
+
+const createUi = (theme: ReturnType<typeof useAppTheme>) => ({
+  isDark: theme.name === "dark",
+  primary: theme.colors.primary,
+  bg: theme.semantic.screenBackground,
+  surface: theme.semantic.screenSurface,
+  mutedSurface: theme.semantic.screenMutedSurface,
+  textPrimary: theme.semantic.textPrimary,
+  textSecondary: theme.semantic.textSecondary,
+  border: theme.semantic.divider,
+  placeholder: theme.colors.placeholder,
+  chipText: theme.name === "dark" ? "#cbd5e1" : "#334155",
+  onPrimary: theme.colors.white,
+  overlay: theme.colors.overlay,
+});
 
 const getCategoryMaterialIcon = (category: string) => {
   const normalized = category.toLowerCase();
@@ -137,43 +142,88 @@ const mapTourToSearchCard = (tour: Tour): SearchTourCard => {
   };
 };
 
-const PriceRangeSlider = ({
+const createSliderStyles = (ui: ReturnType<typeof createUi>) =>
+  StyleSheet.create({
+    outerWrap: { marginTop: 4, marginBottom: 2 },
+    container: { alignSelf: "center", height: 32 },
+    trackStyle: { height: 5, borderRadius: 3 },
+    track: { backgroundColor: ui.border, borderRadius: 3 },
+    activeTrack: { backgroundColor: ui.primary, borderRadius: 3 },
+    thumb: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: ui.surface,
+      borderWidth: 2,
+      borderColor: ui.primary,
+    },
+    thumbPressed: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: ui.surface,
+      borderWidth: 2,
+      borderColor: ui.primary,
+    },
+    tickRow: { marginTop: 8, flexDirection: "row", justifyContent: "space-between" },
+    tickText: { fontSize: 12, fontWeight: "700", color: ui.textSecondary },
+  });
+
+function PriceRangeSlider({
   bounds,
   minPrice,
   maxPrice,
   onValuesChange,
+  sliderStyles,
 }: {
   bounds: TourSearchPriceBounds;
   minPrice: number;
   maxPrice: number;
   onValuesChange: (newMin: number, newMax: number) => void;
-}) => (
-  <View style={sliderStyles.outerWrap}>
-    <MultiSlider
-      values={[minPrice, maxPrice]}
-      min={bounds.minAvailablePrice}
-      max={bounds.sliderMaxPrice}
-      step={bounds.step}
-      sliderLength={SLIDER_LENGTH}
-      onValuesChange={(values) => onValuesChange(values[0], values[1])}
-      allowOverlap={false}
-      snapped
-      selectedStyle={sliderStyles.activeTrack}
-      unselectedStyle={sliderStyles.track}
-      markerStyle={sliderStyles.thumb}
-      pressedMarkerStyle={sliderStyles.thumbPressed}
-      trackStyle={sliderStyles.trackStyle}
-      containerStyle={sliderStyles.container}
-    />
-    <View style={sliderStyles.tickRow}>
-      <Text style={sliderStyles.tickText}>{formatCompactSearchPrice(bounds.minAvailablePrice)}</Text>
-      <Text style={sliderStyles.tickText}>{formatCompactSearchPrice(bounds.sliderMaxPrice)}</Text>
+  sliderStyles: ReturnType<typeof createSliderStyles>;
+}) {
+  return (
+    <View style={sliderStyles.outerWrap}>
+      <MultiSlider
+        values={[minPrice, maxPrice]}
+        min={bounds.minAvailablePrice}
+        max={bounds.sliderMaxPrice}
+        step={bounds.step}
+        sliderLength={SLIDER_LENGTH}
+        onValuesChange={(values) => onValuesChange(values[0], values[1])}
+        allowOverlap={false}
+        snapped
+        selectedStyle={sliderStyles.activeTrack}
+        unselectedStyle={sliderStyles.track}
+        markerStyle={sliderStyles.thumb}
+        pressedMarkerStyle={sliderStyles.thumbPressed}
+        trackStyle={sliderStyles.trackStyle}
+        containerStyle={sliderStyles.container}
+      />
+      <View style={sliderStyles.tickRow}>
+        <Text style={sliderStyles.tickText}>{formatCompactSearchPrice(bounds.minAvailablePrice)}</Text>
+        <Text style={sliderStyles.tickText}>{formatCompactSearchPrice(bounds.sliderMaxPrice)}</Text>
+      </View>
     </View>
-  </View>
-);
+  );
+}
 
 export default function TourSearchScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useI18n();
+  const theme = useAppTheme();
+  const { themeName } = useThemeMode();
+  const ui = useMemo(() => createUi(theme), [theme]);
+  const styles = useMemo(() => createStyles(ui), [ui]);
+  const sliderStyles = useMemo(() => createSliderStyles(ui), [ui]);
+  const sortOptions = useMemo(
+    () => SORT_OPTION_DEFS.map((option) => ({ ...option, label: t(option.labelKey) })),
+    [t]
+  );
+  const durationOptions = useMemo(
+    () => DURATION_OPTION_DEFS.map((option) => ({ ...option, label: t(option.labelKey) })),
+    [t]
+  );
 
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -206,20 +256,23 @@ export default function TourSearchScreen() {
     data: tours,
   });
 
-  const fetchTours = useCallback(async (showLoader = true) => {
-    if (showLoader) setLoading(true);
-    try {
-      const tourList = await TourService.getTours();
-      const mappedTours = tourList.map(mapTourToSearchCard);
-      setTours(mappedTours);
-      setCategories(buildSuggestedCategories(mappedTours, 8));
-    } catch (error: any) {
-      console.log("Fetch search tours error:", error);
-      MessageBoxService.error("Lỗi", error?.message || "Không lấy được dữ liệu tour.", "OK");
-    } finally {
-      if (showLoader) setLoading(false);
-    }
-  }, []);
+  const fetchTours = useCallback(
+    async (showLoader = true) => {
+      if (showLoader) setLoading(true);
+      try {
+        const tourList = await TourService.getTours();
+        const mappedTours = tourList.map(mapTourToSearchCard);
+        setTours(mappedTours);
+        setCategories(buildSuggestedCategories(mappedTours, 8));
+      } catch (error: any) {
+        console.log("Fetch search tours error:", error);
+        MessageBoxService.error("Lỗi", error?.message || t("search.loadFailed"), "OK");
+      } finally {
+        if (showLoader) setLoading(false);
+      }
+    },
+    [t]
+  );
 
   useEffect(() => {
     if (hasLoadedRef.current) return;
@@ -228,7 +281,10 @@ export default function TourSearchScreen() {
   }, [fetchTours]);
 
   const priceBounds = useMemo(() => getTourSearchPriceBounds(tours, filters.maxPrice), [filters.maxPrice, tours]);
-  const draftPriceBounds = useMemo(() => getTourSearchPriceBounds(tours, draftFilters.maxPrice), [draftFilters.maxPrice, tours]);
+  const draftPriceBounds = useMemo(
+    () => getTourSearchPriceBounds(tours, draftFilters.maxPrice),
+    [draftFilters.maxPrice, tours]
+  );
   const defaultFilters = useMemo(() => createDefaultTourSearchFilters(priceBounds), [priceBounds]);
   const normalizedFilters = useMemo(() => normalizeTourSearchFilters(filters, priceBounds), [filters, priceBounds]);
   const normalizedDraftFilters = useMemo(
@@ -291,7 +347,9 @@ export default function TourSearchScreen() {
     if (
       normalizedFilters.minPrice !== defaultFilters.minPrice ||
       normalizedFilters.maxPrice !== defaultFilters.maxPrice
-    ) count += 1;
+    ) {
+      count += 1;
+    }
     if (normalizedFilters.duration !== defaultFilters.duration) count += 1;
     if (normalizedFilters.minRating !== defaultFilters.minRating) count += 1;
     return count;
@@ -344,39 +402,37 @@ export default function TourSearchScreen() {
     }));
   }, []);
 
-  const clearSearch = useCallback(() => {
-    setSearch("");
-  }, []);
-
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} />
+
       <AppHeader
         variant="compact"
         style={styles.header}
-        title="Tìm kiếm tour"
+        title={t("search.title")}
         onBack={() => navigation.goBack()}
       />
 
       <View style={styles.searchShell}>
         <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={20} color={UI.slate500} />
+          <Ionicons name="search-outline" size={20} color={ui.textSecondary} />
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Nhập tên tour, điểm đến, danh mục..."
-            placeholderTextColor={UI.slate400}
+            placeholder={t("search.placeholder")}
+            placeholderTextColor={ui.placeholder}
             style={styles.searchInput}
             returnKeyType="search"
           />
           {search.length > 0 ? (
-            <Pressable onPress={clearSearch}>
-              <Ionicons name="close-circle" size={20} color={UI.slate500} />
+            <Pressable onPress={() => setSearch("")}>
+              <Ionicons name="close-circle" size={20} color={ui.textSecondary} />
             </Pressable>
           ) : null}
         </View>
 
         <Pressable style={styles.filterButton} onPress={openFilterModal}>
-          <Ionicons name="options-outline" size={18} color={UI.slate900} />
+          <Ionicons name="options-outline" size={18} color={ui.textPrimary} />
           {activeFilterCount > 0 ? (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
@@ -399,7 +455,7 @@ export default function TourSearchScreen() {
                   <MaterialCommunityIcons
                     name={getCategoryMaterialIcon(category) as any}
                     size={18}
-                    color={active ? UI.white : UI.slate500}
+                    color={active ? ui.onPrimary : ui.textSecondary}
                   />
                   <Text style={[styles.categoryText, active && styles.categoryTextActive]}>{category}</Text>
                 </Pressable>
@@ -426,15 +482,15 @@ export default function TourSearchScreen() {
         ) : showSuggestions ? (
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Gợi ý tìm kiếm</Text>
-              <Text style={styles.sectionSubtitle}>Chọn nhanh một danh mục hoặc một tour nổi bật để bắt đầu.</Text>
+              <Text style={styles.sectionTitle}>{t("search.suggestionsTitle")}</Text>
+              <Text style={styles.sectionSubtitle}>{t("search.suggestionsSubtitle")}</Text>
             </View>
 
             {suggestedTours.length === 0 ? (
               <EmptyState
                 icon="search-outline"
-                title="Chưa có dữ liệu tour"
-                description="Dữ liệu gợi ý sẽ xuất hiện sau khi danh sách tour được tải thành công."
+                title={t("search.noDataTitle")}
+                description={t("search.noDataDescription")}
               />
             ) : (
               <View style={styles.resultsList}>
@@ -462,16 +518,16 @@ export default function TourSearchScreen() {
 
                       <View style={styles.resultMetaRow}>
                         <View style={styles.metaChip}>
-                          <Ionicons name="time-outline" size={14} color={UI.slate500} />
+                          <Ionicons name="time-outline" size={14} color={ui.textSecondary} />
                           <Text style={styles.metaChipText}>{tour.durationText}</Text>
                         </View>
                         <View style={styles.metaChip}>
                           <MaterialCommunityIcons
                             name={getCategoryMaterialIcon(tour.category) as any}
                             size={14}
-                            color={UI.slate500}
+                            color={ui.textSecondary}
                           />
-                          <Text style={styles.metaChipText}>{tour.category || "Tour"}</Text>
+                          <Text style={styles.metaChipText}>{tour.category || t("search.defaultCategory")}</Text>
                         </View>
                       </View>
 
@@ -480,7 +536,7 @@ export default function TourSearchScreen() {
                           {tour.originalPrice ? <Text style={styles.oldPrice}>{formatPrice(tour.originalPrice)}</Text> : null}
                           <Text style={styles.newPrice}>{formatPrice(tour.displayPrice)}</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color={UI.primary} />
+                        <Ionicons name="chevron-forward" size={20} color={ui.primary} />
                       </View>
                     </View>
                   </Pressable>
@@ -491,9 +547,9 @@ export default function TourSearchScreen() {
         ) : filteredTours.length === 0 ? (
           <EmptyState
             icon="boat-outline"
-            title="Không tìm thấy tour"
-            description="Thử đổi từ khóa tìm kiếm hoặc điều chỉnh bộ lọc để xem nhiều kết quả hơn."
-            actionLabel="Đặt lại bộ lọc"
+            title={t("search.noResultsTitle")}
+            description={t("search.noResultsDescription")}
+            actionLabel={t("search.resetFilters")}
             onAction={() => {
               setSearch("");
               setSelectedCategory(null);
@@ -503,8 +559,8 @@ export default function TourSearchScreen() {
         ) : (
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Kết quả tìm kiếm</Text>
-              <Text style={styles.sectionSubtitle}>{filteredTours.length} tour phù hợp với bộ lọc hiện tại.</Text>
+              <Text style={styles.sectionTitle}>{t("search.resultsTitle")}</Text>
+              <Text style={styles.sectionSubtitle}>{t("search.resultsSubtitle", { count: filteredTours.length })}</Text>
             </View>
 
             <View style={styles.resultsList}>
@@ -532,16 +588,16 @@ export default function TourSearchScreen() {
 
                     <View style={styles.resultMetaRow}>
                       <View style={styles.metaChip}>
-                        <Ionicons name="time-outline" size={14} color={UI.slate500} />
+                        <Ionicons name="time-outline" size={14} color={ui.textSecondary} />
                         <Text style={styles.metaChipText}>{tour.durationText}</Text>
                       </View>
                       <View style={styles.metaChip}>
                         <MaterialCommunityIcons
                           name={getCategoryMaterialIcon(tour.category) as any}
                           size={14}
-                          color={UI.slate500}
+                          color={ui.textSecondary}
                         />
-                        <Text style={styles.metaChipText}>{tour.category || "Tour"}</Text>
+                        <Text style={styles.metaChipText}>{tour.category || t("search.defaultCategory")}</Text>
                       </View>
                     </View>
 
@@ -550,7 +606,7 @@ export default function TourSearchScreen() {
                         {tour.originalPrice ? <Text style={styles.oldPrice}>{formatPrice(tour.originalPrice)}</Text> : null}
                         <Text style={styles.newPrice}>{formatPrice(tour.displayPrice)}</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={20} color={UI.primary} />
+                      <Ionicons name="chevron-forward" size={20} color={ui.primary} />
                     </View>
                   </View>
                 </Pressable>
@@ -561,29 +617,27 @@ export default function TourSearchScreen() {
       </ScrollView>
 
       <LoadingOverlay visible={refreshing} />
-
       <Modal visible={filterVisible} transparent animationType="slide" onRequestClose={closeFilterModal}>
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={closeFilterModal} />
           <View style={styles.filterSheet}>
             <View style={styles.handleBar} />
+
             <View style={styles.filterHeader}>
               <View style={styles.filterHeaderText}>
-                <Text style={styles.filterSheetTitle}>Lọc & Sắp xếp</Text>
-                <Text style={styles.filterSheetSubtitle}>
-                  Tùy chỉnh giá, thời lượng và đánh giá để thu hẹp kết quả tìm kiếm.
-                </Text>
+                <Text style={styles.filterSheetTitle}>{t("search.filterTitle")}</Text>
+                <Text style={styles.filterSheetSubtitle}>{t("search.filterSubtitle")}</Text>
               </View>
               <Pressable style={styles.closeIconBtn} onPress={closeFilterModal}>
-                <Ionicons name="close" size={18} color={UI.slate900} />
+                <Ionicons name="close" size={18} color={ui.textPrimary} />
               </Pressable>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
               <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Sắp xếp theo</Text>
+                <Text style={styles.filterSectionTitle}>{t("search.sortBy")}</Text>
                 <View style={styles.optionGrid}>
-                  {SORT_OPTIONS.map((option) => {
+                  {sortOptions.map((option) => {
                     const active = draftFilters.sortBy === option.key;
                     return (
                       <Pressable
@@ -591,7 +645,7 @@ export default function TourSearchScreen() {
                         style={[styles.optionChip, active && styles.optionChipActive]}
                         onPress={() => setDraftFilters((prev) => ({ ...prev, sortBy: option.key }))}
                       >
-                        <Ionicons name={option.icon} size={16} color={active ? UI.white : UI.slate700} />
+                        <Ionicons name={option.icon} size={16} color={active ? ui.onPrimary : ui.chipText} />
                         <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>
                           {option.label}
                         </Text>
@@ -602,60 +656,64 @@ export default function TourSearchScreen() {
               </View>
 
               <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Khoảng giá</Text>
+                <Text style={styles.filterSectionTitle}>{t("search.priceRange")}</Text>
                 <View style={styles.rangeSummary}>
                   <View style={styles.rangeBadge}>
-                    <Text style={styles.rangeBadgeLabel}>Tối thiểu</Text>
+                    <Text style={styles.rangeBadgeLabel}>{t("search.minPrice")}</Text>
                     <Text style={styles.rangeBadgeValue}>{formatCompactSearchPrice(normalizedDraftFilters.minPrice)}</Text>
                   </View>
                   <View style={styles.rangeTrack} />
                   <View style={[styles.rangeBadge, styles.rangeBadgeHighlight]}>
-                    <Text style={styles.rangeBadgeLabel}>Tối đa</Text>
+                    <Text style={styles.rangeBadgeLabel}>{t("search.maxPrice")}</Text>
                     <Text style={styles.rangeBadgeValue}>{formatCompactSearchPrice(normalizedDraftFilters.maxPrice)}</Text>
                   </View>
                 </View>
+
                 <PriceRangeSlider
                   bounds={draftPriceBounds}
                   minPrice={normalizedDraftFilters.minPrice}
                   maxPrice={normalizedDraftFilters.maxPrice}
-                  onValuesChange={(min, max) => {
-                    setDraftFilters((prev) => ({ ...prev, minPrice: min, maxPrice: max }));
-                  }}
+                  onValuesChange={(min, max) => setDraftFilters((prev) => ({ ...prev, minPrice: min, maxPrice: max }))}
+                  sliderStyles={sliderStyles}
                 />
+
                 <View style={styles.priceInputsRow}>
                   <View style={styles.priceInputCard}>
-                    <Text style={styles.priceInputLabel}>Giá tối thiểu</Text>
+                    <Text style={styles.priceInputLabel}>{t("search.minPrice")}</Text>
                     <TextInput
                       value={String(draftFilters.minPrice)}
                       onChangeText={(value) => updateDraftPrice("minPrice", value)}
                       keyboardType="numeric"
                       style={styles.priceInput}
                       placeholder={String(draftPriceBounds.minAvailablePrice)}
-                      placeholderTextColor={UI.slate400}
+                      placeholderTextColor={ui.placeholder}
                     />
                   </View>
                   <View style={styles.priceInputCard}>
-                    <Text style={styles.priceInputLabel}>Giá tối đa</Text>
+                    <Text style={styles.priceInputLabel}>{t("search.maxPrice")}</Text>
                     <TextInput
                       value={String(draftFilters.maxPrice)}
                       onChangeText={(value) => updateDraftPrice("maxPrice", value)}
                       keyboardType="numeric"
                       style={styles.priceInput}
                       placeholder={String(draftPriceBounds.sliderMaxPrice)}
-                      placeholderTextColor={UI.slate400}
+                      placeholderTextColor={ui.placeholder}
                     />
                   </View>
                 </View>
                 <Text style={styles.rangeHint}>
-                  Dải giá hiện có: {formatCompactSearchPrice(draftPriceBounds.minAvailablePrice)} -{" "}
-                  {formatCompactSearchPrice(draftPriceBounds.maxAvailablePrice)}.
+                  {t("search.availableRangeExpanded", {
+                    min: formatCompactSearchPrice(draftPriceBounds.minAvailablePrice),
+                    max: formatCompactSearchPrice(draftPriceBounds.maxAvailablePrice),
+                    sliderMax: formatCompactSearchPrice(draftPriceBounds.sliderMaxPrice),
+                  })}
                 </Text>
               </View>
 
               <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Thời lượng</Text>
+                <Text style={styles.filterSectionTitle}>{t("search.duration")}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.durationScroll}>
-                  {DURATION_OPTIONS.map((option) => {
+                  {durationOptions.map((option) => {
                     const active = draftFilters.duration === option.key;
                     return (
                       <Pressable
@@ -673,7 +731,7 @@ export default function TourSearchScreen() {
               </View>
 
               <View style={styles.filterSection}>
-                <Text style={styles.filterSectionTitle}>Đánh giá</Text>
+                <Text style={styles.filterSectionTitle}>{t("search.rating")}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ratingScroll}>
                   {RATING_OPTIONS.map((rating) => {
                     const active = draftFilters.minRating === rating;
@@ -685,7 +743,7 @@ export default function TourSearchScreen() {
                       >
                         <Ionicons name="star" size={15} color={active ? "#fef08a" : "#f59e0b"} />
                         <Text style={[styles.ratingChipText, active && styles.ratingChipTextActive]}>
-                          {rating === 0 ? "Tất cả" : `${rating}+ sao`}
+                          {rating === 0 ? t("search.all") : t("search.starsPlus", { count: rating })}
                         </Text>
                       </Pressable>
                     );
@@ -696,10 +754,10 @@ export default function TourSearchScreen() {
 
             <View style={styles.sheetActionBar}>
               <Pressable style={styles.resetBtn} onPress={resetDraftFilters}>
-                <Text style={styles.resetBtnText}>Đặt lại</Text>
+                <Text style={styles.resetBtnText}>{t("search.resetFilters")}</Text>
               </Pressable>
               <Pressable style={styles.applyBtn} onPress={applyFilters}>
-                <Text style={styles.applyBtnText}>Xem {draftResultCount} kết quả</Text>
+                <Text style={styles.applyBtnText}>{t("search.viewResults", { count: draftResultCount })}</Text>
               </Pressable>
             </View>
           </View>
@@ -709,441 +767,430 @@ export default function TourSearchScreen() {
   );
 }
 
-const sliderStyles = StyleSheet.create({
-  outerWrap: { marginTop: 4, marginBottom: 2 },
-  container: { alignSelf: "center", height: 32 },
-  trackStyle: { height: 5, borderRadius: 3 },
-  track: { backgroundColor: "#e2e8f0", borderRadius: 3 },
-  activeTrack: { backgroundColor: theme.colors.primary, borderRadius: 3 },
-  thumb: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#fff", borderWidth: 2, borderColor: theme.colors.primary },
-  thumbPressed: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#fff", borderWidth: 2, borderColor: theme.colors.primary },
-  tickRow: { marginTop: 8, flexDirection: "row", justifyContent: "space-between" },
-  tickText: { fontSize: 12, fontWeight: "700", color: UI.slate500 },
-});
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: UI.bgLight },
-  header: { backgroundColor: UI.bgLight },
-  searchShell: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: UI.white,
-    borderWidth: 1,
-    borderColor: UI.slate200,
-    paddingHorizontal: 16,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: UI.slate900,
-    fontWeight: "500",
-  },
-  filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: UI.white,
-    borderWidth: 1,
-    borderColor: UI.slate200,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filterBadge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 4,
-    borderRadius: 9,
-    backgroundColor: UI.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filterBadgeText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: UI.white,
-  },
-  categoriesWrap: {
-    marginTop: 14,
-  },
-  categoriesScroll: {
-    paddingHorizontal: 16,
-    gap: 10,
-  },
-  categoryChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: UI.slate100,
-  },
-  categoryChipActive: {
-    backgroundColor: UI.primary,
-  },
-  categoryText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: UI.slate500,
-  },
-  categoryTextActive: {
-    color: UI.white,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 22,
-    paddingBottom: 120,
-    gap: 18,
-  },
-  sectionWrap: {
-    gap: 18,
-  },
-  sectionHeader: {
-    gap: 6,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: UI.slate900,
-    letterSpacing: -0.4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: UI.slate500,
-  },
-  resultsList: {
-    gap: 16,
-  },
-  resultCard: {
-    flexDirection: "row",
-    gap: 14,
-    borderRadius: 24,
-    backgroundColor: UI.white,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: UI.slate200,
-  },
-  resultImage: {
-    width: 108,
-    height: 108,
-    borderRadius: 18,
-    backgroundColor: UI.slate100,
-  },
-  resultBody: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
-  resultTop: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
-  },
-  resultTitle: {
-    flex: 1,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "800",
-    color: UI.slate900,
-  },
-  ratingPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: "#fff7ed",
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#b45309",
-  },
-  resultLocation: {
-    marginTop: 6,
-    fontSize: 13,
-    color: UI.slate500,
-    fontWeight: "600",
-  },
-  resultMetaRow: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-    marginTop: 10,
-  },
-  metaChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: UI.slate100,
-  },
-  metaChipText: {
-    fontSize: 12,
-    color: UI.slate700,
-    fontWeight: "700",
-  },
-  priceRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  oldPrice: {
-    fontSize: 12,
-    color: UI.slate400,
-    textDecorationLine: "line-through",
-    marginBottom: 2,
-  },
-  newPrice: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: UI.primary,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(15, 23, 42, 0.18)",
-  },
-  modalBackdrop: {
-    flex: 1,
-  },
-  filterSheet: {
-    maxHeight: "86%",
-    backgroundColor: UI.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 12,
-  },
-  handleBar: {
-    alignSelf: "center",
-    width: 52,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: UI.slate200,
-    marginBottom: 14,
-  },
-  filterHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  filterHeaderText: {
-    flex: 1,
-  },
-  filterSheetTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: UI.slate900,
-  },
-  filterSheetSubtitle: {
-    marginTop: 6,
-    fontSize: 14,
-    lineHeight: 20,
-    color: UI.slate500,
-  },
-  closeIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: UI.slate100,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filterContent: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 24,
-    gap: 22,
-  },
-  filterSection: {
-    gap: 14,
-  },
-  filterSectionTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: UI.slate900,
-  },
-  optionGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  optionChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: UI.slate100,
-  },
-  optionChipActive: {
-    backgroundColor: UI.primary,
-  },
-  optionChipText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: UI.slate700,
-  },
-  optionChipTextActive: {
-    color: UI.white,
-  },
-  rangeSummary: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  rangeBadge: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: UI.slate100,
-  },
-  rangeBadgeHighlight: {
-    backgroundColor: "#eef6ff",
-  },
-  rangeBadgeLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: UI.slate500,
-    textTransform: "uppercase",
-  },
-  rangeBadgeValue: {
-    marginTop: 6,
-    fontSize: 16,
-    fontWeight: "800",
-    color: UI.slate900,
-  },
-  rangeTrack: {
-    width: 20,
-    height: 2,
-    borderRadius: 2,
-    backgroundColor: UI.slate200,
-  },
-  priceInputsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  priceInputCard: {
-    flex: 1,
-    gap: 8,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: UI.slate100,
-  },
-  priceInputLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: UI.slate500,
-  },
-  priceInput: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: UI.slate900,
-    paddingVertical: 0,
-  },
-  rangeHint: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: UI.slate500,
-  },
-  durationScroll: {
-    gap: 10,
-  },
-  durationChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: UI.slate100,
-  },
-  durationChipActive: {
-    backgroundColor: UI.primary,
-  },
-  durationChipText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: UI.slate700,
-  },
-  durationChipTextActive: {
-    color: UI.white,
-  },
-  ratingScroll: {
-    gap: 10,
-  },
-  ratingChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: UI.slate100,
-  },
-  ratingChipActive: {
-    backgroundColor: UI.primary,
-  },
-  ratingChipText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: UI.slate700,
-  },
-  ratingChipTextActive: {
-    color: UI.white,
-  },
-  sheetActionBar: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 24,
-    borderTopWidth: 1,
-    borderTopColor: UI.slate200,
-  },
-  resetBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: UI.slate100,
-  },
-  resetBtnText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: UI.slate700,
-  },
-  applyBtn: {
-    flex: 1.4,
-    height: 52,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: UI.primary,
-  },
-  applyBtnText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: UI.white,
-  },
-});
+const createStyles = (ui: ReturnType<typeof createUi>) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: ui.bg },
+    header: { backgroundColor: ui.bg },
+    searchShell: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+    },
+    searchBar: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: ui.surface,
+      borderWidth: 1,
+      borderColor: ui.border,
+      paddingHorizontal: 16,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 15,
+      color: ui.textPrimary,
+      fontWeight: "500",
+    },
+    filterButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: ui.surface,
+      borderWidth: 1,
+      borderColor: ui.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    filterBadge: {
+      position: "absolute",
+      top: -4,
+      right: -4,
+      minWidth: 18,
+      height: 18,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      backgroundColor: ui.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    filterBadgeText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: ui.onPrimary,
+    },
+    categoriesWrap: {
+      marginTop: 14,
+    },
+    categoriesScroll: {
+      paddingHorizontal: 16,
+      gap: 10,
+    },
+    categoryChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 999,
+      backgroundColor: ui.mutedSurface,
+    },
+    categoryChipActive: {
+      backgroundColor: ui.primary,
+    },
+    categoryText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: ui.textSecondary,
+    },
+    categoryTextActive: {
+      color: ui.onPrimary,
+    },
+    content: {
+      paddingHorizontal: 16,
+      paddingTop: 22,
+      paddingBottom: 120,
+      gap: 18,
+    },
+    sectionWrap: {
+      gap: 18,
+    },
+    sectionHeader: {
+      gap: 6,
+    },
+    sectionTitle: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: ui.textPrimary,
+      letterSpacing: -0.4,
+    },
+    sectionSubtitle: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: ui.textSecondary,
+    },
+    resultsList: {
+      gap: 16,
+    },
+    resultCard: {
+      flexDirection: "row",
+      gap: 14,
+      borderRadius: 24,
+      backgroundColor: ui.surface,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    resultImage: {
+      width: 108,
+      height: 108,
+      borderRadius: 18,
+      backgroundColor: ui.mutedSurface,
+    },
+    resultBody: {
+      flex: 1,
+      justifyContent: "space-between",
+    },
+    resultTop: {
+      flexDirection: "row",
+      gap: 10,
+      alignItems: "flex-start",
+    },
+    resultTitle: {
+      flex: 1,
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: "800",
+      color: ui.textPrimary,
+    },
+    ratingPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: ui.isDark ? "rgba(245, 158, 11, 0.18)" : "#fff7ed",
+    },
+    ratingText: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: "#b45309",
+    },
+    resultLocation: {
+      marginTop: 6,
+      fontSize: 13,
+      color: ui.textSecondary,
+      fontWeight: "600",
+    },
+    resultMetaRow: {
+      flexDirection: "row",
+      gap: 8,
+      flexWrap: "wrap",
+      marginTop: 10,
+    },
+    metaChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: 999,
+      backgroundColor: ui.mutedSurface,
+    },
+    metaChipText: {
+      fontSize: 12,
+      color: ui.chipText,
+      fontWeight: "700",
+    },
+    priceRow: {
+      marginTop: 12,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-end",
+    },
+    oldPrice: {
+      fontSize: 12,
+      color: ui.placeholder,
+      textDecorationLine: "line-through",
+      marginBottom: 2,
+    },
+    newPrice: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: ui.primary,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: ui.overlay,
+    },
+    modalBackdrop: {
+      flex: 1,
+    },
+    filterSheet: {
+      maxHeight: "86%",
+      backgroundColor: ui.surface,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingTop: 12,
+    },
+    handleBar: {
+      alignSelf: "center",
+      width: 52,
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: ui.border,
+      marginBottom: 14,
+    },
+    filterHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 16,
+      paddingHorizontal: 20,
+      paddingBottom: 12,
+    },
+    filterHeaderText: {
+      flex: 1,
+    },
+    filterSheetTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: ui.textPrimary,
+    },
+    filterSheetSubtitle: {
+      marginTop: 6,
+      fontSize: 14,
+      lineHeight: 20,
+      color: ui.textSecondary,
+    },
+    closeIconBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: ui.mutedSurface,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    filterContent: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 24,
+      gap: 22,
+    },
+    filterSection: {
+      gap: 14,
+    },
+    filterSectionTitle: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: ui.textPrimary,
+    },
+    optionGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    optionChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 16,
+      backgroundColor: ui.mutedSurface,
+    },
+    optionChipActive: {
+      backgroundColor: ui.primary,
+    },
+    optionChipText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: ui.chipText,
+    },
+    optionChipTextActive: {
+      color: ui.onPrimary,
+    },
+    rangeSummary: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    rangeBadge: {
+      flex: 1,
+      padding: 14,
+      borderRadius: 18,
+      backgroundColor: ui.mutedSurface,
+    },
+    rangeBadgeHighlight: {
+      backgroundColor: ui.isDark ? "rgba(34, 211, 238, 0.12)" : "#eef6ff",
+    },
+    rangeBadgeLabel: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: ui.textSecondary,
+      textTransform: "uppercase",
+    },
+    rangeBadgeValue: {
+      marginTop: 6,
+      fontSize: 16,
+      fontWeight: "800",
+      color: ui.textPrimary,
+    },
+    rangeTrack: {
+      width: 20,
+      height: 2,
+      borderRadius: 2,
+      backgroundColor: ui.border,
+    },
+    priceInputsRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    priceInputCard: {
+      flex: 1,
+      gap: 8,
+      padding: 14,
+      borderRadius: 18,
+      backgroundColor: ui.mutedSurface,
+    },
+    priceInputLabel: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: ui.textSecondary,
+    },
+    priceInput: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: ui.textPrimary,
+      paddingVertical: 0,
+    },
+    rangeHint: {
+      fontSize: 12,
+      lineHeight: 18,
+      color: ui.textSecondary,
+    },
+    durationScroll: {
+      gap: 10,
+    },
+    durationChip: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 999,
+      backgroundColor: ui.mutedSurface,
+    },
+    durationChipActive: {
+      backgroundColor: ui.primary,
+    },
+    durationChipText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: ui.chipText,
+    },
+    durationChipTextActive: {
+      color: ui.onPrimary,
+    },
+    ratingScroll: {
+      gap: 10,
+    },
+    ratingChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 999,
+      backgroundColor: ui.mutedSurface,
+    },
+    ratingChipActive: {
+      backgroundColor: ui.primary,
+    },
+    ratingChipText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: ui.chipText,
+    },
+    ratingChipTextActive: {
+      color: ui.onPrimary,
+    },
+    sheetActionBar: {
+      flexDirection: "row",
+      gap: 10,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 24,
+      borderTopWidth: 1,
+      borderTopColor: ui.border,
+    },
+    resetBtn: {
+      flex: 1,
+      height: 52,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: ui.mutedSurface,
+    },
+    resetBtnText: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: ui.chipText,
+    },
+    applyBtn: {
+      flex: 1.4,
+      height: 52,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: ui.primary,
+    },
+    applyBtnText: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: ui.onPrimary,
+    },
+  });

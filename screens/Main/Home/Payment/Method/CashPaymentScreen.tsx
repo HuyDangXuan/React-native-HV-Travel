@@ -1,17 +1,21 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useEffect, useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
+  Animated,
+  Linking,
   Pressable,
   ScrollView,
-  Linking,
-  Animated} from 'react-native';
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import theme from "../../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { StatusBar } from "expo-status-bar";
+
 import SuccessTick from "../../../../../components/SuccessTick";
+import { useI18n } from "../../../../../context/I18nContext";
+import { useAppTheme, useThemeMode } from "../../../../../context/ThemeModeContext";
 
 type RouteParams = {
   id?: string;
@@ -23,20 +27,39 @@ type RouteParams = {
 export default function CashPaymentScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { t } = useI18n();
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+
+  const ui = useMemo(
+    () => ({
+      bg: appTheme.semantic.screenBackground,
+      surface: appTheme.semantic.screenSurface,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      accent: appTheme.colors.primary,
+      accentSoft: `${appTheme.colors.primary}14`,
+      infoSurface:
+        themeName === "dark" ? "rgba(37, 99, 235, 0.18)" : "rgba(59, 130, 246, 0.12)",
+      infoText: themeName === "dark" ? "#93c5fd" : "#1d4ed8",
+      onPrimary: appTheme.colors.white,
+    }),
+    [appTheme, themeName]
+  );
+  const styles = useMemo(() => createStyles(appTheme, ui), [appTheme, ui]);
 
   const params: RouteParams = route?.params ?? {};
-  const { id: tourId, amountText, orderId } = params;
+  const tourId = params?.id;
+  const amountText = params?.amountText || "0 VND";
+  const orderId = params?.orderId || `DL${Date.now()}`;
 
-  // Animation values
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
   const [scaleAnim] = useState(new Animated.Value(0.8));
 
-  // Timer state (24 hours countdown)
-  const [timeLeft, setTimeLeft] = useState(86400); // 24 hours in seconds
-
   useEffect(() => {
-    // Entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -55,50 +78,25 @@ export default function CashPaymentScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-
-    // Timer countdown
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [fadeAnim, slideAnim, scaleAnim]);
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, "0")}:${mins
-      .toString()
-      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
+  }, [fadeAnim, scaleAnim, slideAnim]);
 
   const handleCall = () => {
     Linking.openURL("tel:19001234");
   };
 
   const handleOpenMap = () => {
-    const address =
-      "Tầng 8, Tòa nhà HV Travel, 123 Trần Duy Hưng, Cầu Giấy, Hà Nội";
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      address
-    )}`;
+    const address = t("paymentFlow.cash.addressValue");
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     Linking.openURL(url);
   };
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Timer Box */}
-        <SuccessTick color={theme.colors.primary || "#10B981"} />
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} backgroundColor={ui.bg} />
 
-        {/* Success Icon with Animation */}
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <SuccessTick color={ui.accent} />
+
         <Animated.View
           style={[
             styles.iconContainer,
@@ -109,523 +107,465 @@ export default function CashPaymentScreen() {
           ]}
         >
           <View style={styles.iconCircle}>
-            <Ionicons
-              name="document-text"
-              size={80}
-              color={theme.colors.primary}
-            />
+            <Ionicons name="document-text" size={80} color={ui.accent} />
           </View>
         </Animated.View>
 
-        {/* Title with Animation */}
         <Animated.View
           style={{
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }],
           }}
         >
-          <Text style={styles.title}>Đã ghi nhận đơn hàng</Text>
-          <Text style={styles.subtitle}>
-            Chúng tôi đã ghi nhận yêu cầu thanh toán tiền mặt của bạn
-          </Text>
+          <Text style={styles.title}>{t("paymentFlow.cash.title")}</Text>
+          <Text style={styles.subtitle}>{t("paymentFlow.cash.subtitle")}</Text>
         </Animated.View>
 
-        {/* Order Info Card */}
         <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Mã đơn hàng</Text>
-            <Text style={styles.infoValue}>{orderId}</Text>
-          </View>
-
-          {!!tourId && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Mã tour</Text>
-              <Text style={styles.infoValue}>{tourId}</Text>
-            </View>
-          )}
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Số tiền cần thanh toán</Text>
-            <Text style={[styles.infoValue, styles.amountHighlight]}>
-              {amountText}
-            </Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Hình thức</Text>
-            <Text style={styles.infoValue}>Tiền mặt tại văn phòng</Text>
-          </View>
+          <Row label={t("paymentFlow.cash.orderCode")} value={orderId} styles={styles} />
+          {!!tourId && <Row label={t("paymentFlow.cash.tourCode")} value={tourId} styles={styles} />}
+          <Divider styles={styles} />
+          <Row label={t("paymentFlow.cash.amount")} value={amountText} styles={styles} highlight />
+          <Row
+            label={t("paymentFlow.cash.method")}
+            value={t("paymentFlow.cash.methodValue")}
+            styles={styles}
+          />
         </View>
 
-        {/* Office Info Card */}
         <View style={styles.officeCard}>
           <View style={styles.officeHeader}>
-            <Ionicons
-              name="business"
-              size={24}
-              color={theme.colors.primary}
-            />
-            <Text style={styles.officeTitle}>Thông tin văn phòng</Text>
+            <Ionicons name="business" size={24} color={ui.accent} />
+            <Text style={styles.officeTitle}>{t("paymentFlow.cash.officeTitle")}</Text>
           </View>
 
-          <View style={styles.officeRow}>
-            <Ionicons name="location" size={20} color={theme.colors.gray} />
-            <View style={styles.officeContent}>
-              <Text style={styles.officeLabel}>Địa chỉ</Text>
-              <Text style={styles.officeValue}>
-                Tầng 8, Tòa nhà HV Travel{"\n"}
-                123 Trần Duy Hưng, Cầu Giấy, Hà Nội
-              </Text>
+          <OfficeRow
+            icon="location"
+            label={t("paymentFlow.cash.address")}
+            value={t("paymentFlow.cash.addressValue")}
+            extra={
               <Pressable style={styles.mapBtn} onPress={handleOpenMap}>
-                <Text style={styles.mapBtnText}>Xem bản đồ</Text>
-                <Ionicons
-                  name="navigate"
-                  size={16}
-                  color={theme.colors.primary}
-                />
+                <Text style={styles.mapBtnText}>{t("paymentFlow.cash.map")}</Text>
+                <Ionicons name="navigate" size={16} color={ui.accent} />
               </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.officeRow}>
-            <Ionicons name="time" size={20} color={theme.colors.gray} />
-            <View style={styles.officeContent}>
-              <Text style={styles.officeLabel}>Giờ làm việc</Text>
-              <Text style={styles.officeValue}>
-                08:00 - 17:30 (Thứ 2 - Thứ 7)
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.officeRow}>
-            <Ionicons name="call" size={20} color={theme.colors.gray} />
-            <View style={styles.officeContent}>
-              <Text style={styles.officeLabel}>Hotline</Text>
-              <Pressable onPress={handleCall}>
-                <Text style={[styles.officeValue, styles.phoneLink]}>
-                  1900 1234
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        {/* Important Notice */}
-        <View style={styles.noticeBox}>
-          <Ionicons
-            name="information-circle"
-            size={24}
-            color="#2563EB"
+            }
+            styles={styles}
+            ui={ui}
           />
+
+          <OfficeRow
+            icon="time"
+            label={t("paymentFlow.cash.hours")}
+            value={t("paymentFlow.cash.hoursValue")}
+            styles={styles}
+            ui={ui}
+          />
+
+          <OfficeRow
+            icon="call"
+            label={t("paymentFlow.cash.hotline")}
+            value="1900 1234"
+            extra={
+              <Pressable onPress={handleCall}>
+                <Text style={styles.phoneLink}>{t("paymentFlow.cash.callNow")}</Text>
+              </Pressable>
+            }
+            styles={styles}
+            ui={ui}
+          />
+        </View>
+
+        <View style={styles.noticeBox}>
+          <Ionicons name="information-circle" size={24} color={ui.infoText} />
           <View style={styles.noticeContent}>
-            <Text style={styles.noticeTitle}>Lưu ý khi đến thanh toán</Text>
-            <Text style={styles.noticeText}>
-              • Mang theo <Text style={styles.bold}>mã đơn hàng</Text> để nhân viên xác nhận
-              {"\n"}• Nhận biên nhận ngay sau khi thanh toán
-              {"\n"}• Đơn hàng được xác nhận trong vòng <Text style={styles.bold}>15 phút</Text>
-              {"\n"}• Vui lòng thanh toán trong <Text style={styles.bold}>24 giờ</Text> để giữ chỗ
-            </Text>
+            <Text style={styles.noticeTitle}>{t("paymentFlow.cash.noticeTitle")}</Text>
+            <Text style={styles.noticeText}>{t("paymentFlow.cash.noticeBody")}</Text>
           </View>
         </View>
 
-        {/* Timeline */}
         <View style={styles.timelineCard}>
-          <Text style={styles.timelineTitle}>Quy trình thanh toán</Text>
+          <Text style={styles.timelineTitle}>{t("paymentFlow.cash.timelineTitle")}</Text>
 
-          <View style={styles.timelineItem}>
-            <View style={styles.timelineDot} />
-            <View style={styles.timelineContent}>
-              <Text style={styles.timelineStep}>Bước 1</Text>
-              <Text style={styles.timelineDesc}>
-                Đến văn phòng HV Travel trong giờ làm việc
-              </Text>
-            </View>
-          </View>
-
+          <TimelineItem
+            title={t("paymentFlow.cash.timelineStep1Title")}
+            description={t("paymentFlow.cash.timelineStep1Description")}
+            styles={styles}
+            ui={ui}
+          />
           <View style={styles.timelineLine} />
-
-          <View style={styles.timelineItem}>
-            <View style={styles.timelineDot} />
-            <View style={styles.timelineContent}>
-              <Text style={styles.timelineStep}>Bước 2</Text>
-              <Text style={styles.timelineDesc}>
-                Cung cấp mã đơn <Text style={styles.codeInline}>{orderId}</Text> cho nhân viên
-              </Text>
-            </View>
-          </View>
-
+          <TimelineItem
+            title={t("paymentFlow.cash.timelineStep2Title")}
+            description={t("paymentFlow.cash.timelineStep2Description", { orderId })}
+            styles={styles}
+            ui={ui}
+          />
           <View style={styles.timelineLine} />
-
-          <View style={styles.timelineItem}>
-            <View style={styles.timelineDot} />
-            <View style={styles.timelineContent}>
-              <Text style={styles.timelineStep}>Bước 3</Text>
-              <Text style={styles.timelineDesc}>
-                Thanh toán tiền mặt và nhận biên nhận
-              </Text>
-            </View>
-          </View>
-
+          <TimelineItem
+            title={t("paymentFlow.cash.timelineStep3Title")}
+            description={t("paymentFlow.cash.timelineStep3Description")}
+            styles={styles}
+            ui={ui}
+          />
           <View style={styles.timelineLine} />
-
-          <View style={styles.timelineItem}>
-            <View style={[styles.timelineDot, styles.timelineDotLast]} />
-            <View style={styles.timelineContent}>
-              <Text style={styles.timelineStep}>Hoàn tất</Text>
-              <Text style={styles.timelineDesc}>
-                Đơn hàng được xác nhận và bạn nhận thông tin tour qua email
-              </Text>
-            </View>
-          </View>
+          <TimelineItem
+            title={t("paymentFlow.cash.timelineCompleteTitle")}
+            description={t("paymentFlow.cash.timelineCompleteDescription")}
+            styles={styles}
+            ui={ui}
+          />
         </View>
 
-        {/* Contact Support */}
-        <View style={styles.contactBox}>
-          <Text style={styles.contactTitle}>Cần hỗ trợ thêm?</Text>
-          <Text style={styles.contactText}>
-            Đội ngũ chăm sóc khách hàng của chúng tôi sẵn sàng hỗ trợ bạn
-          </Text>
-          <Pressable style={styles.contactBtn} onPress={handleCall}>
-            <Ionicons name="call" size={20} color={theme.colors.white} />
-            <Text style={styles.contactBtnText}>Gọi ngay: 1900 1234</Text>
-          </Pressable>
+        <View style={styles.supportBox}>
+          <Ionicons name="headset-outline" size={20} color={ui.accent} />
+          <View style={styles.supportContent}>
+            <Text style={styles.supportTitle}>{t("paymentFlow.cash.supportTitle")}</Text>
+            <Text style={styles.supportBody}>{t("paymentFlow.cash.supportBody")}</Text>
+          </View>
         </View>
       </ScrollView>
 
-      {/* Bottom Actions */}
       <View style={styles.footer}>
-        <Pressable
-          style={styles.secondaryBtn}
-          onPress={() => navigation.navigate("MyBookingScreen")}
-        >
-          <Text style={styles.secondaryBtnText}>Xem đơn hàng</Text>
+        <Pressable style={styles.secondaryBtn} onPress={() => navigation.replace("MyBookingScreen")}>
+          <Text style={styles.secondaryBtnText}>{t("paymentFlow.cash.viewOrder")}</Text>
         </Pressable>
 
-        <Pressable
-          style={styles.primaryBtn}
-          onPress={() => navigation.replace("MainTabs")}
-        >
-          <Text style={styles.primaryBtnText}>Về trang chủ</Text>
+        <Pressable style={styles.primaryBtn} onPress={() => navigation.navigate("MainTabs")}>
+          <Text style={styles.primaryBtnText}>{t("paymentFlow.cash.backHome")}</Text>
         </Pressable>
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: theme.colors.white,
-  },
-  container: {
-    padding: theme.spacing.lg,
-    paddingBottom: 120,
-  },
+function Row({
+  label,
+  value,
+  styles,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+  highlight?: boolean;
+}) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoValue, highlight && styles.amountHighlight]}>{value}</Text>
+    </View>
+  );
+}
 
-  timerBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: theme.spacing.md,
-    backgroundColor: "#EFF6FF",
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.lg,
-    gap: theme.spacing.xs,
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-  },
-  timerText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    fontWeight: "600",
-  },
-  timerValue: {
-    fontSize: theme.fontSize.lg,
-    color: "#2563EB",
-    fontWeight: "800",
-  },
+function OfficeRow({
+  icon,
+  label,
+  value,
+  extra,
+  styles,
+  ui,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  extra?: React.ReactNode;
+  styles: ReturnType<typeof createStyles>;
+  ui: { textSecondary: string };
+}) {
+  return (
+    <View style={styles.officeRow}>
+      <Ionicons name={icon} size={20} color={ui.textSecondary} />
+      <View style={styles.officeContent}>
+        <Text style={styles.officeLabel}>{label}</Text>
+        <Text style={styles.officeValue}>{value}</Text>
+        {extra}
+      </View>
+    </View>
+  );
+}
 
-  iconContainer: {
-    alignItems: "center",
-    marginTop: theme.spacing.xl,
-    marginBottom: theme.spacing.lg,
-  },
-  iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#DBEAFE",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+function TimelineItem({
+  title,
+  description,
+  styles,
+  ui,
+}: {
+  title: string;
+  description: string;
+  styles: ReturnType<typeof createStyles>;
+  ui: { accent: string };
+}) {
+  return (
+    <View style={styles.timelineItem}>
+      <View style={[styles.timelineDot, { backgroundColor: ui.accent }]} />
+      <View style={styles.timelineContent}>
+        <Text style={styles.timelineStep}>{title}</Text>
+        <Text style={styles.timelineDesc}>{description}</Text>
+      </View>
+    </View>
+  );
+}
 
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: theme.colors.text,
-    textAlign: "center",
-    marginBottom: theme.spacing.sm,
-  },
-  subtitle: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.gray,
-    textAlign: "center",
-    marginBottom: theme.spacing.xl,
-    lineHeight: 22,
-    paddingHorizontal: theme.spacing.md,
-  },
+function Divider({ styles }: { styles: ReturnType<typeof createStyles> }) {
+  return <View style={styles.divider} />;
+}
 
-  infoCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing.sm,
-  },
-  infoLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
-  },
-  infoValue: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: "700",
-  },
-  amountHighlight: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.lg,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.sm,
-  },
-
-  officeCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  officeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.lg,
-  },
-  officeTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: "700",
-    color: theme.colors.text,
-  },
-  officeRow: {
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-  },
-  officeContent: {
-    flex: 1,
-  },
-  officeLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  officeValue: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: "600",
-    lineHeight: 22,
-  },
-  phoneLink: {
-    color: theme.colors.primary,
-    textDecorationLine: "underline",
-  },
-  mapBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: theme.spacing.sm,
-  },
-  mapBtnText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.primary,
-    fontWeight: "700",
-  },
-
-  noticeBox: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    padding: theme.spacing.lg,
-    backgroundColor: "#DBEAFE",
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: "#93C5FD",
-  },
-  noticeContent: {
-    flex: 1,
-  },
-  noticeTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: "#1E40AF",
-    marginBottom: theme.spacing.xs,
-  },
-  noticeText: {
-    fontSize: theme.fontSize.sm,
-    color: "#1E40AF",
-    lineHeight: 20,
-  },
-  bold: {
-    fontWeight: "800",
-  },
-
-  timelineCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  timelineTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.lg,
-  },
-  timelineItem: {
-    flexDirection: "row",
-    gap: theme.spacing.md,
-  },
-  timelineDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: theme.colors.primary,
-    borderWidth: 4,
-    borderColor: "#DBEAFE",
-  },
-  timelineDotLast: {
-    backgroundColor: "#10B981",
-    borderColor: "#D1FAE5",
-  },
-  timelineLine: {
-    width: 2,
-    height: 24,
-    backgroundColor: "#E5E7EB",
-    marginLeft: 11,
-  },
-  timelineContent: {
-    flex: 1,
-    paddingBottom: theme.spacing.xs,
-  },
-  timelineStep: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: 2,
-  },
-  timelineDesc: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    lineHeight: 20,
-  },
-  codeInline: {
-    fontWeight: "700",
-    color: theme.colors.primary,
-    backgroundColor: "#F3F4F6",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-
-  contactBox: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    alignItems: "center",
-  },
-  contactTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  contactText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    textAlign: "center",
-    marginBottom: theme.spacing.md,
-  },
-  contactBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.sm,
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-  },
-  contactBtnText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
-
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
-    paddingBottom: 34,
-    backgroundColor: theme.colors.white,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  secondaryBtn: {
-    flex: 1,
-    height: 54,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  secondaryBtnText: {
-    color: theme.colors.text,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
-  primaryBtn: {
-    flex: 1,
-    height: 54,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryBtnText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
-});
+function createStyles(
+  appTheme: ReturnType<typeof useAppTheme>,
+  ui: {
+    bg: string;
+    surface: string;
+    mutedSurface: string;
+    textPrimary: string;
+    textSecondary: string;
+    border: string;
+    accent: string;
+    accentSoft: string;
+    infoSurface: string;
+    infoText: string;
+    onPrimary: string;
+  }
+) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: ui.bg,
+    },
+    container: {
+      padding: appTheme.spacing.lg,
+      paddingBottom: 120,
+    },
+    iconContainer: {
+      alignItems: "center",
+      marginBottom: appTheme.spacing.lg,
+    },
+    iconCircle: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: ui.accentSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    title: {
+      ...appTheme.typography.heroTitle,
+      color: ui.textPrimary,
+      textAlign: "center",
+    },
+    subtitle: {
+      ...appTheme.typography.body,
+      color: ui.textSecondary,
+      textAlign: "center",
+      marginTop: appTheme.spacing.sm,
+      marginBottom: appTheme.spacing.xl,
+    },
+    infoCard: {
+      backgroundColor: ui.surface,
+      borderRadius: appTheme.radius.xl,
+      padding: appTheme.spacing.lg,
+      marginBottom: appTheme.spacing.lg,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    infoRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: appTheme.spacing.md,
+      marginBottom: appTheme.spacing.sm,
+    },
+    infoLabel: {
+      fontSize: appTheme.fontSize.sm,
+      color: ui.textSecondary,
+      fontWeight: "600",
+      flex: 1,
+    },
+    infoValue: {
+      fontSize: appTheme.fontSize.md,
+      color: ui.textPrimary,
+      fontWeight: "700",
+      flex: 1,
+      textAlign: "right",
+    },
+    amountHighlight: {
+      color: ui.accent,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: ui.border,
+      marginVertical: appTheme.spacing.sm,
+    },
+    officeCard: {
+      backgroundColor: ui.surface,
+      borderRadius: appTheme.radius.xl,
+      padding: appTheme.spacing.lg,
+      marginBottom: appTheme.spacing.lg,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    officeHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: appTheme.spacing.sm,
+      marginBottom: appTheme.spacing.md,
+    },
+    officeTitle: {
+      ...appTheme.typography.sectionTitle,
+      color: ui.textPrimary,
+    },
+    officeRow: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+      marginBottom: appTheme.spacing.md,
+    },
+    officeContent: {
+      flex: 1,
+    },
+    officeLabel: {
+      fontSize: appTheme.fontSize.sm,
+      color: ui.textSecondary,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    officeValue: {
+      ...appTheme.typography.body,
+      color: ui.textPrimary,
+    },
+    mapBtn: {
+      marginTop: appTheme.spacing.sm,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    mapBtnText: {
+      fontSize: appTheme.fontSize.sm,
+      color: ui.accent,
+      fontWeight: "700",
+    },
+    phoneLink: {
+      marginTop: appTheme.spacing.sm,
+      fontSize: appTheme.fontSize.sm,
+      color: ui.accent,
+      fontWeight: "700",
+    },
+    noticeBox: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+      padding: appTheme.spacing.md,
+      borderRadius: appTheme.radius.lg,
+      backgroundColor: ui.infoSurface,
+      marginBottom: appTheme.spacing.lg,
+    },
+    noticeContent: {
+      flex: 1,
+    },
+    noticeTitle: {
+      fontSize: appTheme.fontSize.md,
+      color: ui.infoText,
+      fontWeight: "800",
+      marginBottom: 4,
+    },
+    noticeText: {
+      ...appTheme.typography.body,
+      color: ui.infoText,
+    },
+    timelineCard: {
+      backgroundColor: ui.surface,
+      borderRadius: appTheme.radius.xl,
+      padding: appTheme.spacing.lg,
+      borderWidth: 1,
+      borderColor: ui.border,
+      marginBottom: appTheme.spacing.lg,
+    },
+    timelineTitle: {
+      ...appTheme.typography.sectionTitle,
+      color: ui.textPrimary,
+      marginBottom: appTheme.spacing.md,
+    },
+    timelineItem: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+    },
+    timelineDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      marginTop: 6,
+    },
+    timelineContent: {
+      flex: 1,
+    },
+    timelineStep: {
+      fontSize: appTheme.fontSize.sm,
+      color: ui.textPrimary,
+      fontWeight: "800",
+      marginBottom: 4,
+    },
+    timelineDesc: {
+      ...appTheme.typography.body,
+      color: ui.textSecondary,
+    },
+    timelineLine: {
+      width: 2,
+      height: 20,
+      backgroundColor: ui.border,
+      marginLeft: 5,
+      marginVertical: 6,
+    },
+    supportBox: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+      padding: appTheme.spacing.md,
+      borderRadius: appTheme.radius.lg,
+      backgroundColor: ui.accentSoft,
+    },
+    supportContent: {
+      flex: 1,
+    },
+    supportTitle: {
+      fontSize: appTheme.fontSize.md,
+      color: ui.textPrimary,
+      fontWeight: "800",
+      marginBottom: 4,
+    },
+    supportBody: {
+      ...appTheme.typography.body,
+      color: ui.textSecondary,
+    },
+    footer: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+      padding: appTheme.layout.bottomBarPadding,
+      borderTopWidth: 1,
+      borderTopColor: ui.border,
+      backgroundColor: ui.surface,
+    },
+    secondaryBtn: {
+      flex: 1,
+      minHeight: 54,
+      borderRadius: appTheme.radius.lg,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: ui.border,
+      backgroundColor: ui.mutedSurface,
+    },
+    secondaryBtnText: {
+      fontSize: appTheme.fontSize.md,
+      fontWeight: "800",
+      color: ui.textPrimary,
+    },
+    primaryBtn: {
+      flex: 1,
+      minHeight: 54,
+      borderRadius: appTheme.radius.lg,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: ui.accent,
+    },
+    primaryBtnText: {
+      fontSize: appTheme.fontSize.md,
+      fontWeight: "800",
+      color: ui.onPrimary,
+    },
+  });
+}

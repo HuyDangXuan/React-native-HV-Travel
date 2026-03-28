@@ -1,6 +1,8 @@
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import theme from "../../../../../config/theme";
+
+import { useAppTheme } from "../../../../../context/ThemeModeContext";
+import { useI18n } from "../../../../../context/I18nContext";
 
 type Tour = {
   schedule?: {
@@ -19,51 +21,70 @@ type ItineraryDay = {
   activities: { desc: string }[];
 };
 
+type ItineraryUi = {
+  surface: string;
+  textPrimary: string;
+  textSecondary: string;
+  border: string;
+  primary: string;
+  onPrimary: string;
+};
+
 export default function ItineraryTab({ tour }: { tour: Tour | null }) {
+  const { t } = useI18n();
+  const appTheme = useAppTheme();
+  const ui = useMemo<ItineraryUi>(
+    () => ({
+      surface: appTheme.semantic.screenSurface,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      primary: appTheme.colors.primary,
+      onPrimary: appTheme.colors.white,
+    }),
+    [appTheme]
+  );
+  const styles = useMemo(() => createStyles(ui), [ui]);
+
   const itinerary = useMemo<ItineraryDay[]>(() => {
     if (!tour) return [];
 
-    // Backend trả schedule: [{ day, title, description, activities: string[] }]
     if (Array.isArray(tour.schedule) && tour.schedule.length > 0) {
       return tour.schedule.map((s, idx) => {
         const activitiesArr =
           Array.isArray(s.activities) && s.activities.length > 0
             ? s.activities.map((a) => ({ desc: a }))
-            : [{ desc: s.description || "Chưa có mô tả lịch trình." }];
+            : [{ desc: s.description || t("tourDetail.itineraryNoActivityDescription") }];
 
         return {
           day: s.day ?? idx + 1,
-          title: s.title || `Lịch trình ngày ${idx + 1}`,
+          title: s.title || t("tourDetail.itineraryDefaultDayTitle", { day: idx + 1 }),
           activities: activitiesArr,
         };
       });
     }
 
-    // Fallback: chưa có schedule -> hiện tổng quan từ description + duration
-    const fallbackDesc =
-      tour.description || "Hiện tour chưa cập nhật lịch trình chi tiết.";
+    const fallbackDesc = tour.description || t("tourDetail.itineraryFallbackDescription");
     return [
       {
         day: 1,
-        title: tour.duration?.text ? `Tổng quan (${tour.duration.text})` : "Tổng quan",
+        title: tour.duration?.text
+          ? t("tourDetail.itineraryFallbackTitleWithDuration", { duration: tour.duration.text })
+          : t("tourDetail.itineraryFallbackTitle"),
         activities: [{ desc: fallbackDesc }],
       },
     ];
-  }, [tour]);
+  }, [t, tour]);
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Lịch trình chi tiết</Text>
-      <Text style={styles.desc}>
-        Khám phá từng hoạt động theo ngày với thời gian cụ thể
-      </Text>
+      <Text style={styles.title}>{t("tourDetail.itineraryTitle")}</Text>
+      <Text style={styles.desc}>{t("tourDetail.itineraryDescription")}</Text>
 
       {itinerary.length === 0 ? (
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyTitle}>Chưa có lịch trình</Text>
-          <Text style={styles.emptyDesc}>
-            Tour này chưa được cập nhật lịch trình từ hệ thống.
-          </Text>
+          <Text style={styles.emptyTitle}>{t("tourDetail.itineraryEmptyTitle")}</Text>
+          <Text style={styles.emptyDesc}>{t("tourDetail.itineraryEmptyDescription")}</Text>
         </View>
       ) : (
         <View style={styles.itineraryList}>
@@ -72,6 +93,8 @@ export default function ItineraryTab({ tour }: { tour: Tour | null }) {
               key={`${item.day}-${idx}`}
               data={item}
               isLast={idx === itinerary.length - 1}
+              styles={styles}
+              t={t}
             />
           ))}
         </View>
@@ -83,29 +106,29 @@ export default function ItineraryTab({ tour }: { tour: Tour | null }) {
 function DayCard({
   data,
   isLast,
+  styles,
+  t,
 }: {
   data: ItineraryDay;
   isLast: boolean;
+  styles: ReturnType<typeof createStyles>;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   return (
     <View style={styles.dayCard}>
-      {/* Day Header */}
       <View style={styles.dayHeader}>
         <View style={styles.dayBadge}>
-          <Text style={styles.dayBadgeText}>Ngày {data.day}</Text>
+          <Text style={styles.dayBadgeText}>{t("tourDetail.itineraryDayLabel", { day: data.day })}</Text>
         </View>
         <Text style={styles.dayTitle}>{data.title}</Text>
       </View>
 
-      {/* Activities */}
       <View style={styles.activitiesWrap}>
         {data.activities.map((activity, idx) => (
           <View key={idx} style={styles.activityRow}>
             <View style={styles.timelineCol}>
               <View style={styles.timelineDot} />
-              {idx < data.activities.length - 1 && (
-                <View style={styles.timelineLine} />
-              )}
+              {idx < data.activities.length - 1 && <View style={styles.timelineLine} />}
             </View>
 
             <View style={styles.activityContent}>
@@ -115,112 +138,105 @@ function DayCard({
         ))}
       </View>
 
-      {/* Connector to next day */}
       {!isLast && <View style={styles.dayConnector} />}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { marginTop: theme.spacing.xl },
-
-  title: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-  },
-  desc: {
-    color: theme.colors.gray,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 22,
-    marginBottom: theme.spacing.lg,
-  },
-
-  emptyBox: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  emptyTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: theme.colors.text,
-  },
-  emptyDesc: {
-    marginTop: theme.spacing.xs,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    lineHeight: 20,
-  },
-
-  itineraryList: { gap: theme.spacing.md },
-
-  dayCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  dayHeader: { marginBottom: theme.spacing.md },
-  dayBadge: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.radius.sm,
-    alignSelf: "flex-start",
-    marginBottom: theme.spacing.xs,
-  },
-  dayBadgeText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.xs,
-    fontWeight: "600",
-  },
-  dayTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "600",
-    color: theme.colors.text,
-  },
-
-  activitiesWrap: { gap: theme.spacing.sm },
-  activityRow: { flexDirection: "row", gap: theme.spacing.sm },
-
-  timelineCol: { alignItems: "center", width: 20 },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.colors.primary,
-    borderWidth: 2,
-    borderColor: theme.colors.white,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  timelineLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: theme.colors.border,
-    marginTop: 4,
-  },
-
-  activityContent: { flex: 1, paddingBottom: theme.spacing.sm },
-  activityDesc: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    lineHeight: 20,
-  },
-
-  dayConnector: {
-    height: 20,
-    width: 2,
-    backgroundColor: theme.colors.border,
-    alignSelf: "center",
-    marginTop: theme.spacing.sm,
-  },
-});
+function createStyles(ui: ItineraryUi) {
+  return StyleSheet.create({
+    wrap: { marginTop: 32 },
+    title: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: ui.textPrimary,
+      marginBottom: 8,
+    },
+    desc: {
+      color: ui.textSecondary,
+      fontSize: 14,
+      lineHeight: 22,
+      marginBottom: 24,
+    },
+    emptyBox: {
+      backgroundColor: ui.surface,
+      borderRadius: 16,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    emptyTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: ui.textPrimary,
+    },
+    emptyDesc: {
+      marginTop: 4,
+      fontSize: 14,
+      color: ui.textSecondary,
+      lineHeight: 20,
+    },
+    itineraryList: { gap: 16 },
+    dayCard: {
+      backgroundColor: ui.surface,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    dayHeader: { marginBottom: 16 },
+    dayBadge: {
+      backgroundColor: ui.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+      alignSelf: "flex-start",
+      marginBottom: 4,
+    },
+    dayBadgeText: {
+      color: ui.onPrimary,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    dayTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: ui.textPrimary,
+    },
+    activitiesWrap: { gap: 8 },
+    activityRow: { flexDirection: "row", gap: 8 },
+    timelineCol: { alignItems: "center", width: 20 },
+    timelineDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: ui.primary,
+      borderWidth: 2,
+      borderColor: ui.onPrimary,
+      shadowColor: ui.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    timelineLine: {
+      width: 2,
+      flex: 1,
+      backgroundColor: ui.border,
+      marginTop: 4,
+    },
+    activityContent: { flex: 1, paddingBottom: 8 },
+    activityDesc: {
+      fontSize: 14,
+      color: ui.textPrimary,
+      lineHeight: 20,
+    },
+    dayConnector: {
+      height: 20,
+      width: 2,
+      backgroundColor: ui.border,
+      alignSelf: "center",
+      marginTop: 8,
+    },
+  });
+}

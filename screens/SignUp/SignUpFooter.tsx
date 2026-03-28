@@ -1,31 +1,44 @@
-import {View, Text, StyleSheet, TouchableOpacity} from "react-native"
-import theme from "../../config/theme";
+import { View, Text, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
-export default function SignUpFooter(){
-    const navigation = useNavigation<any>();
-    return(
-        <View style={styles.container}>
-            <Text style={styles.text}>Đã có tài khoản?{' '}
-                <Text style={styles.link} onPress={() => navigation.replace("LoginScreen")}>
-                                    Đăng nhập</Text>
-            </Text>
-        </View>
-    );
+import { useI18n } from "../../context/I18nContext";
+import { useAppTheme } from "../../context/ThemeModeContext";
+
+export default function SignUpFooter() {
+  const navigation = useNavigation<any>();
+  const { t } = useI18n();
+  const theme = useAppTheme();
+
+  return (
+    <View style={[styles.container, { marginTop: theme.spacing.lg }]}>
+      <Text
+        style={[
+          styles.text,
+          {
+            fontSize: theme.fontSize.md,
+            color: theme.semantic.textPrimary,
+            marginTop: theme.spacing.sm,
+          },
+        ]}
+      >
+        {t("signUp.hasAccount")}{" "}
+        <Text
+          style={[styles.link, { color: theme.colors.primary }]}
+          onPress={() => navigation.replace("LoginScreen")}
+        >
+          {t("signUp.signIn")}
+        </Text>
+      </Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        marginTop: theme.spacing.lg,
-        alignItems: "center",
-    },
-    text: {
-        fontSize: theme.fontSize.md,
-        color: theme.colors.text,
-        marginTop: theme.spacing.sm,
-    },
-    link: {
-        color: theme.colors.primary,
-        fontWeight: "bold",
-    },
+  container: {
+    alignItems: "center",
+  },
+  text: {},
+  link: {
+    fontWeight: "bold",
+  },
 });

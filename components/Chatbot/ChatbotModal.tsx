@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   View,
@@ -10,12 +10,20 @@ import {
   Dimensions,
   Keyboard,
   Platform,
+  Animated,
+  PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Animated, PanResponder } from "react-native";
-import theme from "../../config/theme";
+
+import { useAppTheme } from "../../context/ThemeModeContext";
+import { useI18n } from "../../context/I18nContext";
 import { chatWithTour } from "../../services/ChatbotService";
-import { string } from "joi";
+import {
+  buildChatbotBusyMessage,
+  buildChatbotWelcomeMessage,
+  createConversationId,
+} from "../../utils/chatbot";
+
 const { height } = Dimensions.get("window");
 
 type Message = {
@@ -25,66 +33,98 @@ type Message = {
   typing?: boolean;
 };
 
-export default function ChatbotModal({ visible, onClose, tour }: any) {
+type ChatbotModalProps = {
+  visible: boolean;
+  onClose: () => void;
+  tour?: {
+    id?: string;
+    _id?: string;
+    name?: string;
+  } | null;
+};
+
+type ChatUi = {
+  overlay: string;
+  surface: string;
+  mutedSurface: string;
+  border: string;
+  textPrimary: string;
+  textSecondary: string;
+  primary: string;
+  onPrimary: string;
+  inputSurface: string;
+  handle: string;
+};
+
+export default function ChatbotModal({ visible, onClose, tour }: ChatbotModalProps) {
+  const { t } = useI18n();
+  const appTheme = useAppTheme();
+  const ui = useMemo<ChatUi>(
+    () => ({
+      overlay: appTheme.colors.overlay,
+      surface: appTheme.semantic.screenSurface,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      border: appTheme.semantic.divider,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      primary: appTheme.colors.primary,
+      onPrimary: appTheme.colors.white,
+      inputSurface: appTheme.semantic.screenBackground,
+      handle: appTheme.colors.placeholder,
+    }),
+    [appTheme]
+  );
+  const styles = useMemo(() => createStyles(ui), [ui]);
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [conversationId, setConversationId] = useState("");
 
-  const listRef = useRef<FlatList>(null);
-  const [conversationIdRef, setCreateConversationId] = useState("");
+  const listRef = useRef<FlatList<Message>>(null);
 
-  /* ================= DRAG MODAL ================= */
-  const INITIAL_HEIGHT = height * 0.85;
-
-  const modalHeight = useRef(new Animated.Value(INITIAL_HEIGHT)).current;
-  const currentHeight = useRef(INITIAL_HEIGHT);
-  const dragStartHeight = useRef(INITIAL_HEIGHT);
+  const initialHeight = height * 0.85;
+  const modalHeight = useRef(new Animated.Value(initialHeight)).current;
+  const currentHeight = useRef(initialHeight);
+  const dragStartHeight = useRef(initialHeight);
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-
       onPanResponderGrant: () => {
         dragStartHeight.current = currentHeight.current;
       },
-
-      onPanResponderMove: (_, g) => {
-        const newHeight = dragStartHeight.current - g.dy;
+      onPanResponderMove: (_, gesture) => {
         const min = height * 0.55;
         const max = height * 0.9;
+        const nextHeight = dragStartHeight.current - gesture.dy;
 
-        if (newHeight >= min && newHeight <= max) {
-          modalHeight.setValue(newHeight);
+        if (nextHeight >= min && nextHeight <= max) {
+          modalHeight.setValue(nextHeight);
         }
       },
-
-      onPanResponderRelease: (_, g) => {
+      onPanResponderRelease: (_, gesture) => {
         const min = height * 0.55;
         const max = height * 0.9;
+        const nextHeight = Math.max(min, Math.min(max, dragStartHeight.current - gesture.dy));
 
-        let finalHeight = dragStartHeight.current - g.dy;
-        finalHeight = Math.max(min, Math.min(max, finalHeight));
-
-        currentHeight.current = finalHeight;
-
+        currentHeight.current = nextHeight;
         Animated.spring(modalHeight, {
-          toValue: finalHeight,
+          toValue: nextHeight,
           useNativeDriver: false,
         }).start();
       },
     })
   ).current;
 
-  /* ================= KEYBOARD (CHỈ INPUT) ================= */
-  const keyboardOffset = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      (e: any) => {
+      (event) => {
         Animated.timing(keyboardOffset, {
-          toValue: e.endCoordinates.height,
+          toValue: event.endCoordinates.height,
           duration: 250,
           useNativeDriver: false,
         }).start(() => {
@@ -108,71 +148,73 @@ export default function ChatbotModal({ visible, onClose, tour }: any) {
       show.remove();
       hide.remove();
     };
-  }, []);
-
-  const createConversationId = () => {
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  }
-
-  /* ================= INIT ================= */
-  useEffect(() => {
-    if (visible) {
-      setCreateConversationId(createConversationId());
-      setMessages([
-        {
-          id: "init",
-          role: "bot",
-          text: `Chào bạn 👋  
-Mình là trợ lý cho tour **${tour?.name || ""}**.  
-Bạn muốn hỏi gì về tour này?`,
-        },
-      ]);
-
-      const h = height * 0.85;
-      currentHeight.current = h;
-      modalHeight.setValue(h);
-    }
-  }, [visible]);
+  }, [keyboardOffset]);
 
   useEffect(() => {
-    setTimeout(() => {
+    if (!visible) return;
+
+    const nextConversationId = createConversationId();
+    setConversationId(nextConversationId);
+    setInput("");
+    setSending(false);
+    setMessages([
+      {
+        id: "init",
+        role: "bot",
+        text: buildChatbotWelcomeMessage(t, tour?.name),
+      },
+    ]);
+
+    currentHeight.current = initialHeight;
+    modalHeight.setValue(initialHeight);
+  }, [initialHeight, modalHeight, t, tour?.name, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const timeout = setTimeout(() => {
       listRef.current?.scrollToEnd({ animated: true });
     }, 80);
-  }, [messages]);
 
-  /* ================= SEND ================= */
+    return () => clearTimeout(timeout);
+  }, [messages, visible]);
+
   const sendMessage = async () => {
     if (!input.trim() || sending) return;
 
-    const userText = input;
+    const targetTourId = tour?.id || tour?._id;
+    const userText = input.trim();
     setInput("");
     setSending(true);
-
     setMessages((prev) => [
       ...prev,
-      { id: Date.now().toString(), role: "user", text: userText },
+      { id: `${Date.now()}-user`, role: "user", text: userText },
       { id: "typing", role: "bot", typing: true },
     ]);
 
     try {
-      const reply = await chatWithTour(tour?.id || tour?._id, userText, conversationIdRef);
+      if (!targetTourId) {
+        throw new Error("Missing tour id");
+      }
+
+      const reply = await chatWithTour(targetTourId, userText, conversationId);
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === "typing"
-            ? { id: Date.now().toString(), role: "bot", text: reply }
-            : m
+        prev.map((message) =>
+          message.id === "typing"
+            ? { id: `${Date.now()}-bot`, role: "bot", text: reply }
+            : message
         )
       );
     } catch {
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === "typing"
+        prev.map((message) =>
+          message.id === "typing"
             ? {
-                id: Date.now().toString(),
+                id: `${Date.now()}-bot-error`,
                 role: "bot",
-                text: "Xin lỗi, hệ thống đang bận 😢",
+                text: buildChatbotBusyMessage(t),
               }
-            : m
+            : message
         )
       );
     } finally {
@@ -180,63 +222,8 @@ Bạn muốn hỏi gì về tour này?`,
     }
   };
 
-  /* ================= UI HELPERS ================= */
-  function MarkdownText({ text, isUser }: any) {
-    return (
-      <Text style={[styles.text, isUser && { color: "#fff" }]}>
-        {text.split("**").map((p: string, i: number) => (
-          <Text key={i} style={i % 2 ? { fontWeight: "700" } : undefined}>
-            {p}
-          </Text>
-        ))}
-      </Text>
-    );
-  }
-
-  function TypingIndicator() {
-    const dots = [0, 1, 2].map(() => useRef(new Animated.Value(0)).current);
-
-    useEffect(() => {
-      dots.forEach((dot, i) => {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(dot, {
-              toValue: -4,
-              duration: 300,
-              delay: i * 120,
-              useNativeDriver: true,
-            }),
-            Animated.timing(dot, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
-      });
-    }, []);
-
-    return (
-      <View style={{ flexDirection: "row", gap: 6 }}>
-        {dots.map((d, i) => (
-          <Animated.View
-            key={i}
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: "#9CA3AF",
-              transform: [{ translateY: d }],
-            }}
-          />
-        ))}
-      </View>
-    );
-  }
-
-  /* ================= RENDER ================= */
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Animated.View style={[styles.container, { height: modalHeight }]}>
           <View style={styles.handleWrapper} {...panResponder.panHandlers}>
@@ -244,68 +231,61 @@ Bạn muốn hỏi gì về tour này?`,
           </View>
 
           <View style={styles.header}>
-            <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+            <View style={styles.headerInfo}>
               <View style={styles.botAvatar}>
-                <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+                <Ionicons name="chatbubble-ellipses" size={18} color={ui.onPrimary} />
               </View>
-              <View>
-                <Text style={styles.title}>Trợ lý tour HV Travel</Text>
+              <View style={styles.headerTextWrap}>
+                <Text style={styles.title}>{t("chatbot.title")}</Text>
                 <Text style={styles.subtitle} numberOfLines={1}>
-                  Đang hoạt động
+                  {t("chatbot.subtitleOnline")}
                 </Text>
               </View>
             </View>
 
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} />
+            <Pressable onPress={onClose} style={styles.closeBtn} accessibilityLabel={t("chatbot.closeLabel")}>
+              <Ionicons name="close" size={20} color={ui.textPrimary} />
             </Pressable>
           </View>
 
           <FlatList
             ref={listRef}
             data={messages}
-            keyExtractor={(i) => i.id}
+            keyExtractor={(item) => item.id}
             contentContainerStyle={styles.chatList}
             renderItem={({ item }) => (
               <View
                 style={[
                   styles.bubble,
-                  item.role === "user"
-                    ? styles.userBubble
-                    : styles.botBubble,
+                  item.role === "user" ? styles.userBubble : styles.botBubble,
                 ]}
               >
                 {item.typing ? (
-                  <TypingIndicator />
+                  <TypingIndicator styles={styles} ui={ui} />
                 ) : (
-                  <MarkdownText
-                    text={item.text || ""}
-                    isUser={item.role === "user"}
-                  />
+                  <MarkdownText text={item.text || ""} isUser={item.role === "user"} styles={styles} />
                 )}
               </View>
             )}
           />
 
-          {/* INPUT CHỈ LÙI THEO KEYBOARD */}
           <Animated.View style={{ paddingBottom: keyboardOffset }}>
             <View style={styles.inputRow}>
               <TextInput
-                placeholder="Hỏi về tour này..."
+                placeholder={t("chatbot.placeholder")}
+                placeholderTextColor={ui.textSecondary}
                 value={input}
                 onChangeText={setInput}
                 style={styles.input}
+                selectionColor={ui.primary}
                 onSubmitEditing={sendMessage}
               />
               <Pressable
                 onPress={sendMessage}
                 disabled={!input.trim() || sending}
-                style={[
-                  styles.sendBtn,
-                  (!input.trim() || sending) && { opacity: 0.5 },
-                ]}
+                style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
               >
-                <Ionicons name="send" size={18} color="#fff" />
+                <Ionicons name="send" size={18} color={ui.onPrimary} />
               </Pressable>
             </View>
           </Animated.View>
@@ -315,115 +295,228 @@ Bạn muốn hỏi gì về tour này?`,
   );
 }
 
-/* ================= STYLES ================= */
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
-  },
+function MarkdownText({
+  text,
+  isUser,
+  styles,
+}: {
+  text: string;
+  isUser: boolean;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  return (
+    <Text style={[styles.text, isUser && styles.userText]}>
+      {text.split("**").map((part, index) => (
+        <Text key={`${part}-${index}`} style={index % 2 ? styles.boldText : undefined}>
+          {part}
+        </Text>
+      ))}
+    </Text>
+  );
+}
 
-  container: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: "hidden",
-  },
+function TypingIndicator({
+  styles,
+  ui,
+}: {
+  styles: ReturnType<typeof createStyles>;
+  ui: ChatUi;
+}) {
+  const dotA = useRef(new Animated.Value(0)).current;
+  const dotB = useRef(new Animated.Value(0)).current;
+  const dotC = useRef(new Animated.Value(0)).current;
+  const dots = [dotA, dotB, dotC];
 
-  handleWrapper: {
-    alignItems: "center",
-    paddingVertical: 12,
-  },
+  useEffect(() => {
+    const animations = dots.map((dot, index) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(dot, {
+            toValue: -4,
+            duration: 260,
+            delay: index * 120,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 260,
+            useNativeDriver: true,
+          }),
+        ])
+      )
+    );
 
-  handle: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: "#D1D5DB",
-  },
+    animations.forEach((animation) => animation.start());
 
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
+    return () => {
+      animations.forEach((animation) => animation.stop());
+    };
+  }, [dotA, dotB, dotC, dots]);
 
-  botAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  return (
+    <View style={styles.typingWrap}>
+      {dots.map((dot, index) => (
+        <Animated.View
+          key={index}
+          style={[
+            styles.typingDot,
+            {
+              backgroundColor: ui.textSecondary,
+              transform: [{ translateY: dot }],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
 
-  title: { fontSize: 17, fontWeight: "700" },
-  subtitle: { fontSize: 13, color: "#6B7280" },
-
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  chatList: {
-    padding: 16,
-    gap: 10,
-  },
-
-  bubble: {
-    maxWidth: "80%",
-    padding: 12,
-    borderRadius: 16,
-  },
-
-  userBubble: {
-    backgroundColor: theme.colors.primary,
-    alignSelf: "flex-end",
-    borderTopRightRadius: 6,
-  },
-
-  botBubble: {
-    backgroundColor: "#F3F4F6",
-    alignSelf: "flex-start",
-    borderTopLeftRadius: 6,
-  },
-
-  text: {
-    fontSize: 15,
-    lineHeight: 21,
-    color: "#111827",
-  },
-
-  inputRow: {
-    flexDirection: "row",
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-    gap: 8,
-  },
-
-  input: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    height: 46,
-  },
-
-  sendBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+function createStyles(ui: ChatUi) {
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: ui.overlay,
+      justifyContent: "flex-end",
+    },
+    container: {
+      backgroundColor: ui.surface,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      overflow: "hidden",
+    },
+    handleWrapper: {
+      alignItems: "center",
+      paddingVertical: 12,
+    },
+    handle: {
+      width: 44,
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: ui.handle,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: ui.border,
+    },
+    headerInfo: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      flex: 1,
+    },
+    headerTextWrap: {
+      flex: 1,
+    },
+    botAvatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: ui.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    title: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: ui.textPrimary,
+    },
+    subtitle: {
+      marginTop: 2,
+      fontSize: 13,
+      color: ui.textSecondary,
+    },
+    closeBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: ui.mutedSurface,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    chatList: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 12,
+      gap: 10,
+    },
+    bubble: {
+      maxWidth: "82%",
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 18,
+    },
+    userBubble: {
+      alignSelf: "flex-end",
+      backgroundColor: ui.primary,
+      borderTopRightRadius: 6,
+    },
+    botBubble: {
+      alignSelf: "flex-start",
+      backgroundColor: ui.mutedSurface,
+      borderTopLeftRadius: 6,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    text: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: ui.textPrimary,
+    },
+    userText: {
+      color: ui.onPrimary,
+    },
+    boldText: {
+      fontWeight: "800",
+    },
+    typingWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      minHeight: 18,
+    },
+    typingDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 12,
+      borderTopWidth: 1,
+      borderTopColor: ui.border,
+      backgroundColor: ui.surface,
+    },
+    input: {
+      flex: 1,
+      height: 46,
+      borderRadius: 23,
+      paddingHorizontal: 18,
+      backgroundColor: ui.inputSurface,
+      color: ui.textPrimary,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    sendBtn: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: ui.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    sendBtnDisabled: {
+      opacity: 0.45,
+    },
+  });
+}

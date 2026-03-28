@@ -1,59 +1,70 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
+  Image,
+  ImageSourcePropType,
   Modal,
+  Pressable,
   ScrollView,
-  Image} from 'react-native';
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import theme from "../../../../config/theme";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { StatusBar } from "expo-status-bar";
+
 import { useAuth } from "../../../../context/AuthContext";
+import { useI18n } from "../../../../context/I18nContext";
+import { useAppTheme, useThemeMode } from "../../../../context/ThemeModeContext";
 import { BookingService } from "../../../../services/BookingService";
-import { MessageBoxService } from "../../../MessageBox/MessageBoxService";
 import LoadingOverlay from "../../../Loading/LoadingOverlay";
+import { MessageBoxService } from "../../../MessageBox/MessageBoxService";
 
 type Method = {
-  id: string;
-  name: string;
-  logo?: string;
-  icon?: string;
-  description?: string;
+  id: "zalopay" | "vnpay" | "momo" | "bank" | "cash";
+  nameKey: string;
+  descriptionKey: string;
+  logoSource?: ImageSourcePropType;
+  icon?: keyof typeof Ionicons.glyphMap;
 };
+
+const PAYMENT_LOGOS = {
+  zalopay: require("./assets/zalopay.png"),
+  vnpay: require("./assets/vnpay.png"),
+  momo: require("./assets/momo.png"),
+} satisfies Record<"zalopay" | "vnpay" | "momo", ImageSourcePropType>;
 
 const METHODS: Method[] = [
   {
     id: "zalopay",
-    name: "ZaloPay",
-    logo: "https://vnpay.vn/wp-content/uploads/2020/07/Logo-ZaloPay.png", // Placeholder or real logo
-    description: "Thanh toán qua ví điện tử ZaloPay",
+    nameKey: "paymentMethod.methods.zalopayName",
+    descriptionKey: "paymentMethod.methods.zalopayDescription",
+    logoSource: PAYMENT_LOGOS.zalopay,
   },
   {
     id: "vnpay",
-    name: "VNPay",
-    logo: "https://vnpay.vn/wp-content/uploads/2020/05/vnpay-logo.png",
-    description: "Thanh toán qua cổng VNPay",
+    nameKey: "paymentMethod.methods.vnpayName",
+    descriptionKey: "paymentMethod.methods.vnpayDescription",
+    logoSource: PAYMENT_LOGOS.vnpay,
   },
   {
     id: "momo",
-    name: "MoMo",
-    logo: "https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png",
-    description: "Thanh toán qua ví MoMo",
+    nameKey: "paymentMethod.methods.momoName",
+    descriptionKey: "paymentMethod.methods.momoDescription",
+    logoSource: PAYMENT_LOGOS.momo,
   },
   {
     id: "bank",
-    name: "Chuyển khoản ngân hàng",
+    nameKey: "paymentMethod.methods.bankName",
+    descriptionKey: "paymentMethod.methods.bankDescription",
     icon: "swap-horizontal-outline",
-    description: "Chuyển khoản vào tài khoản công ty",
   },
   {
     id: "cash",
-    name: "Tiền mặt",
+    nameKey: "paymentMethod.methods.cashName",
+    descriptionKey: "paymentMethod.methods.cashDescription",
     icon: "cash-outline",
-    description: "Thanh toán tiền mặt tại văn phòng",
   },
 ];
 
@@ -73,43 +84,69 @@ type RouteParams = {
   };
 };
 
-const formatVND = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-    Number.isFinite(v) ? v : 0
-  );
+function getCurrencyLocale(locale: string) {
+  return locale === "vi" ? "vi-VN" : "en-US";
+}
 
 export default function PaymentMethodScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { token } = useAuth();
+  const { t, locale } = useI18n();
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+
   const [showBankModal, setShowBankModal] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { token } = useAuth();
 
+  const ui = useMemo(
+    () => ({
+      bg: appTheme.semantic.screenBackground,
+      surface: appTheme.semantic.screenSurface,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      elevated: appTheme.semantic.screenElevated,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      primary: appTheme.colors.primary,
+      onPrimary: appTheme.colors.white,
+      overlay: appTheme.colors.overlay,
+      warningSurface:
+        themeName === "dark" ? "rgba(245, 158, 11, 0.18)" : "rgba(245, 158, 11, 0.16)",
+      warningText: themeName === "dark" ? "#fcd34d" : "#92400e",
+      infoSurface:
+        themeName === "dark" ? "rgba(37, 99, 235, 0.18)" : "rgba(59, 130, 246, 0.12)",
+      infoText: themeName === "dark" ? "#93c5fd" : "#1d4ed8",
+    }),
+    [appTheme, themeName]
+  );
+  const styles = useMemo(() => createStyles(appTheme, ui), [appTheme, ui]);
 
   const params: RouteParams = route?.params ?? {};
   const tourId = params?.id;
+  const total = typeof params?.total === "number" ? params.total : 0;
+  const currencyLocale = useMemo(() => getCurrencyLocale(locale), [locale]);
 
-  // total là NUMBER
-  const total: number = typeof params?.total === "number" ? params.total : 0;
-
-  // orderId: nếu không truyền thì tự gen
-  const orderId = useMemo(() => {
-    return params?.orderId || "DL" + Date.now();
-  }, [params?.orderId]);
-
-  // text hiển thị
-  const amountText = useMemo(() => formatVND(total), [total]);
+  const orderId = useMemo(() => params?.orderId || `DL${Date.now()}`, [params?.orderId]);
+  const amountText = useMemo(
+    () =>
+      new Intl.NumberFormat(currencyLocale, {
+        style: "currency",
+        currency: "VND",
+      }).format(Number.isFinite(total) ? total : 0),
+    [currencyLocale, total]
+  );
 
   const generatePassengers = () => {
     const passengers: any[] = [];
-    const contactName = params?.contactInfo?.name || "Người lớn 1";
+    const contactName = params?.contactInfo?.name || "Adult 1";
 
     const adultsCount = params?.adults || 1;
     for (let i = 0; i < adultsCount; i++) {
       passengers.push({
         type: "Adult",
-        fullName: i === 0 ? contactName : `Người lớn ${i + 1}`,
+        fullName: i === 0 ? contactName : `Adult ${i + 1}`,
         birthDate: null,
         gender: null,
         passportNumber: null,
@@ -120,7 +157,7 @@ export default function PaymentMethodScreen() {
     for (let i = 0; i < childrenCount; i++) {
       passengers.push({
         type: "Child",
-        fullName: `Trẻ em ${i + 1}`,
+        fullName: `Child ${i + 1}`,
         birthDate: null,
         gender: null,
         passportNumber: null,
@@ -131,18 +168,23 @@ export default function PaymentMethodScreen() {
     for (let i = 0; i < infantsCount; i++) {
       passengers.push({
         type: "Infant",
-        fullName: `Em bé ${i + 1}`,
+        fullName: `Infant ${i + 1}`,
         birthDate: null,
         gender: null,
         passportNumber: null,
       });
     }
+
     return passengers;
   };
 
   const processBookingAndNavigate = async (methodId: string) => {
     if (!token) {
-      MessageBoxService.error("Lỗi", "Vui lòng đăng nhập để tiếp tục", "OK");
+      MessageBoxService.error(
+        t("paymentMethod.errors.authTitle"),
+        t("paymentMethod.errors.authMessage"),
+        t("common.ok")
+      );
       return;
     }
 
@@ -155,7 +197,7 @@ export default function PaymentMethodScreen() {
           name: params?.contactInfo?.name || "",
           email: params?.contactInfo?.email || "",
           phone: params?.contactInfo?.phone || "",
-          selectedDate: params?.contactInfo?.selectedDate || ""
+          selectedDate: params?.contactInfo?.selectedDate || "",
         },
         adultCount: params?.adults || 0,
         childCount: params?.children || 0,
@@ -164,39 +206,36 @@ export default function PaymentMethodScreen() {
       };
 
       const booking = await BookingService.createBooking(token, bookingData);
-      if (booking) {
-        setIsLoading(false);
-        const newOrderId = booking.bookingCode || orderId;
-
-        const paymentParams = {
-          id: tourId,
-          total,
-          amountText,
-          orderId: newOrderId,
-          method: methodId,
-        };
-        navigation.navigate("PaymentSuccessScreen", paymentParams);
-      } else {
-        setIsLoading(false);
-        MessageBoxService.error("Lỗi đặt tour", "Có lỗi xảy ra, vui lòng thử lại.", "OK");
+      if (!booking) {
+        MessageBoxService.error(
+          t("paymentMethod.errors.bookingTitle"),
+          t("paymentMethod.errors.bookingMessage"),
+          t("common.ok")
+        );
+        return;
       }
+
+      const newOrderId = booking.bookingCode || orderId;
+      navigation.navigate("PaymentSuccessScreen", {
+        id: tourId,
+        total,
+        amountText,
+        orderId: newOrderId,
+        method: methodId,
+      });
     } catch (error: any) {
-      setIsLoading(false);
       console.log("Create booking error:", error);
-      MessageBoxService.error("Lỗi kết nối", error.message || "Không thể kết nối đến máy chủ.", "OK");
+      MessageBoxService.error(
+        t("paymentMethod.errors.connectionTitle"),
+        error?.message || t("paymentMethod.errors.connectionMessage"),
+        t("common.ok")
+      );
     } finally {
-      // setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleMethodPress = (method: Method) => {
-    const paymentParams = {
-      id: tourId,
-      total,       // number
-      amountText,  // string để hiển thị
-      orderId,
-    };
-
     switch (method.id) {
       case "zalopay":
         processBookingAndNavigate("ZaloPay");
@@ -213,152 +252,122 @@ export default function PaymentMethodScreen() {
       case "cash":
         setShowCashModal(true);
         break;
-
       default:
-        console.log("Unknown payment method:", method.id);
+        break;
     }
   };
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar style={themeName === "dark" ? "light" : "dark"} backgroundColor={ui.bg} />
       <LoadingOverlay visible={isLoading} />
-      {/* Header */}
+
       <View style={styles.header}>
-        <Pressable
-          style={styles.headerIcon}
-          onPress={() => navigation.goBack()}
-          hitSlop={10}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        <Pressable style={styles.headerIcon} onPress={() => navigation.goBack()} hitSlop={10}>
+          <Ionicons name="arrow-back" size={24} color={ui.textPrimary} />
         </Pressable>
 
-        <Text style={styles.headerTitle}>Phương thức thanh toán</Text>
+        <Text style={styles.headerTitle}>{t("paymentMethod.title")}</Text>
 
-        {/* spacer để title centered */}
         <View style={styles.headerIcon} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionTitle}>Chọn phương thức thanh toán</Text>
+        <Text style={styles.sectionTitle}>{t("paymentMethod.selectTitle")}</Text>
 
-        {/* Amount Display */}
         <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>Tổng thanh toán</Text>
+          <Text style={styles.amountLabel}>{t("paymentMethod.totalLabel")}</Text>
           <Text style={styles.amountValue}>{amountText}</Text>
-          {!!tourId && (
-            <Text style={styles.subInfo}>Mã tour: {tourId}</Text>
-          )}
-          <Text style={styles.subInfo}>Mã đơn: {orderId}</Text>
+          {!!tourId && <Text style={styles.subInfo}>{t("paymentMethod.tourCode", { code: tourId })}</Text>}
+          <Text style={styles.subInfo}>{t("paymentMethod.orderCode", { code: orderId })}</Text>
         </View>
 
-        {METHODS.map((m) => (
+        {METHODS.map((method) => (
           <Pressable
-            key={m.id}
+            key={method.id}
             style={styles.methodCard}
-            onPress={() => handleMethodPress(m)}
-            android_ripple={{ color: "rgba(0,0,0,0.06)" }}
+            onPress={() => handleMethodPress(method)}
+            android_ripple={{ color: ui.overlay }}
           >
             <View style={styles.methodLeft}>
               <View style={styles.logoBox}>
-                {m.logo ? (
-                  <Image
-                    source={{ uri: m.logo }}
-                    style={styles.logoImage}
-                    resizeMode="contain"
-                  />
+                {method.logoSource ? (
+                  <Image source={method.logoSource} style={styles.logoImage} resizeMode="contain" />
                 ) : (
-                  <Ionicons
-                    name={m.icon as any}
-                    size={28}
-                    color={theme.colors.primary}
-                  />
+                  <Ionicons name={method.icon || "wallet-outline"} size={28} color={ui.primary} />
                 )}
               </View>
 
-              <View style={{ flex: 1 }}>
-                <Text style={styles.methodText}>{m.name}</Text>
-                {!!m.description && (
-                  <Text style={styles.methodDesc}>{m.description}</Text>
-                )}
+              <View style={styles.methodTextWrap}>
+                <Text style={styles.methodText}>{t(method.nameKey)}</Text>
+                <Text style={styles.methodDesc}>{t(method.descriptionKey)}</Text>
               </View>
             </View>
 
-            <Ionicons
-              name="chevron-forward"
-              size={22}
-              color={theme.colors.gray}
-            />
+            <Ionicons name="chevron-forward" size={22} color={ui.textSecondary} />
           </Pressable>
         ))}
 
         <View style={styles.note}>
-          <Ionicons
-            name="information-circle-outline"
-            size={20}
-            color={theme.colors.primary}
-          />
-          <Text style={styles.noteText}>
-            Vui lòng hoàn tất thanh toán trong vòng 24h để giữ chỗ. Sau thời gian
-            này, đơn hàng sẽ tự động hủy.
-          </Text>
+          <Ionicons name="information-circle-outline" size={20} color={ui.primary} />
+          <Text style={styles.noteText}>{t("paymentMethod.note")}</Text>
         </View>
       </ScrollView>
 
-      {/* Bank Transfer Modal */}
       <Modal visible={showBankModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setShowBankModal(false)}
-          />
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowBankModal(false)} />
 
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Thông tin chuyển khoản</Text>
-              <Pressable
-                onPress={() => setShowBankModal(false)}
-                hitSlop={10}
-              >
-                <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Text style={styles.modalTitle}>{t("paymentMethod.bankModal.title")}</Text>
+              <Pressable onPress={() => setShowBankModal(false)} hitSlop={10}>
+                <Ionicons name="close" size={24} color={ui.textPrimary} />
               </Pressable>
             </View>
 
             <ScrollView style={styles.modalBody}>
               <View style={styles.bankInfo}>
                 <InfoRow
-                  label="Ngân hàng"
-                  value="Vietcombank - Chi nhánh Hà Nội"
+                  label={t("paymentMethod.bankModal.bankLabel")}
+                  value={t("paymentMethod.bankModal.bankValue")}
+                  styles={styles}
                 />
-                <InfoRow label="Số tài khoản" value="1234567890" copyable />
                 <InfoRow
-                  label="Chủ tài khoản"
-                  value="CÔNG TY DU LỊCH HV TRAVEL"
+                  label={t("paymentMethod.bankModal.accountNumber")}
+                  value="1234567890"
+                  copyable
+                  styles={styles}
+                  ui={ui}
                 />
-                <InfoRow label="Số tiền" value={amountText} highlight />
                 <InfoRow
-                  label="Nội dung"
+                  label={t("paymentMethod.bankModal.accountHolder")}
+                  value={t("paymentMethod.bankModal.accountHolderValue")}
+                  styles={styles}
+                />
+                <InfoRow
+                  label={t("paymentMethod.bankModal.amount")}
+                  value={amountText}
+                  highlight
+                  styles={styles}
+                />
+                <InfoRow
+                  label={t("paymentMethod.bankModal.content")}
                   value={`${orderId} DAT VE`}
                   copyable
+                  styles={styles}
+                  ui={ui}
                 />
               </View>
 
               <View style={styles.warningBox}>
-                <Ionicons name="warning-outline" size={20} color="#F59E0B" />
-                <Text style={styles.warningText}>
-                  Vui lòng ghi đúng nội dung chuyển khoản để chúng tôi xác nhận
-                  thanh toán nhanh nhất.
-                </Text>
+                <Ionicons name="warning-outline" size={20} color={ui.warningText} />
+                <Text style={styles.warningText}>{t("paymentMethod.bankModal.warning")}</Text>
               </View>
 
               <View style={styles.instructionBox}>
-                <Text style={styles.instructionTitle}>Hướng dẫn:</Text>
-                <Text style={styles.instructionText}>
-                  1. Mở ứng dụng ngân hàng{"\n"}
-                  2. Chuyển khoản đến số tài khoản trên{"\n"}
-                  3. Nhập đúng số tiền và nội dung{"\n"}
-                  4. Chụp ảnh hoặc lưu lại biên lai{"\n"}
-                  5. Chờ xác nhận từ hệ thống (1-2 giờ)
-                </Text>
+                <Text style={styles.instructionTitle}>{t("paymentMethod.bankModal.instructionTitle")}</Text>
+                <Text style={styles.instructionText}>{t("paymentMethod.bankModal.instructionSteps")}</Text>
               </View>
             </ScrollView>
 
@@ -370,68 +379,83 @@ export default function PaymentMethodScreen() {
                   processBookingAndNavigate("Bank");
                 }}
               >
-                <Text style={styles.modalBtnText}>Tiếp tục</Text>
+                <Text style={styles.modalBtnText}>{t("paymentMethod.bankModal.continue")}</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Cash Payment Modal */}
       <Modal visible={showCashModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setShowCashModal(false)}
-          />
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowCashModal(false)} />
 
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Thanh toán tiền mặt</Text>
+              <Text style={styles.modalTitle}>{t("paymentMethod.cashModal.title")}</Text>
               <Pressable onPress={() => setShowCashModal(false)} hitSlop={10}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
+                <Ionicons name="close" size={24} color={ui.textPrimary} />
               </Pressable>
             </View>
 
             <ScrollView style={styles.modalBody}>
               <View style={styles.bankInfo}>
-                <InfoRow label="Hình thức" value="Tiền mặt tại văn phòng" />
-                <InfoRow label="Số tiền" value={amountText} highlight />
-                <InfoRow label="Mã đơn" value={orderId} copyable />
-                {!!tourId && <InfoRow label="Mã tour" value={tourId} copyable />}
-
                 <InfoRow
-                  label="Địa chỉ văn phòng"
-                  value="Tầng 8, Tòa nhà HV Travel, 123 Trần Duy Hưng, Cầu Giấy, Hà Nội"
-                  copyable
+                  label={t("paymentMethod.cashModal.method")}
+                  value={t("paymentMethod.cashModal.methodValue")}
+                  styles={styles}
                 />
                 <InfoRow
-                  label="Giờ làm việc"
-                  value="08:00 - 17:30 (Thứ 2 - Thứ 7)"
+                  label={t("paymentMethod.cashModal.amount")}
+                  value={amountText}
+                  highlight
+                  styles={styles}
                 />
                 <InfoRow
-                  label="Hotline"
-                  value="1900 1234"
+                  label={t("paymentMethod.cashModal.orderCode")}
+                  value={orderId}
                   copyable
+                  styles={styles}
+                  ui={ui}
+                />
+                {!!tourId && (
+                  <InfoRow
+                    label={t("paymentMethod.cashModal.tourCode")}
+                    value={tourId}
+                    copyable
+                    styles={styles}
+                    ui={ui}
+                  />
+                )}
+                <InfoRow
+                  label={t("paymentMethod.cashModal.officeAddress")}
+                  value={t("paymentMethod.cashModal.officeAddressValue")}
+                  copyable
+                  styles={styles}
+                  ui={ui}
+                />
+                <InfoRow
+                  label={t("paymentMethod.cashModal.officeHours")}
+                  value={t("paymentMethod.cashModal.officeHoursValue")}
+                  styles={styles}
+                />
+                <InfoRow
+                  label={t("paymentMethod.cashModal.hotline")}
+                  value={t("paymentMethod.cashModal.hotlineValue")}
+                  copyable
+                  styles={styles}
+                  ui={ui}
                 />
               </View>
 
               <View style={styles.warningBoxCash}>
-                <Ionicons name="information-circle-outline" size={20} color="#2563EB" />
-                <Text style={styles.warningTextCash}>
-                  Khi đến thanh toán, bạn vui lòng cung cấp <Text style={styles.bold}>mã đơn</Text> để nhân viên xác nhận nhanh.
-                  Sau khi thu tiền, hệ thống sẽ cập nhật trạng thái trong vòng <Text style={styles.bold}>15 phút</Text>.
-                </Text>
+                <Ionicons name="information-circle-outline" size={20} color={ui.infoText} />
+                <Text style={styles.warningTextCash}>{t("paymentMethod.cashModal.warning")}</Text>
               </View>
 
               <View style={styles.instructionBox}>
-                <Text style={styles.instructionTitle}>Hướng dẫn:</Text>
-                <Text style={styles.instructionText}>
-                  1. Đến văn phòng HV Travel trong giờ làm việc{"\n"}
-                  2. Cung cấp mã đơn để đối chiếu{"\n"}
-                  3. Thanh toán tiền mặt và nhận biên nhận{"\n"}
-                  4. Đơn hàng được xác nhận và giữ chỗ ngay sau khi cập nhật
-                </Text>
+                <Text style={styles.instructionTitle}>{t("paymentMethod.cashModal.instructionTitle")}</Text>
+                <Text style={styles.instructionText}>{t("paymentMethod.cashModal.instructionSteps")}</Text>
               </View>
             </ScrollView>
 
@@ -443,13 +467,12 @@ export default function PaymentMethodScreen() {
                   processBookingAndNavigate("Cash");
                 }}
               >
-                <Text style={styles.modalBtnText}>Tiếp tục</Text>
+                <Text style={styles.modalBtnText}>{t("paymentMethod.cashModal.continue")}</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
@@ -459,270 +482,308 @@ function InfoRow({
   value,
   copyable,
   highlight,
+  styles,
+  ui,
 }: {
   label: string;
   value: string;
   copyable?: boolean;
   highlight?: boolean;
+  styles: ReturnType<typeof createStyles>;
+  ui?: { primary: string };
 }) {
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
       <View style={styles.infoValueWrap}>
-        <Text style={[styles.infoValue, highlight && styles.infoValueHighlight]}>
-          {value}
-        </Text>
+        <Text style={[styles.infoValue, highlight && styles.infoValueHighlight]}>{value}</Text>
 
-        {copyable && (
+        {copyable && ui ? (
           <Pressable
             style={styles.copyBtn}
             onPress={() => {
-              // TODO: Clipboard.setStringAsync(value)
               console.log("Copied:", value);
             }}
           >
-            <Ionicons name="copy-outline" size={16} color={theme.colors.primary} />
+            <Ionicons name="copy-outline" size={16} color={ui.primary} />
           </Pressable>
-        )}
+        ) : null}
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.white },
-
-  header: {
-    height: 54,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: theme.colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  headerIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: theme.fontSize.lg, fontWeight: "800", color: theme.colors.text },
-
-  content: { padding: theme.spacing.md },
-
-  sectionTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-
-  amountCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    alignItems: "center",
-    marginBottom: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: 6,
-  },
-  amountLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
-  },
-  amountValue: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: theme.colors.primary,
-  },
-  subInfo: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    fontWeight: "600",
-  },
-
-  methodCard: {
-    minHeight: 80,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.white,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    overflow: "hidden",
-    marginBottom: theme.spacing.md,
-  },
-  methodLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.md,
-    flex: 1,
-  },
-  logoBox: {
-    width: 54,
-    height: 54,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: theme.spacing.xs,
-  },
-  logoImage: { width: "100%", height: "100%" },
-
-  methodText: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: "700",
-  },
-  methodDesc: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    marginTop: 2,
-  },
-
-  note: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    marginTop: theme.spacing.md,
-  },
-  noteText: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    lineHeight: 20,
-  },
-
-  modalOverlay: { flex: 1, justifyContent: "flex-end" },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  modalContent: {
-    backgroundColor: theme.colors.white,
-    borderTopLeftRadius: theme.radius.xl,
-    borderTopRightRadius: theme.radius.xl,
-    maxHeight: "90%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  modalTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: "700",
-    color: theme.colors.text,
-  },
-  modalBody: { padding: theme.spacing.lg },
-  modalFooter: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    paddingBottom: 34,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  modalBtn: {
-    height: 54,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalBtnText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-  },
-
-  bankInfo: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
-  },
-  infoRow: { gap: 4 },
-  infoLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "600",
-  },
-  infoValueWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.sm,
-  },
-  infoValue: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: "700",
-    flex: 1,
-  },
-  infoValueHighlight: {
-    color: theme.colors.primary,
-    fontSize: theme.fontSize.lg,
-  },
-  copyBtn: { padding: theme.spacing.xs },
-
-  warningBox: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    padding: theme.spacing.md,
-    backgroundColor: "#FEF3C7",
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.lg,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    color: "#92400E",
-    lineHeight: 20,
-  },
-
-  instructionBox: {
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  instructionTitle: {
-    fontSize: theme.fontSize.md,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-  },
-  instructionText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    lineHeight: 22,
-  },
-  warningBoxCash: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-    padding: theme.spacing.md,
-    backgroundColor: "#DBEAFE",
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.lg,
-  },
-  warningTextCash: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    color: "#1E40AF",
-    lineHeight: 20,
-  },
-  bold: {
-    fontWeight: "800",
-    color: "#1E40AF",
-  },
-
-});
+function createStyles(
+  appTheme: ReturnType<typeof useAppTheme>,
+  ui: {
+    bg: string;
+    surface: string;
+    mutedSurface: string;
+    elevated: string;
+    textPrimary: string;
+    textSecondary: string;
+    border: string;
+    primary: string;
+    onPrimary: string;
+    overlay: string;
+    warningSurface: string;
+    warningText: string;
+    infoSurface: string;
+    infoText: string;
+  }
+) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: ui.bg,
+    },
+    header: {
+      height: 56,
+      paddingHorizontal: appTheme.spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: ui.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: ui.border,
+    },
+    headerIcon: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerTitle: {
+      ...appTheme.typography.pageTitle,
+      color: ui.textPrimary,
+    },
+    content: {
+      padding: appTheme.spacing.md,
+      paddingBottom: appTheme.spacing.xl,
+    },
+    sectionTitle: {
+      ...appTheme.typography.sectionTitle,
+      color: ui.textPrimary,
+      marginBottom: appTheme.spacing.md,
+    },
+    amountCard: {
+      backgroundColor: ui.surface,
+      borderRadius: appTheme.radius.xl,
+      padding: appTheme.spacing.lg,
+      alignItems: "center",
+      marginBottom: appTheme.spacing.lg,
+      borderWidth: 1,
+      borderColor: ui.border,
+      gap: 6,
+      ...appTheme.shadow.sm,
+    },
+    amountLabel: {
+      ...appTheme.typography.label,
+      color: ui.textSecondary,
+    },
+    amountValue: {
+      fontSize: 28,
+      lineHeight: 34,
+      fontWeight: "800",
+      color: ui.primary,
+    },
+    subInfo: {
+      ...appTheme.typography.label,
+      color: ui.textSecondary,
+    },
+    methodCard: {
+      minHeight: 80,
+      borderRadius: appTheme.radius.lg,
+      borderWidth: 1,
+      borderColor: ui.border,
+      backgroundColor: ui.surface,
+      paddingHorizontal: appTheme.spacing.md,
+      paddingVertical: appTheme.spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      overflow: "hidden",
+      marginBottom: appTheme.spacing.md,
+    },
+    methodLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: appTheme.spacing.md,
+      flex: 1,
+    },
+    logoBox: {
+      width: 54,
+      height: 54,
+      borderRadius: appTheme.radius.md,
+      backgroundColor: ui.mutedSurface,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: appTheme.spacing.xs,
+    },
+    logoImage: {
+      width: "100%",
+      height: "100%",
+      borderRadius: appTheme.radius.sm,
+    },
+    methodTextWrap: {
+      flex: 1,
+    },
+    methodText: {
+      fontSize: appTheme.fontSize.md,
+      lineHeight: 22,
+      color: ui.textPrimary,
+      fontWeight: "700",
+    },
+    methodDesc: {
+      ...appTheme.typography.body,
+      color: ui.textSecondary,
+      marginTop: 2,
+    },
+    note: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+      padding: appTheme.spacing.md,
+      backgroundColor: ui.surface,
+      borderRadius: appTheme.radius.lg,
+      marginTop: appTheme.spacing.md,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    noteText: {
+      flex: 1,
+      ...appTheme.typography.body,
+      color: ui.textSecondary,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    modalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: ui.overlay,
+    },
+    modalContent: {
+      backgroundColor: ui.surface,
+      borderTopLeftRadius: appTheme.radius.xl,
+      borderTopRightRadius: appTheme.radius.xl,
+      maxHeight: "90%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: appTheme.spacing.lg,
+      paddingVertical: appTheme.spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: ui.border,
+    },
+    modalTitle: {
+      fontSize: appTheme.fontSize.lg,
+      lineHeight: 24,
+      fontWeight: "700",
+      color: ui.textPrimary,
+    },
+    modalBody: {
+      padding: appTheme.spacing.lg,
+    },
+    modalFooter: {
+      paddingHorizontal: appTheme.spacing.lg,
+      paddingVertical: appTheme.spacing.md,
+      paddingBottom: 34,
+      borderTopWidth: 1,
+      borderTopColor: ui.border,
+    },
+    modalBtn: {
+      height: 54,
+      borderRadius: appTheme.radius.lg,
+      backgroundColor: ui.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    modalBtnText: {
+      color: ui.onPrimary,
+      fontSize: appTheme.fontSize.md,
+      fontWeight: "700",
+    },
+    bankInfo: {
+      backgroundColor: ui.mutedSurface,
+      borderRadius: appTheme.radius.lg,
+      padding: appTheme.spacing.md,
+      gap: appTheme.spacing.md,
+      marginBottom: appTheme.spacing.lg,
+    },
+    infoRow: {
+      gap: 4,
+    },
+    infoLabel: {
+      fontSize: appTheme.fontSize.sm,
+      lineHeight: 20,
+      color: ui.textSecondary,
+      fontWeight: "600",
+    },
+    infoValueWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: appTheme.spacing.sm,
+    },
+    infoValue: {
+      fontSize: appTheme.fontSize.md,
+      lineHeight: 22,
+      color: ui.textPrimary,
+      fontWeight: "700",
+      flex: 1,
+    },
+    infoValueHighlight: {
+      color: ui.primary,
+      fontSize: appTheme.fontSize.lg,
+      lineHeight: 24,
+    },
+    copyBtn: {
+      padding: appTheme.spacing.xs,
+    },
+    warningBox: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+      padding: appTheme.spacing.md,
+      backgroundColor: ui.warningSurface,
+      borderRadius: appTheme.radius.lg,
+      marginBottom: appTheme.spacing.lg,
+    },
+    warningText: {
+      flex: 1,
+      ...appTheme.typography.body,
+      color: ui.warningText,
+    },
+    instructionBox: {
+      padding: appTheme.spacing.md,
+      backgroundColor: ui.surface,
+      borderRadius: appTheme.radius.lg,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    instructionTitle: {
+      fontSize: appTheme.fontSize.md,
+      lineHeight: 22,
+      fontWeight: "700",
+      color: ui.textPrimary,
+      marginBottom: appTheme.spacing.sm,
+    },
+    instructionText: {
+      ...appTheme.typography.body,
+      color: ui.textSecondary,
+    },
+    warningBoxCash: {
+      flexDirection: "row",
+      gap: appTheme.spacing.sm,
+      padding: appTheme.spacing.md,
+      backgroundColor: ui.infoSurface,
+      borderRadius: appTheme.radius.lg,
+      marginBottom: appTheme.spacing.lg,
+    },
+    warningTextCash: {
+      flex: 1,
+      ...appTheme.typography.body,
+      color: ui.infoText,
+    },
+  });
+}

@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
-import { Text, StyleSheet, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import theme from "../../../../../../config/theme";
+
+import { useI18n } from "../../../../../../context/I18nContext";
+import { useAppTheme } from "../../../../../../context/ThemeModeContext";
 import ResultScreenLayout, {
   ResultCard,
 } from "../../../../../../components/ui/ResultScreenLayout";
@@ -17,19 +19,42 @@ type RouteParams = {
   reason?: string;
 };
 
-const formatVND = (v: number) =>
+type UiTokens = {
+  accent: string;
+  accentSoft: string;
+  textPrimary: string;
+  textSecondary: string;
+  divider: string;
+};
+
+const formatVND = (value: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-    Number.isFinite(v) ? v : 0
+    Number.isFinite(value) ? value : 0
   );
 
 export default function PaymentFailedScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const params: RouteParams = route?.params ?? {};
+  const { t } = useI18n();
+  const appTheme = useAppTheme();
+
+  const ui = useMemo<UiTokens>(
+    () => ({
+      accent: appTheme.colors.error,
+      accentSoft: `${appTheme.colors.error}14`,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      divider: appTheme.semantic.divider,
+    }),
+    [appTheme]
+  );
+
+  const sheet = useMemo(() => createStyles(ui), [ui]);
 
   const reason = params?.reason || "unknown";
-  const method = params?.method || "Unknown";
-  const orderId = params?.orderId || "DL" + Date.now();
+  const method = params?.method || t("paymentResult.common.unknown");
+  const orderId = params?.orderId || `DL${Date.now()}`;
   const tourId = params?.id;
   const total = typeof params?.total === "number" ? params.total : 0;
 
@@ -40,7 +65,7 @@ export default function PaymentFailedScreen() {
     return formatVND(0);
   }, [params?.amountText, params?.amount, total]);
 
-  const failureInfo = getFailureInfo(reason);
+  const failureInfo = getFailureInfo(reason, t);
 
   return (
     <ResultScreenLayout
@@ -50,12 +75,12 @@ export default function PaymentFailedScreen() {
       subtitle={failureInfo.message}
       footerActions={[
         {
-          label: "Về trang chủ",
+          label: t("paymentResult.failed.actions.home"),
           onPress: () => navigation.navigate("MainTabs"),
           variant: "secondary",
         },
         {
-          label: "Thử lại",
+          label: t("paymentResult.failed.actions.retry"),
           onPress: () =>
             navigation.navigate("PaymentMethodScreen", {
               id: tourId,
@@ -67,53 +92,105 @@ export default function PaymentFailedScreen() {
       ]}
     >
       <ResultCard>
-        {!!tourId ? <DetailRow icon="pricetag-outline" label="Mã tour" value={tourId} /> : null}
-        {!!tourId ? <Divider /> : null}
-        <DetailRow icon="receipt-outline" label="Mã đơn hàng" value={orderId} />
-        <Divider />
-        <DetailRow icon="cash-outline" label="Số tiền" value={amountText} />
-        <Divider />
-        <DetailRow icon="wallet-outline" label="Phương thức" value={method} />
-        <Divider />
-        <DetailRow icon="alert-circle-outline" label="Lý do" value={failureInfo.title} />
+        {!!tourId ? (
+          <DetailRow
+            icon="pricetag-outline"
+            label={t("paymentResult.failed.fields.tourCode")}
+            value={tourId}
+            ui={ui}
+            sheet={sheet}
+          />
+        ) : null}
+        {!!tourId ? <Divider sheet={sheet} /> : null}
+        <DetailRow
+          icon="receipt-outline"
+          label={t("paymentResult.failed.fields.orderCode")}
+          value={orderId}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Divider sheet={sheet} />
+        <DetailRow
+          icon="cash-outline"
+          label={t("paymentResult.failed.fields.amount")}
+          value={amountText}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Divider sheet={sheet} />
+        <DetailRow
+          icon="wallet-outline"
+          label={t("paymentResult.failed.fields.method")}
+          value={method}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Divider sheet={sheet} />
+        <DetailRow
+          icon="alert-circle-outline"
+          label={t("paymentResult.failed.fields.reason")}
+          value={failureInfo.reasonLabel}
+          ui={ui}
+          sheet={sheet}
+        />
       </ResultCard>
 
-      <ResultCard style={styles.solutionCard}>
-        <Text style={styles.sectionTitle}>Giải pháp gợi ý</Text>
-        <Step icon="refresh-outline" text="Kiểm tra lại thông tin và thử thanh toán lại." />
-        <Step icon="card-outline" text="Thử một phương thức thanh toán khác nếu cần." />
-        <Step icon="headset-outline" text="Liên hệ hotline để được hỗ trợ khi giao dịch đã bị trừ tiền." />
+      <ResultCard style={sheet.cardTinted}>
+        <Text style={sheet.sectionTitle}>{t("paymentResult.failed.solutionTitle")}</Text>
+        <Step
+          icon="refresh-outline"
+          text={t("paymentResult.failed.solutions.review")}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Step
+          icon="card-outline"
+          text={t("paymentResult.failed.solutions.alternateMethod")}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Step
+          icon="headset-outline"
+          text={t("paymentResult.failed.solutions.support")}
+          ui={ui}
+          sheet={sheet}
+        />
       </ResultCard>
     </ResultScreenLayout>
   );
 }
 
-function getFailureInfo(reason: string) {
+function getFailureInfo(reason: string, t: (key: string) => string) {
   switch (reason) {
     case "timeout":
       return {
-        title: "Hết thời gian thanh toán",
-        message: "Phiên thanh toán đã hết hạn. Vui lòng thử lại với một phiên mới.",
+        title: t("paymentResult.failed.reasons.timeout.title"),
+        message: t("paymentResult.failed.reasons.timeout.message"),
+        reasonLabel: t("paymentResult.failed.reasons.timeout.label"),
       };
     case "insufficient_funds":
       return {
-        title: "Số dư không đủ",
-        message: "Tài khoản của bạn không đủ số dư để hoàn tất giao dịch.",
+        title: t("paymentResult.failed.reasons.insufficientFunds.title"),
+        message: t("paymentResult.failed.reasons.insufficientFunds.message"),
+        reasonLabel: t("paymentResult.failed.reasons.insufficientFunds.label"),
       };
     case "cancelled":
       return {
-        title: "Đã huỷ thanh toán",
-        message: "Bạn đã huỷ giao dịch trước khi hệ thống xác nhận thành công.",
+        title: t("paymentResult.failed.reasons.cancelled.title"),
+        message: t("paymentResult.failed.reasons.cancelled.message"),
+        reasonLabel: t("paymentResult.failed.reasons.cancelled.label"),
       };
     case "network_error":
       return {
-        title: "Lỗi kết nối",
-        message: "Không thể kết nối đến cổng thanh toán. Hãy kiểm tra kết nối mạng và thử lại.",
+        title: t("paymentResult.failed.reasons.networkError.title"),
+        message: t("paymentResult.failed.reasons.networkError.message"),
+        reasonLabel: t("paymentResult.failed.reasons.networkError.label"),
       };
     default:
       return {
-        title: "Thanh toán thất bại",
-        message: "Đã có lỗi xảy ra trong quá trình thanh toán. Vui lòng thử lại.",
+        title: t("paymentResult.failed.reasons.unknown.title"),
+        message: t("paymentResult.failed.reasons.unknown.message"),
+        reasonLabel: t("paymentResult.failed.reasons.unknown.label"),
       };
   }
 }
@@ -122,17 +199,21 @@ function DetailRow({
   icon,
   label,
   value,
+  ui,
+  sheet,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+  ui: UiTokens;
+  sheet: ReturnType<typeof createStyles>;
 }) {
   return (
-    <View style={styles.detailRow}>
-      <Ionicons name={icon} size={18} color={theme.colors.error} />
-      <View style={styles.detailMeta}>
-        <Text style={styles.detailLabel}>{label}</Text>
-        <Text style={styles.detailValue}>{value}</Text>
+    <View style={sheet.detailRow}>
+      <Ionicons name={icon} size={18} color={ui.accent} />
+      <View style={sheet.detailMeta}>
+        <Text style={sheet.detailLabel}>{label}</Text>
+        <Text style={sheet.detailValue}>{value}</Text>
       </View>
     </View>
   );
@@ -141,75 +222,80 @@ function DetailRow({
 function Step({
   icon,
   text,
+  ui,
+  sheet,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   text: string;
+  ui: UiTokens;
+  sheet: ReturnType<typeof createStyles>;
 }) {
   return (
-    <View style={styles.step}>
-      <View style={styles.stepIconWrap}>
-        <Ionicons name={icon} size={18} color={theme.colors.error} />
+    <View style={sheet.step}>
+      <View style={[sheet.stepIconWrap, { backgroundColor: ui.accentSoft }]}>
+        <Ionicons name={icon} size={18} color={ui.accent} />
       </View>
-      <Text style={styles.stepText}>{text}</Text>
+      <Text style={sheet.stepText}>{text}</Text>
     </View>
   );
 }
 
-function Divider() {
-  return <View style={styles.divider} />;
+function Divider({ sheet }: { sheet: ReturnType<typeof createStyles> }) {
+  return <View style={sheet.divider} />;
 }
 
-const styles = StyleSheet.create({
-  sectionTitle: {
-    ...theme.typography.sectionTitle,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  detailMeta: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "700",
-  },
-  detailValue: {
-    marginTop: 2,
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: "700",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.md,
-  },
-  solutionCard: {
-    backgroundColor: "#FEF2F2",
-  },
-  step: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  stepIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FEE2E2",
-  },
-  stepText: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    lineHeight: 22,
-    fontWeight: "600",
-  },
-});
+const createStyles = (ui: UiTokens) =>
+  StyleSheet.create({
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: ui.textPrimary,
+      marginBottom: 12,
+    },
+    cardTinted: {
+      backgroundColor: `${ui.accent}0F`,
+    },
+    detailRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    detailMeta: {
+      flex: 1,
+    },
+    detailLabel: {
+      fontSize: 13,
+      color: ui.textSecondary,
+      fontWeight: "700",
+    },
+    detailValue: {
+      marginTop: 2,
+      fontSize: 15,
+      color: ui.textPrimary,
+      fontWeight: "700",
+    },
+    divider: {
+      height: 1,
+      backgroundColor: ui.divider,
+      marginVertical: 12,
+    },
+    step: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    stepIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    stepText: {
+      flex: 1,
+      fontSize: 13,
+      color: ui.textPrimary,
+      lineHeight: 22,
+      fontWeight: "600",
+    },
+  });

@@ -4,8 +4,9 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import AppButton from "../../components/Button";
 import AppInput from "../../components/TextInput";
-import theme from "../../config/theme";
 import { useAuth } from "../../context/AuthContext";
+import { useI18n } from "../../context/I18nContext";
+import { useAppTheme } from "../../context/ThemeModeContext";
 import { AccountStorageService, StoredAccount } from "../../services/AccountStorageService";
 import { AuthSessionService } from "../../services/AuthSessionService";
 import { loginSchema } from "../../validators/authSchema";
@@ -32,6 +33,8 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
 
   const navigation = useNavigation<any>();
   const { signIn, signInWithRememberedAccount } = useAuth();
+  const { t } = useI18n();
+  const theme = useAppTheme();
 
   const validateField = (fieldName: keyof FormErrors, value: string) => {
     const { error } = loginSchema.validate(
@@ -102,15 +105,15 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
       if (error?.status === 401) {
         promptPasswordLogin(account);
         MessageBoxService.error(
-          "Cần đăng nhập lại",
-          "Vui lòng nhập lại mật khẩu để tiếp tục."
+          t("login.needPasswordTitle"),
+          t("login.needPasswordMessage")
         );
         return;
       }
 
       MessageBoxService.error(
-        "Lỗi",
-        error?.message || "Không thể khôi phục phiên đăng nhập."
+        t("common.close"),
+        error?.message || t("login.restoreFailed")
       );
     } finally {
       setQuickLoginLoading(false);
@@ -125,10 +128,10 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
       const user = await signIn(email, password);
 
       MessageBoxService.confirm({
-        title: "Lưu thông tin đăng nhập?",
-        content: `Chúng tôi sẽ ghi nhớ tài khoản ${user.fullName} trên thiết bị này để lần sau bạn không phải chọn lại nếu chưa đăng xuất.`,
-        confirmText: "Lưu",
-        cancelText: "Lúc khác",
+        title: t("login.rememberTitle"),
+        content: t("login.rememberMessage", { name: user.fullName }),
+        confirmText: t("common.save"),
+        cancelText: t("common.later"),
         onConfirm: async () => {
           await AuthSessionService.rememberCurrentAccount();
           await loadAccounts();
@@ -138,21 +141,25 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
       navigation.replace("MainTabs");
     } catch (error: any) {
       if (error?.status === 401) {
-        MessageBoxService.error("Đăng nhập thất bại", error.message, "OK");
+        MessageBoxService.error(t("login.failedTitle"), error.message, t("common.ok"));
       } else if (error?.message === "Request failed") {
         MessageBoxService.error(
-          "Lỗi kết nối",
-          "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.",
-          "OK"
+          t("login.connectionErrorTitle"),
+          t("login.connectionErrorMessage"),
+          t("common.ok")
         );
       } else if (error?.message === "Request timeout") {
         MessageBoxService.error(
-          "Hết thời gian chờ",
-          "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.",
-          "OK"
+          t("login.timeoutTitle"),
+          t("login.timeoutMessage"),
+          t("common.ok")
         );
       } else {
-        MessageBoxService.error("Lỗi", error?.message || "Không thể đăng nhập.", "OK");
+        MessageBoxService.error(
+          t("common.close"),
+          error?.message || t("login.genericFailed"),
+          t("common.ok")
+        );
       }
     } finally {
       setLoading(false);
@@ -163,7 +170,7 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
     return (
       <View>
         <AppInput
-          placeholder="Email"
+          placeholder={t("login.email")}
           value={email}
           onChangeText={(text) => {
             setEmail(text);
@@ -176,7 +183,7 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
         />
 
         <AppInput
-          placeholder="Mật khẩu"
+          placeholder={t("login.password")}
           value={password}
           onChangeText={(text) => {
             setPassword(text);
@@ -189,7 +196,7 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
           isPassword
         />
 
-        <AppButton title="Đăng nhập" onPress={handleLogin} loading={loading} />
+        <AppButton title={t("login.submit")} onPress={handleLogin} loading={loading} />
         <LoadingOverlay visible={quickLoginLoading} />
       </View>
     );
@@ -206,10 +213,25 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
             <Pressable
               disabled={quickLoginLoading}
               onPress={() => handleLoginSelect(item)}
-              style={stylesAccount.card}
+              style={[
+                stylesAccount.card,
+                {
+                  backgroundColor: theme.semantic.screenSurface,
+                  borderColor: theme.semantic.divider,
+                },
+              ]}
             >
               <Image source={item.avatar || theme.image.testAvatar} style={stylesAccount.avatar} />
-              <Text numberOfLines={1} style={stylesAccount.username}>
+              <Text
+                numberOfLines={1}
+                style={[
+                  stylesAccount.username,
+                  {
+                    color: theme.semantic.textPrimary,
+                    fontSize: theme.fontSize.sm,
+                  },
+                ]}
+              >
                 {item.fullName}
               </Text>
             </Pressable>
@@ -219,7 +241,7 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
 
       <View style={{ marginTop: 12 }}>
         <AppButton
-          title="Đăng nhập bằng tài khoản khác"
+          title={t("login.otherAccount")}
           onPress={() => setForceLogin(true)}
           loading={false}
           disabled={quickLoginLoading}
@@ -237,10 +259,8 @@ const stylesAccount = StyleSheet.create({
     alignItems: "center",
     padding: 12,
     borderRadius: 12,
-    backgroundColor: "#fff",
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
   },
   avatar: {
     width: 64,
@@ -250,8 +270,6 @@ const stylesAccount = StyleSheet.create({
   },
   username: {
     flex: 1,
-    fontSize: 14,
-    color: "#222",
     fontWeight: "bold",
   },
 });

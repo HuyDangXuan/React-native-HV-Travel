@@ -7,7 +7,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { Edge, SafeAreaView } from "react-native-safe-area-context";
-import theme from "../../config/theme";
+import { useAppTheme } from "../../context/ThemeModeContext";
 
 type Variant = "topLevel" | "detail" | "auth" | "plain";
 
@@ -30,6 +30,7 @@ export default function ScreenContainer({
   contentContainerStyle,
   scrollProps,
 }: Props) {
+  const theme = useAppTheme();
   const backgroundColor =
     variant === "detail"
       ? theme.semantic.screenSurface
@@ -72,6 +73,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: 32,
   },
 });

@@ -6,7 +6,8 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import AppButton from "../../components/Button";
 import AppInput from "../../components/TextInput";
 import AppHeader from "../../components/ui/AppHeader";
-import theme from "../../config/theme";
+import { useI18n } from "../../context/I18nContext";
+import { useAppTheme } from "../../context/ThemeModeContext";
 import { AuthService } from "../../services/AuthService";
 import { resetPasswordSchema } from "../../validators/authSchema";
 import { MessageBoxService } from "../MessageBox/MessageBoxService";
@@ -22,9 +23,10 @@ export default function CreateNewPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const navigation = useNavigation<any>();
-
   const route = useRoute<any>();
   const { otpId } = route.params as { otpId: string };
+  const { t } = useI18n();
+  const theme = useAppTheme();
 
   const validateField = (fieldName: keyof FormErrors) => {
     const { error } = resetPasswordSchema.validate(
@@ -73,30 +75,30 @@ export default function CreateNewPasswordScreen() {
       const response = await AuthService.resetPassword(otpId, newPassword);
       if (response.status === true) {
         MessageBoxService.success(
-          "Thành công",
-          "Đặt lại mật khẩu thành công!",
-          "OK",
+          t("forgotPassword.resetSuccessTitle"),
+          t("forgotPassword.resetSuccessMessage"),
+          t("common.ok"),
           () => navigation.replace("LoginScreen")
         );
       }
     } catch (error: any) {
       if (error?.message === "Request failed") {
         MessageBoxService.error(
-          "Lỗi kết nối",
-          "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.",
-          "OK"
+          t("login.connectionErrorTitle"),
+          t("login.connectionErrorMessage"),
+          t("common.ok")
         );
       } else if (error?.message === "Request timeout") {
         MessageBoxService.error(
-          "Hết thời gian chờ",
-          "Yêu cầu mất quá nhiều thời gian. Vui lòng thử lại.",
-          "OK"
+          t("login.timeoutTitle"),
+          t("login.timeoutMessage"),
+          t("common.ok")
         );
       } else {
         MessageBoxService.error(
-          "Lỗi",
-          error?.message || "Đã xảy ra lỗi. Vui lòng thử lại sau.",
-          "OK"
+          t("common.close"),
+          error?.message || t("forgotPassword.genericFailed"),
+          t("common.ok")
         );
       }
     } finally {
@@ -105,27 +107,35 @@ export default function CreateNewPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
       <AppHeader
         variant="compact"
-        title="Tạo mật khẩu mới"
+        title={t("forgotPassword.createPasswordTitle")}
         onBack={() => navigation.goBack()}
       />
 
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { padding: theme.spacing.lg }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         automaticallyAdjustKeyboardInsets
         contentInsetAdjustmentBehavior="automatic"
       >
-        <Text style={styles.desc}>
-          Mật khẩu mới của bạn phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ
-          thường và số.
+        <Text
+          style={[
+            styles.desc,
+            {
+              fontSize: theme.fontSize.md,
+              color: theme.semantic.textPrimary,
+              marginBottom: theme.spacing.xl,
+            },
+          ]}
+        >
+          {t("forgotPassword.createPasswordDescription")}
         </Text>
 
         <AppInput
-          placeholder="Mật khẩu mới"
+          placeholder={t("forgotPassword.newPassword")}
           value={newPassword}
           onChangeText={(text) => {
             setNewPassword(text);
@@ -139,7 +149,7 @@ export default function CreateNewPasswordScreen() {
         />
 
         <AppInput
-          placeholder="Nhập lại mật khẩu"
+          placeholder={t("forgotPassword.confirmNewPassword")}
           value={reNewPassword}
           onChangeText={(text) => {
             setReNewPassword(text);
@@ -153,7 +163,7 @@ export default function CreateNewPasswordScreen() {
         />
 
         <AppButton
-          title="Đặt lại mật khẩu"
+          title={t("forgotPassword.resetPassword")}
           onPress={handleResetPassword}
           loading={loading}
         />
@@ -165,17 +175,12 @@ export default function CreateNewPasswordScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.white,
   },
   container: {
     flexGrow: 1,
-    padding: theme.spacing.lg,
     justifyContent: "flex-start",
   },
   desc: {
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xl,
     textAlign: "center",
   },
 });

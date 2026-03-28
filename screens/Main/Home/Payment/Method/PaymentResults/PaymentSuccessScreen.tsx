@@ -1,8 +1,10 @@
 import React, { useMemo } from "react";
-import { Text, StyleSheet, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import theme from "../../../../../../config/theme";
+
+import { useI18n } from "../../../../../../context/I18nContext";
+import { useAppTheme } from "../../../../../../context/ThemeModeContext";
 import ResultScreenLayout, {
   ResultCard,
 } from "../../../../../../components/ui/ResultScreenLayout";
@@ -17,19 +19,42 @@ type RouteParams = {
   transactionId?: string;
 };
 
-const formatVND = (v: number) =>
+type UiTokens = {
+  accent: string;
+  accentSoft: string;
+  textPrimary: string;
+  textSecondary: string;
+  divider: string;
+};
+
+const formatVND = (value: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-    Number.isFinite(v) ? v : 0
+    Number.isFinite(value) ? value : 0
   );
 
 export default function PaymentSuccessScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const params: RouteParams = route?.params ?? {};
+  const { locale, t } = useI18n();
+  const appTheme = useAppTheme();
 
-  const method = params?.method || "Unknown";
-  const orderId = params?.orderId || "DL" + Date.now();
-  const transactionId = params?.transactionId || "TX" + Date.now();
+  const ui = useMemo<UiTokens>(
+    () => ({
+      accent: appTheme.colors.success,
+      accentSoft: `${appTheme.colors.success}14`,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      divider: appTheme.semantic.divider,
+    }),
+    [appTheme]
+  );
+
+  const sheet = useMemo(() => createStyles(ui), [ui]);
+
+  const method = params?.method || t("paymentResult.common.unknown");
+  const orderId = params?.orderId || `DL${Date.now()}`;
+  const transactionId = params?.transactionId || `TX${Date.now()}`;
   const tourId = params?.id;
   const total = typeof params?.total === "number" ? params.total : 0;
 
@@ -44,11 +69,11 @@ export default function PaymentSuccessScreen() {
     <ResultScreenLayout
       tone="success"
       icon="checkmark-done-outline"
-      title="Thanh toán thành công"
-      subtitle="Đơn hàng của bạn đã được xác nhận và đang chờ những bước chuẩn bị tiếp theo."
+      title={t("paymentResult.success.title")}
+      subtitle={t("paymentResult.success.subtitle")}
       footerActions={[
         {
-          label: "Xem đơn hàng",
+          label: t("paymentResult.success.actions.viewOrder"),
           onPress: () => {
             navigation.replace("MainTabs");
             setTimeout(() => navigation.navigate("MyBookingScreen"), 100);
@@ -56,33 +81,80 @@ export default function PaymentSuccessScreen() {
           variant: "secondary",
         },
         {
-          label: "Về trang chủ",
+          label: t("paymentResult.success.actions.home"),
           onPress: () => navigation.replace("MainTabs"),
         },
       ]}
     >
       <ResultCard>
-        <Text style={styles.amountLabel}>Số tiền đã thanh toán</Text>
-        <Text style={styles.amountValue}>{amountText}</Text>
+        <Text style={sheet.amountLabel}>{t("paymentResult.success.amountLabel")}</Text>
+        <Text style={sheet.amountValue}>{amountText}</Text>
       </ResultCard>
 
       <ResultCard>
-        {!!tourId ? <DetailRow icon="pricetag-outline" label="Mã tour" value={tourId} /> : null}
-        {!!tourId ? <Divider /> : null}
-        <DetailRow icon="receipt-outline" label="Mã đơn hàng" value={orderId} />
-        <Divider />
-        <DetailRow icon="card-outline" label="Mã giao dịch" value={transactionId} />
-        <Divider />
-        <DetailRow icon="wallet-outline" label="Phương thức" value={method} />
-        <Divider />
-        <DetailRow icon="time-outline" label="Thời gian" value={new Date().toLocaleString("vi-VN")} />
+        {!!tourId ? (
+          <DetailRow
+            icon="pricetag-outline"
+            label={t("paymentResult.success.fields.tourCode")}
+            value={tourId}
+            ui={ui}
+            sheet={sheet}
+          />
+        ) : null}
+        {!!tourId ? <Divider sheet={sheet} /> : null}
+        <DetailRow
+          icon="receipt-outline"
+          label={t("paymentResult.success.fields.orderCode")}
+          value={orderId}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Divider sheet={sheet} />
+        <DetailRow
+          icon="card-outline"
+          label={t("paymentResult.success.fields.transactionCode")}
+          value={transactionId}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Divider sheet={sheet} />
+        <DetailRow
+          icon="wallet-outline"
+          label={t("paymentResult.success.fields.method")}
+          value={method}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Divider sheet={sheet} />
+        <DetailRow
+          icon="time-outline"
+          label={t("paymentResult.success.fields.time")}
+          value={new Date().toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}
+          ui={ui}
+          sheet={sheet}
+        />
       </ResultCard>
 
-      <ResultCard>
-        <Text style={styles.sectionTitle}>Các bước tiếp theo</Text>
-        <Step icon="mail-outline" text="Email xác nhận đã được gửi tới hộp thư của bạn." />
-        <Step icon="calendar-outline" text='Kiểm tra lịch trình trong mục "Chuyến đi đã đặt".' />
-        <Step icon="headset-outline" text="Liên hệ hotline nếu bạn cần hỗ trợ trước ngày khởi hành." />
+      <ResultCard style={[sheet.cardTinted]}>
+        <Text style={sheet.sectionTitle}>{t("paymentResult.success.nextStepsTitle")}</Text>
+        <Step
+          icon="mail-outline"
+          text={t("paymentResult.success.nextSteps.email")}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Step
+          icon="calendar-outline"
+          text={t("paymentResult.success.nextSteps.booking")}
+          ui={ui}
+          sheet={sheet}
+        />
+        <Step
+          icon="headset-outline"
+          text={t("paymentResult.success.nextSteps.support")}
+          ui={ui}
+          sheet={sheet}
+        />
       </ResultCard>
     </ResultScreenLayout>
   );
@@ -92,17 +164,21 @@ function DetailRow({
   icon,
   label,
   value,
+  ui,
+  sheet,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+  ui: UiTokens;
+  sheet: ReturnType<typeof createStyles>;
 }) {
   return (
-    <View style={styles.detailRow}>
-      <Ionicons name={icon} size={18} color={theme.colors.success} />
-      <View style={styles.detailMeta}>
-        <Text style={styles.detailLabel}>{label}</Text>
-        <Text style={styles.detailValue}>{value}</Text>
+    <View style={sheet.detailRow}>
+      <Ionicons name={icon} size={18} color={ui.accent} />
+      <View style={sheet.detailMeta}>
+        <Text style={sheet.detailLabel}>{label}</Text>
+        <Text style={sheet.detailValue}>{value}</Text>
       </View>
     </View>
   );
@@ -111,85 +187,93 @@ function DetailRow({
 function Step({
   icon,
   text,
+  ui,
+  sheet,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   text: string;
+  ui: UiTokens;
+  sheet: ReturnType<typeof createStyles>;
 }) {
   return (
-    <View style={styles.step}>
-      <View style={styles.stepIconWrap}>
-        <Ionicons name={icon} size={18} color={theme.colors.success} />
+    <View style={sheet.step}>
+      <View style={[sheet.stepIconWrap, { backgroundColor: ui.accentSoft }]}>
+        <Ionicons name={icon} size={18} color={ui.accent} />
       </View>
-      <Text style={styles.stepText}>{text}</Text>
+      <Text style={sheet.stepText}>{text}</Text>
     </View>
   );
 }
 
-function Divider() {
-  return <View style={styles.divider} />;
+function Divider({ sheet }: { sheet: ReturnType<typeof createStyles> }) {
+  return <View style={sheet.divider} />;
 }
 
-const styles = StyleSheet.create({
-  amountLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  amountValue: {
-    marginTop: 8,
-    fontSize: 32,
-    fontWeight: "900",
-    color: theme.colors.success,
-    textAlign: "center",
-  },
-  sectionTitle: {
-    ...theme.typography.sectionTitle,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  detailMeta: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    fontWeight: "700",
-  },
-  detailValue: {
-    marginTop: 2,
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: "700",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: theme.spacing.md,
-  },
-  step: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  stepIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#D1FAE5",
-  },
-  stepText: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    lineHeight: 22,
-    fontWeight: "600",
-  },
-});
+const createStyles = (ui: UiTokens) =>
+  StyleSheet.create({
+    amountLabel: {
+      fontSize: 13,
+      color: ui.textSecondary,
+      fontWeight: "700",
+      textAlign: "center",
+    },
+    amountValue: {
+      marginTop: 8,
+      fontSize: 32,
+      fontWeight: "900",
+      color: ui.accent,
+      textAlign: "center",
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: ui.textPrimary,
+      marginBottom: 12,
+    },
+    cardTinted: {
+      backgroundColor: `${ui.accent}0F`,
+    },
+    detailRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    detailMeta: {
+      flex: 1,
+    },
+    detailLabel: {
+      fontSize: 13,
+      color: ui.textSecondary,
+      fontWeight: "700",
+    },
+    detailValue: {
+      marginTop: 2,
+      fontSize: 15,
+      color: ui.textPrimary,
+      fontWeight: "700",
+    },
+    divider: {
+      height: 1,
+      backgroundColor: ui.divider,
+      marginVertical: 12,
+    },
+    step: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    stepIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    stepText: {
+      flex: 1,
+      fontSize: 13,
+      color: ui.textPrimary,
+      lineHeight: 22,
+      fontWeight: "600",
+    },
+  });
