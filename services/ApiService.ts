@@ -5,6 +5,15 @@ type RetryableRequestInit = RequestInit & {
 };
 
 export class ApiService {
+  private static isAuthExpiredError(error: unknown) {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      (error as { status?: number }).status === 401
+    );
+  }
+
   static fetchWithTimeout = async (
     url: string,
     options: RetryableRequestInit = {},
@@ -41,20 +50,27 @@ export class ApiService {
         typeof authorizationHeader === "string" &&
         authorizationHeader.startsWith("Bearer ")
       ) {
-        const refreshedSession = await AuthSessionService.refreshSession();
+        try {
+          const refreshedSession = await AuthSessionService.refreshSession();
 
-        return this.fetchWithTimeout(
-          url,
-          {
-            ...options,
-            headers: {
-              ...headers,
-              Authorization: `Bearer ${refreshedSession.accessToken}`,
+          return this.fetchWithTimeout(
+            url,
+            {
+              ...options,
+              headers: {
+                ...headers,
+                Authorization: `Bearer ${refreshedSession.accessToken}`,
+              },
+              _skipAuthRefresh: true,
             },
-            _skipAuthRefresh: true,
-          },
-          timeout
-        );
+            timeout
+          );
+        } catch (refreshError) {
+          if (this.isAuthExpiredError(refreshError)) {
+            throw refreshError;
+          }
+          throw refreshError;
+        }
       }
 
       if (!response.ok) {

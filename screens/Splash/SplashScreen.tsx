@@ -6,6 +6,10 @@ import { Image, StyleSheet, View } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { useAppTheme } from "../../context/ThemeModeContext";
 import { useUser } from "../../context/UserContext";
+import {
+  hasSeenCurrentOnboarding,
+  ONBOARDING_STORAGE_KEY,
+} from "../../utils/onboarding";
 
 export default function SplashScreen() {
   const navigation = useNavigation<any>();
@@ -19,13 +23,13 @@ export default function SplashScreen() {
     }
 
     const routeNext = async () => {
-      if (token && user) {
-        navigation.replace("MainTabs");
+      const onboardingValue = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
+      if (!hasSeenCurrentOnboarding(onboardingValue)) {
+        navigation.replace("OnboardingScreen");
         return;
       }
 
-      const onboardingValue = await AsyncStorage.getItem("has_seen_onboarding");
-      navigation.replace(onboardingValue === "true" ? "LoginScreen" : "OnboardingScreen");
+      navigation.replace(token && user ? "MainTabs" : "LoginScreen");
     };
 
     routeNext();
@@ -33,18 +37,7 @@ export default function SplashScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.semantic.screenBackground }]}>
-      <View
-        style={[
-          styles.logoWrap,
-          {
-            backgroundColor: theme.semantic.screenSurface,
-            borderColor: theme.semantic.divider,
-          },
-          theme.shadow.md,
-        ]}
-      >
-        <Image source={theme.icon.favicon} style={styles.logo} />
-      </View>
+      <Image source={theme.icon.favicon} style={styles.logo} resizeMode="contain" />
     </View>
   );
 }
@@ -55,16 +48,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  logoWrap: {
-    width: 176,
-    height: 176,
-    borderRadius: 88,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
   logo: {
-    width: 96,
-    height: 96,
+    width: 220,
+    height: 152,
   },
 });

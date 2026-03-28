@@ -4,6 +4,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApiService = void 0;
 const AuthSessionService_1 = require("./AuthSessionService");
 class ApiService {
+    static isAuthExpiredError(error) {
+        return (typeof error === "object" &&
+            error !== null &&
+            "status" in error &&
+            error.status === 401);
+    }
 }
 exports.ApiService = ApiService;
 _a = ApiService;
@@ -28,15 +34,23 @@ ApiService.fetchWithTimeout = async (url, options = {}, timeout = 10000) => {
             !options._skipAuthRefresh &&
             typeof authorizationHeader === "string" &&
             authorizationHeader.startsWith("Bearer ")) {
-            const refreshedSession = await AuthSessionService_1.AuthSessionService.refreshSession();
-            return _a.fetchWithTimeout(url, {
-                ...options,
-                headers: {
-                    ...headers,
-                    Authorization: `Bearer ${refreshedSession.accessToken}`,
-                },
-                _skipAuthRefresh: true,
-            }, timeout);
+            try {
+                const refreshedSession = await AuthSessionService_1.AuthSessionService.refreshSession();
+                return _a.fetchWithTimeout(url, {
+                    ...options,
+                    headers: {
+                        ...headers,
+                        Authorization: `Bearer ${refreshedSession.accessToken}`,
+                    },
+                    _skipAuthRefresh: true,
+                }, timeout);
+            }
+            catch (refreshError) {
+                if (_a.isAuthExpiredError(refreshError)) {
+                    throw refreshError;
+                }
+                throw refreshError;
+            }
         }
         if (!response.ok) {
             throw {

@@ -101,8 +101,7 @@ export default function FavouriteScreen() {
     if (showLoader) setLoading(true);
     try {
       if (!token) {
-        MessageBoxService.error(t("favourites.invalidSession"));
-        navigation.replace("Login");
+        navigation.replace("MainTabs");
         return;
       }
 
@@ -188,28 +187,18 @@ export default function FavouriteScreen() {
   }, [loading, onRefresh, refreshing]);
 
   const handleRemoveFavourite = useCallback(
-    (tourId: string) => {
-      MessageBoxService.confirm({
-        title: "Xác nhận",
-        content: t("favourites.removeConfirm"),
-        confirmText: "Xóa",
-        cancelText: "Hủy",
-        onConfirm: async () => {
-          try {
-            if (!token) {
-              MessageBoxService.error(t("favourites.invalidSession"));
-              navigation.replace("Login");
-              return;
-            }
+    async (tourId: string) => {
+      try {
+        if (!token) {
+          navigation.replace("LoginScreen");
+          return;
+        }
 
-            await FavouriteService.deleteByTourId(token, tourId);
-            setFavourites((prev) => prev.filter((item) => item.tourId !== tourId));
-            MessageBoxService.success("Thành công", t("favourites.removed"), "OK");
-          } catch (error: any) {
-            MessageBoxService.error("Lỗi", error?.message || t("favourites.removeFailed"), "OK");
-          }
-        },
-      });
+        await FavouriteService.deleteByTourId(token, tourId);
+        setFavourites((prev) => prev.filter((item) => item.tourId !== tourId));
+      } catch (error: any) {
+        console.warn("Remove favourite failed:", error?.message || error);
+      }
     },
     [navigation, t, token]
   );

@@ -1,5 +1,6 @@
 const en = {
   common: {
+    error: "Error",
     continue: "Continue",
     cancel: "Cancel",
     close: "Close",
@@ -10,6 +11,7 @@ const en = {
     later: "Later",
     save: "Save",
     details: "Details",
+    sessionExpired: "Your session has expired. Please sign in again.",
   },
   tabs: {
     home: "Home",
