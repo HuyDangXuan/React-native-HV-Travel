@@ -3,6 +3,7 @@ const {
   buildSuggestedCategories,
   buildSuggestedTours,
   createDefaultTourSearchFilters,
+  getTourSearchDurationDays,
   getTourSearchPriceBounds,
   hasActiveTourSearchFilters,
   shouldShowTourSearchSuggestions,
@@ -45,6 +46,12 @@ const sampleTours = [
 ];
 
 describe("tour search helpers", () => {
+  test("reads duration days from tour data or duration text", () => {
+    expect(getTourSearchDurationDays({ duration: { days: 5, text: "5 days" } })).toBe(5);
+    expect(getTourSearchDurationDays({ duration: { text: "3 ngày 2 đêm" } })).toBe(3);
+    expect(getTourSearchDurationDays({ duration: { text: "N/A" } })).toBe(0);
+  });
+
   test("shows suggestions only when query is empty and no filters are active", () => {
     expect(shouldShowTourSearchSuggestions("", false)).toBe(true);
     expect(shouldShowTourSearchSuggestions("ha long", false)).toBe(false);

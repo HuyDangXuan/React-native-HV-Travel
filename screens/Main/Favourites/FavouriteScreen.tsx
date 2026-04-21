@@ -4,14 +4,12 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  Image,
   Pressable,
   ScrollView,
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import theme from "../../../config/theme";
 import { useNavigation } from "@react-navigation/native";
@@ -27,22 +25,31 @@ import { FavouriteItem } from "../../../services/dataAdapters";
 import { FavouriteContentSkeleton } from "../../../components/skeleton/MainTabSkeletons";
 import { shouldTriggerOverlayRefresh } from "../../../utils/pullToRefresh";
 import { getPullRefreshDisplayState } from "../../../utils/loadingState";
+import TourCard from "../../../components/tours/TourCard";
+import TourCategoryBar from "../../../components/tours/TourCategoryBar";
+import TourFilterSheet, { getTourFilterActiveCount } from "../../../components/tours/TourFilterSheet";
+import { TourUiCard, TourUiFilterState, TourUiPriceBounds } from "../../../components/tours/tourUiTypes";
+import {
+  applyTourSearchFilters,
+  createDefaultTourSearchFilters,
+  getTourSearchDurationDays,
+  getTourSearchPriceBounds,
+  normalizeTourSearchFilters,
+} from "../../../utils/tourSearch";
 
 const PULL_REFRESH_THRESHOLD = 72;
+const FALLBACK_PRICE_BOUNDS: TourUiPriceBounds = {
+  minAvailablePrice: 0,
+  maxAvailablePrice: 5000000,
+  sliderMaxPrice: 5000000,
+  step: 50000,
+  minGap: 50000,
+};
 
-type FavouriteTour = {
+type FavouriteTour = TourUiCard & {
   favouriteId: string;
   tourId: string;
-  name: string;
-  rating: number;
   price: { adult: number; child: number; infant: number; discount?: number };
-  displayPrice: number;
-  originalPrice?: number;
-  discountPercent?: number;
-  thumbnail: string;
-  durationText: string;
-  destinationCity?: string;
-  category: string;
 };
 
 const UI = {
@@ -78,6 +85,7 @@ export default function FavouriteScreen() {
       primary: appTheme.colors.primary,
       placeholder: appTheme.colors.placeholder,
       onPrimary: appTheme.colors.white,
+      overlay: appTheme.colors.overlay,
       error: appTheme.colors.error,
       warning: appTheme.colors.warning,
       softAccent: themeName === "dark" ? "rgba(34, 211, 238, 0.14)" : "rgba(16, 185, 129, 0.12)",
@@ -94,7 +102,10 @@ export default function FavouriteScreen() {
   const [favourites, setFavourites] = useState<FavouriteTour[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const initialFilters = useMemo(() => createDefaultTourSearchFilters(FALLBACK_PRICE_BOUNDS), []);
+  const [filters, setFilters] = useState<TourUiFilterState>(initialFilters);
+  const [draftFilters, setDraftFilters] = useState<TourUiFilterState>(initialFilters);
+  const [filterVisible, setFilterVisible] = useState(false);
   const { showInitialSkeleton, showRefreshSkeleton } = getPullRefreshDisplayState({
     isLoading: loading,
     isRefreshing: refreshing,
@@ -121,6 +132,7 @@ export default function FavouriteScreen() {
             discountPct > 0 ? Math.round(adultPrice * (1 - discountPct / 100)) : adultPrice;
 
           return {
+            id: tour.id,
             favouriteId: item.id,
             tourId: tour.id,
             name: tour?.name ?? t("favourites.unknownTour"),
@@ -131,7 +143,9 @@ export default function FavouriteScreen() {
             discountPercent: discountPct > 0 ? discountPct : undefined,
             thumbnail: tour?.images?.[0] ?? "",
             durationText: tour?.duration?.text ?? "N/A",
+            durationDays: getTourSearchDurationDays(tour),
             destinationCity: tour?.destination?.city,
+            destinationCountry: tour?.destination?.country,
             category: tour?.category ?? "",
           };
         });
@@ -207,12 +221,71 @@ export default function FavouriteScreen() {
     [navigation, t, token]
   );
 
-  const filteredFavourites = useMemo(() => {
-    if (!selectedCategory) return favourites;
-    return favourites.filter((item) => item.category === selectedCategory);
-  }, [favourites, selectedCategory]);
+  const priceBounds = useMemo(
+    () => getTourSearchPriceBounds(favourites, filters.maxPrice),
+    [favourites, filters.maxPrice]
+  );
+  const draftPriceBounds = useMemo(
+    () => getTourSearchPriceBounds(favourites, draftFilters.maxPrice),
+    [draftFilters.maxPrice, favourites]
+  );
+  const defaultFilters = useMemo(() => createDefaultTourSearchFilters(priceBounds), [priceBounds]);
+  const normalizedFilters = useMemo(
+    () => normalizeTourSearchFilters(filters, priceBounds),
+    [filters, priceBounds]
+  );
+  const normalizedDraftFilters = useMemo(
+    () => normalizeTourSearchFilters(draftFilters, draftPriceBounds),
+    [draftFilters, draftPriceBounds]
+  );
 
-  const hasActiveFilter = Boolean(selectedCategory);
+  useEffect(() => {
+    setFilters((prev) => {
+      const next = normalizeTourSearchFilters(prev, priceBounds);
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
+  }, [priceBounds]);
+
+  useEffect(() => {
+    setDraftFilters((prev) => {
+      const next = normalizeTourSearchFilters(prev, draftPriceBounds);
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
+  }, [draftPriceBounds]);
+
+  const filteredFavourites = useMemo(
+    () => applyTourSearchFilters(favourites, "", selectedCategory, normalizedFilters),
+    [favourites, normalizedFilters, selectedCategory]
+  );
+
+  const draftResultCount = useMemo(
+    () => applyTourSearchFilters(favourites, "", selectedCategory, normalizedDraftFilters).length,
+    [favourites, normalizedDraftFilters, selectedCategory]
+  );
+
+  const activeFilterCount = useMemo(
+    () => getTourFilterActiveCount(normalizedFilters, defaultFilters),
+    [defaultFilters, normalizedFilters]
+  );
+  const hasActiveFilter = Boolean(selectedCategory) || activeFilterCount > 0;
+
+  const openFilterModal = useCallback(() => {
+    setDraftFilters(normalizedFilters);
+    setFilterVisible(true);
+  }, [normalizedFilters]);
+
+  const closeFilterModal = useCallback(() => {
+    setFilterVisible(false);
+  }, []);
+
+  const resetDraftFilters = useCallback(() => {
+    setDraftFilters(createDefaultTourSearchFilters(priceBounds));
+  }, [priceBounds]);
+
+  const applyFilters = useCallback(() => {
+    setFilters(normalizedDraftFilters);
+    setFilterVisible(false);
+  }, [normalizedDraftFilters]);
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat("vi-VN", {
@@ -224,98 +297,10 @@ export default function FavouriteScreen() {
     <View style={[styles.headerContainer, { backgroundColor: ui.bg }]}>
       <View style={styles.headerTop}>
         <Text style={[styles.headerTitle, { color: ui.textPrimary }]}>{t("favourites.title")}</Text>
-        {favourites.length > 0 ? (
-          <Pressable
-            style={[styles.filterToggleBtn, { backgroundColor: ui.surface, borderColor: ui.border }]}
-            onPress={() => setShowFilters((prev) => !prev)}
-          >
-            <MaterialCommunityIcons
-              name={showFilters ? "filter-off-outline" : "filter-outline"}
-              size={20}
-              color={ui.textPrimary}
-            />
-            {hasActiveFilter ? (
-              <View style={[styles.filterCountPill, { backgroundColor: ui.primary }]}>
-                <Text style={[styles.filterCountText, { color: ui.onPrimary }]}>1</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        ) : null}
       </View>
       <View style={[styles.headerDivider, { borderBottomColor: ui.border }]} />
     </View>
   );
-
-  const renderFilters = () => {
-    if (!showFilters || favourites.length === 0) return null;
-
-    return (
-      <View style={styles.filterSection}>
-        <View style={styles.filterSectionHead}>
-          <Text style={[styles.filterSectionTitle, { color: ui.textPrimary }]}>{t("favourites.categoryTitle")}</Text>
-          {hasActiveFilter ? (
-            <Pressable onPress={() => setSelectedCategory(null)}>
-              <Text style={[styles.clearFilterText, { color: ui.primary }]}>{t("favourites.clearFilter")}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesRow}
-        >
-          <Pressable
-            style={[
-              styles.categoryChip,
-              { backgroundColor: ui.mutedSurface, borderColor: ui.border },
-              !selectedCategory && styles.categoryChipActive,
-              !selectedCategory && { backgroundColor: ui.primary, borderColor: ui.primary },
-            ]}
-            onPress={() => setSelectedCategory(null)}
-          >
-            <Text
-              style={[
-                styles.categoryChipText,
-                { color: ui.textPrimary },
-                !selectedCategory && styles.categoryChipTextActive,
-                !selectedCategory && { color: ui.onPrimary },
-              ]}
-            >
-              {t("favourites.all")}
-            </Text>
-          </Pressable>
-
-          {categories.map((category) => {
-            const active = selectedCategory === category;
-            return (
-              <Pressable
-                key={category}
-                style={[
-                  styles.categoryChip,
-                  { backgroundColor: ui.mutedSurface, borderColor: ui.border },
-                  active && styles.categoryChipActive,
-                  active && { backgroundColor: ui.primary, borderColor: ui.primary },
-                ]}
-                onPress={() => setSelectedCategory(active ? null : category)}
-              >
-                <Text
-                  style={[
-                    styles.categoryChipText,
-                    { color: ui.textPrimary },
-                    active && styles.categoryChipTextActive,
-                    active && { color: ui.onPrimary },
-                  ]}
-                >
-                  {category}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-    );
-  };
 
   const renderMainEmptyState = () => (
     <View style={[styles.emptyContainer, { backgroundColor: ui.bg }]}>
@@ -344,69 +329,30 @@ export default function FavouriteScreen() {
     </View>
   );
 
-  const renderTourCard = ({ item }: { item: FavouriteTour }) => (
-    <Pressable
-      style={[styles.tourCard, { backgroundColor: ui.surface, borderColor: ui.border }]}
+  const renderTourCard = (item: FavouriteTour) => (
+    <TourCard
+      key={item.favouriteId}
+      tour={item}
+      ui={ui}
+      formatPrice={formatPrice}
+      perPersonLabel={t("home.perPerson")}
+      defaultDestination={t("home.defaultDestination")}
+      favouriteActive
       onPress={() => navigation.navigate("TourDetailScreen", { id: item.tourId })}
-    >
-      <View style={[styles.imageWrap, { backgroundColor: ui.mutedSurface }]}>
-        <Image source={{ uri: item.thumbnail }} style={styles.tourImage} resizeMode="cover" />
-
-        {(item.discountPercent ?? 0) > 0 ? (
-          <View style={[styles.discountBadge, { backgroundColor: ui.badgeSurface, borderColor: ui.border }]}>
-            <Text style={[styles.discountText, { color: ui.primary }]}>-{item.discountPercent}%</Text>
-          </View>
-        ) : null}
-
-        <Pressable
-          style={[styles.removeFavouriteButton, { backgroundColor: ui.actionSurface, borderColor: ui.border }]}
-          onPress={() => handleRemoveFavourite(item.tourId)}
-        >
-          <Ionicons name="heart" size={18} color={ui.error} />
-        </Pressable>
-      </View>
-
-      <View style={styles.tourContent}>
-        <View style={styles.cardHeader}>
-          <Text style={[styles.tourTitle, { color: ui.textPrimary }]} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <View style={styles.ratingRow}>
-            <Ionicons name="star" size={12} color={ui.warning} />
-            <Text style={[styles.ratingText, { color: ui.textPrimary }]}>{item.rating || "4.9"}</Text>
-          </View>
-        </View>
-
-        <Text style={[styles.metaTextSingle, { color: ui.textSecondary }]} numberOfLines={1}>
-          {item.destinationCity || t("favourites.defaultDestination")}
-        </Text>
-        <Text style={[styles.metaTextSingle, { color: ui.textSecondary }]} numberOfLines={1}>
-          {item.durationText}
-        </Text>
-        {item.category ? (
-          <Text style={[styles.metaCategory, { color: ui.textSecondary, backgroundColor: ui.mutedSurface }]} numberOfLines={1}>
-            {item.category}
-          </Text>
-        ) : null}
-
-        <View style={styles.priceRow}>
-          {item.originalPrice ? (
-            <Text style={[styles.oldPrice, { color: ui.placeholder }]}>{formatPrice(item.originalPrice)}</Text>
-          ) : null}
-          <View style={styles.priceCurrentRow}>
-            <Text style={[styles.newPrice, { color: ui.primary }]}>{formatPrice(item.displayPrice)}</Text>
-            <Text style={[styles.priceUnit, { color: ui.textSecondary }]}>{t("favourites.perPerson")}</Text>
-          </View>
-        </View>
-      </View>
-    </Pressable>
+      onFavouritePress={() => handleRemoveFavourite(item.tourId)}
+    />
   );
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: ui.bg }]} edges={["top"]}>
       <StatusBar style={themeName === "dark" ? "light" : "dark"} />
       {renderHeader()}
-      {renderFilters()}
+      <TourCategoryBar
+        categories={categories}
+        selectedCategory={selectedCategory}
+        ui={ui}
+        onSelectCategory={setSelectedCategory}
+      />
 
       {showInitialSkeleton || showRefreshSkeleton ? (
         <View style={styles.loadingContent}>
@@ -423,23 +369,51 @@ export default function FavouriteScreen() {
           {renderMainEmptyState()}
         </ScrollView>
       ) : (
-        <FlatList
-          data={filteredFavourites}
-          keyExtractor={(item) => item.favouriteId}
-          renderItem={renderTourCard}
-          numColumns={2}
-          contentContainerStyle={styles.listContainer}
-          columnWrapperStyle={styles.columnWrapper}
+        <ScrollView
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
           onScroll={handleScroll}
           onScrollBeginDrag={handleScrollBeginDrag}
           onScrollEndDrag={handleScrollEndDrag}
           scrollEventThrottle={16}
-          ListEmptyComponent={renderFilterEmptyState}
-        />
+        >
+          <View style={styles.sectionHead}>
+            <Text style={[styles.sectionTitle, { color: ui.textPrimary }]}>{t("favourites.title")}</Text>
+            <Pressable style={[styles.filterBtn, { borderColor: ui.border, backgroundColor: ui.surface }]} onPress={openFilterModal}>
+              <Ionicons name="options-outline" size={16} color={ui.textPrimary} />
+              <Text style={[styles.filterText, { color: ui.textPrimary }]}>{t("home.filter")}</Text>
+              {hasActiveFilter ? (
+                <View style={[styles.filterCountBadge, { backgroundColor: ui.primary }]}>
+                  <Text style={[styles.filterCountText, { color: ui.onPrimary }]}>
+                    {activeFilterCount + (selectedCategory ? 1 : 0)}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          </View>
+          {filteredFavourites.length === 0 ? (
+            renderFilterEmptyState()
+          ) : (
+            <View style={styles.grid}>{filteredFavourites.map(renderTourCard)}</View>
+          )}
+        </ScrollView>
       )}
 
       <LoadingOverlay visible={refreshing} />
+      <TourFilterSheet
+        visible={filterVisible}
+        ui={ui}
+        themeName={themeName}
+        t={t}
+        draftFilters={draftFilters}
+        normalizedDraftFilters={normalizedDraftFilters}
+        draftPriceBounds={draftPriceBounds}
+        resultCount={draftResultCount}
+        onClose={closeFilterModal}
+        onReset={resetDraftFilters}
+        onApply={applyFilters}
+        onDraftFiltersChange={setDraftFilters}
+      />
     </SafeAreaView>
   );
 }
@@ -489,11 +463,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 4,
     backgroundColor: UI.primary,
-  },
-  filterCountText: {
-    color: UI.white,
-    fontSize: 10,
-    fontWeight: "800",
   },
   headerTitle: {
     fontSize: 28,
@@ -559,131 +528,54 @@ const styles = StyleSheet.create({
 
   listContainer: {
     paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
+    paddingTop: 24,
     paddingBottom: 120,
-    gap: theme.spacing.lg,
   },
-  columnWrapper: {
-    justifyContent: "space-between",
-    gap: theme.spacing.md,
-  },
-  tourCard: {
-    width: "48%",
-    marginBottom: theme.spacing.lg,
-  },
-  imageWrap: {
-    position: "relative",
-    borderRadius: 24,
-    overflow: "hidden",
-    backgroundColor: UI.surface,
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 4,
-  },
-  tourImage: {
-    width: "100%",
-    aspectRatio: 1,
-  },
-  discountBadge: {
-    position: "absolute",
-    top: 14,
-    left: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.92)",
-  },
-  discountText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: "900",
-    color: UI.primary,
-  },
-  removeFavouriteButton: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  tourContent: {
-    paddingTop: 12,
-    paddingHorizontal: 4,
-    paddingBottom: 4,
-  },
-  cardHeader: {
+  sectionHead: {
     flexDirection: "row",
-    alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 8,
-  },
-  ratingRow: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingTop: 2,
+    marginBottom: 20,
   },
-  ratingText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: "700",
-    color: UI.slate900,
-  },
-  tourTitle: {
-    flex: 1,
-    fontSize: theme.fontSize.md,
+  sectionTitle: {
+    fontSize: 22,
     fontWeight: "800",
     color: UI.text,
-    lineHeight: 22,
+    letterSpacing: -0.5,
   },
-  metaTextSingle: {
-    marginTop: 4,
-    fontSize: theme.fontSize.sm,
-    fontWeight: "500",
-    color: UI.gray,
-  },
-  metaCategory: {
-    marginTop: 4,
-    fontSize: theme.fontSize.xs,
-    fontWeight: "700",
-    color: UI.slate700,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  priceRow: {
-    marginTop: 12,
-    gap: 2,
-  },
-  oldPrice: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: "700",
-    color: UI.placeholder,
-    textDecorationLine: "line-through",
-  },
-  priceCurrentRow: {
+  filterBtn: {
     flexDirection: "row",
-    alignItems: "baseline",
-    gap: 4,
-    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: UI.border,
+    borderRadius: 8,
   },
-  newPrice: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: UI.primary,
-  },
-  priceUnit: {
-    fontSize: theme.fontSize.xs,
+  filterText: {
+    fontSize: 14,
     fontWeight: "600",
-    color: UI.gray,
+    color: UI.text,
+  },
+  filterCountBadge: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: UI.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterCountText: {
+    color: UI.white,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
 
   emptyContainer: {

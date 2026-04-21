@@ -30,6 +30,7 @@
     "services/ApiService.ts",
     "services/AuthSessionService.ts",
     "services/AuthService.ts",
+    "services/ChatService.ts",
     "services/ChatbotService.ts",
     "services/dataAdapters.ts",
     "validators/authSchema.ts",

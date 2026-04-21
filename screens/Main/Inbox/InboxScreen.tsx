@@ -368,7 +368,7 @@ export default function InboxScreen() {
           <View style={styles.listHeaderWrap}>
             <Pressable onPress={handleOpenSupport}>
               <SectionCard
-                style={[styles.supportCard, { backgroundColor: theme.semantic.cardBackground }]}
+                style={[styles.supportCard, { backgroundColor: theme.semantic.screenSurface }]}
               >
                 <View
                   style={[

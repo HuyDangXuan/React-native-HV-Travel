@@ -31,6 +31,12 @@ export type TourSearchCard = {
 
 const FALLBACK_PRICE_MAX = 5000000;
 
+export const getTourSearchDurationDays = (tour: any) => {
+  if (typeof tour?.duration?.days === "number") return tour.duration.days;
+  const match = String(tour?.duration?.text ?? "").match(/(\d+)/);
+  return match ? Number(match[1]) : 0;
+};
+
 const roundUpToStep = (value: number, step: number) => Math.ceil(value / step) * step;
 
 const roundUpPriceCeiling = (value: number) => {

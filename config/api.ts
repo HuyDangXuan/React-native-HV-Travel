@@ -50,6 +50,8 @@ const api = {
     `${base_url}/chat/conversations/${conversationId}/messages`,
   mark_chat_conversation_read: (conversationId: string) =>
     `${base_url}/chat/conversations/${conversationId}/read`,
+  reopen_chat_conversation: (conversationId: string) =>
+    `${base_url}/chat/conversations/${conversationId}/reopen`,
 
   chatbot: base_url + "/chatbot/tour",
 };

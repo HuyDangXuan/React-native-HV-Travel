@@ -36,7 +36,7 @@ const normalizeConversationResponse = (payload: any): ChatConversationSummary | 
   return conversation.id ? conversation : null;
 };
 
-const normalizeMessagesResponse = (payload: any): ChatMessageItem[] => {
+export const normalizeChatServiceMessagesResponse = (payload: any): ChatMessageItem[] => {
   if (Array.isArray(payload?.data)) {
     return normalizeChatMessages(payload.data);
   }
@@ -44,8 +44,9 @@ const normalizeMessagesResponse = (payload: any): ChatMessageItem[] => {
   const rawMessage =
     payload?.data?.message ??
     payload?.data?.data?.message ??
-    payload?.message ??
     payload?.data?.data ??
+    payload?.data ??
+    (payload?.message && typeof payload.message === "object" ? payload.message : undefined) ??
     payload;
 
   if (rawMessage && !Array.isArray(rawMessage) && rawMessage.id) {
@@ -193,7 +194,7 @@ export class ChatService {
       headers: { Authorization: "Bearer " + token },
     });
 
-    return normalizeMessagesResponse(response);
+    return normalizeChatServiceMessagesResponse(response);
   };
 
   static sendMessage = async (
@@ -215,7 +216,7 @@ export class ChatService {
       }),
     });
 
-    const message = normalizeMessagesResponse(response)[0];
+    const message = normalizeChatServiceMessagesResponse(response)[0];
     return message ?? null;
   };
 
@@ -224,4 +225,16 @@ export class ChatService {
       method: "PUT",
       headers: { Authorization: "Bearer " + token },
     });
+
+  static reopenConversation = async (
+    token: string,
+    conversationId: string
+  ): Promise<ChatConversationSummary | null> => {
+    const response = await ApiService.fetchWithTimeout(api.reopen_chat_conversation(conversationId), {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token },
+    });
+
+    return normalizeConversationResponse(response);
+  };
 }

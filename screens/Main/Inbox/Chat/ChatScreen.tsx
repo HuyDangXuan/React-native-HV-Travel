@@ -45,6 +45,42 @@ type ChatTimelineItem =
   | { id: string; type: "message"; message: ChatMessageItem };
 
 const PULL_REFRESH_THRESHOLD = 72;
+const POLLING_INTERVAL_MS = 8000;
+const ACTIVE_CHAT_STATUSES = new Set(["waitingStaff", "open", "pending"]);
+
+const isActiveChatStatus = (status?: string) =>
+  ACTIVE_CHAT_STATUSES.has(String(status ?? "waitingStaff"));
+
+const getMessageTimestamp = (message: ChatMessageItem) => {
+  const timestamp = new Date(message.sentAt ?? "").getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const mergeChatMessages = (
+  currentMessages: ChatMessageItem[],
+  incomingMessages: ChatMessageItem[]
+) => {
+  const merged = [...currentMessages];
+
+  incomingMessages.forEach((incoming) => {
+    const existingIndex = merged.findIndex((item) => {
+      const matchesClientId =
+        incoming.clientMessageId &&
+        item.clientMessageId &&
+        incoming.clientMessageId === item.clientMessageId;
+      return matchesClientId || item.id === incoming.id;
+    });
+
+    if (existingIndex >= 0) {
+      merged[existingIndex] = incoming;
+      return;
+    }
+
+    merged.push(incoming);
+  });
+
+  return merged.sort((left, right) => getMessageTimestamp(left) - getMessageTimestamp(right));
+};
 
 const formatMessageTime = (value?: string, localeCode = "vi-VN") => {
   if (!value) return "";
@@ -119,6 +155,7 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [composerValue, setComposerValue] = useState("");
   const [composerMode, setComposerMode] = useState<"ready" | "unavailable">("ready");
   const pullOffsetRef = useRef(0);
@@ -128,9 +165,10 @@ export default function ChatScreen() {
   const activeTitle = conversation?.title ?? initialTitle;
   const activeStatus = conversation?.status ?? initialStatus;
   const subtitle = getChatConversationSubtitle(activeStatus);
+  const canSendMessage = Boolean(activeConversationId) && isActiveChatStatus(activeStatus);
   const timeline = useMemo(() => buildTimeline(messages, localeCode), [messages, localeCode]);
   const showInitialSkeleton = loading && !conversation && messages.length === 0;
-  const isBusy = loading || refreshing || sending;
+  const isBusy = loading || refreshing || sending || reopening;
   const topicChips = [
     t("inbox.supportTopicBooking"),
     t("inbox.supportTopicPayment"),
@@ -155,7 +193,7 @@ export default function ChatScreen() {
         if (conversationId) {
           const foundConversation = await ChatService.getConversation(token, conversationId);
           const data = await ChatService.getMessages(token, conversationId);
-          setConversation(
+          const nextConversation =
             foundConversation ?? {
               id: conversationId,
               customerId: "",
@@ -167,10 +205,10 @@ export default function ChatScreen() {
               channel: "web",
               title: activeTitle,
               subtitle,
-            }
-          );
-          setMessages(data);
-          setComposerMode("ready");
+            };
+          setConversation(nextConversation);
+          setMessages((prev) => (refresh ? mergeChatMessages(prev, data) : data));
+          setComposerMode(isActiveChatStatus(nextConversation.status) ? "ready" : "unavailable");
           await ChatService.markConversationRead(token, conversationId).catch(() => undefined);
           return;
         }
@@ -178,8 +216,15 @@ export default function ChatScreen() {
         if (supportEntry) {
           const bootstrap = await ChatService.bootstrapSupportConversation(token);
           setConversation(bootstrap.conversation);
-          setMessages(bootstrap.messages);
-          setComposerMode(bootstrap.canCreate ? "ready" : "unavailable");
+          setMessages((prev) =>
+            refresh ? mergeChatMessages(prev, bootstrap.messages) : bootstrap.messages
+          );
+          setComposerMode(
+            bootstrap.canCreate &&
+              (!bootstrap.conversation || isActiveChatStatus(bootstrap.conversation.status))
+              ? "ready"
+              : "unavailable"
+          );
 
           if (bootstrap.conversation) {
             await ChatService.markConversationRead(token, bootstrap.conversation.id).catch(
@@ -193,9 +238,11 @@ export default function ChatScreen() {
         setMessages([]);
         setComposerMode("unavailable");
       } catch (error: any) {
-        setConversation(null);
-        setMessages([]);
-        setComposerMode("unavailable");
+        if (!refresh) {
+          setConversation(null);
+          setMessages([]);
+          setComposerMode("unavailable");
+        }
 
         if (!refresh) {
           MessageBoxService.error(
@@ -216,7 +263,19 @@ export default function ChatScreen() {
   useFocusEffect(
     useCallback(() => {
       loadThread({ refresh: false });
-    }, [loadThread])
+
+      if (!token || (!conversationId && !supportEntry && !activeConversationId)) {
+        return undefined;
+      }
+
+      const intervalId = setInterval(() => {
+        loadThread({ refresh: true });
+      }, POLLING_INTERVAL_MS);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }, [activeConversationId, conversationId, loadThread, supportEntry, token])
   );
 
   const onRefresh = useCallback(async () => {
@@ -250,7 +309,7 @@ export default function ChatScreen() {
   }, [isBusy, onRefresh]);
 
   const renderSupportIntro = () => (
-    <SectionCard style={[styles.supportIntroCard, { backgroundColor: theme.semantic.cardBackground }]}>
+    <SectionCard style={[styles.supportIntroCard, { backgroundColor: theme.semantic.screenSurface }]}>
       <View style={[styles.supportIntroIcon, { backgroundColor: theme.colors.primaryLight }]}>
         <Ionicons name="headset-outline" size={20} color={theme.colors.primary} />
       </View>
@@ -308,7 +367,7 @@ export default function ChatScreen() {
             {conversation
               ? t("inbox.supportConversationReady")
               : composerMode === "unavailable"
-                ? t("inbox.supportComposerUnavailable")
+                ? t("inbox.supportComposerConnecting")
                 : t("inbox.supportEntryPending")}
           </Text>
         </View>
@@ -316,11 +375,142 @@ export default function ChatScreen() {
     </SectionCard>
   );
 
+  const handleReopenConversation = useCallback(async () => {
+    if (!token || !activeConversationId) return;
+
+    try {
+      setReopening(true);
+      const reopenedConversation = await ChatService.reopenConversation(token, activeConversationId);
+      if (reopenedConversation) {
+        setConversation(reopenedConversation);
+        setComposerMode("ready");
+      }
+      await loadThread({ refresh: true });
+    } catch (error: any) {
+      MessageBoxService.error(
+        t("common.error"),
+        error?.message || t("inbox.supportReopenFailed"),
+        t("common.ok")
+      );
+    } finally {
+      setReopening(false);
+    }
+  }, [activeConversationId, loadThread, t, token]);
+
+  const handleSendMessage = useCallback(async () => {
+    if (!token) {
+      navigation.navigate("LoginScreen");
+      return;
+    }
+
+    const content = composerValue.trim();
+    if (!content || !activeConversationId || !canSendMessage) {
+      MessageBoxService.error(
+        t("common.error"),
+        t("inbox.supportComposerConnecting"),
+        t("common.ok")
+      );
+      return;
+    }
+
+    const clientMessageId = uuidv4();
+    const optimisticMessage: ChatMessageItem = {
+      id: `local-${clientMessageId}`,
+      conversationId: activeConversationId,
+      senderRole: "me",
+      senderDisplayName: "",
+      messageType: "text",
+      text: content,
+      sentAt: new Date().toISOString(),
+      isRead: true,
+      clientMessageId,
+    };
+
+    setComposerValue("");
+    setSending(true);
+    setMessages((prev) => mergeChatMessages(prev, [optimisticMessage]));
+
+    try {
+      const sentMessage = await ChatService.sendMessage(
+        token,
+        activeConversationId,
+        content,
+        clientMessageId
+      );
+
+      if (sentMessage) {
+        setMessages((prev) => mergeChatMessages(prev, [sentMessage]));
+      } else {
+        await loadThread({ refresh: true });
+      }
+    } catch (error: any) {
+      setMessages((prev) =>
+        prev.filter(
+          (message) =>
+            !(
+              message.clientMessageId === clientMessageId &&
+              message.id === optimisticMessage.id
+            )
+        )
+      );
+      MessageBoxService.error(
+        t("common.error"),
+        error?.message || t("inbox.chatSendFailed"),
+        t("common.ok")
+      );
+    } finally {
+      setSending(false);
+    }
+  }, [activeConversationId, canSendMessage, composerValue, loadThread, navigation, t, token]);
+
   const renderComposer = () => {
+    if (activeConversationId && !canSendMessage) {
+      return (
+        <SectionCard
+          style={[styles.composerCard, { backgroundColor: theme.semantic.screenSurface }]}
+        >
+          <View style={styles.composerHeaderRow}>
+            <View style={[styles.composerIcon, { backgroundColor: theme.colors.primaryLight }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={theme.colors.primary} />
+            </View>
+
+            <View style={styles.composerHeaderContent}>
+              <Text style={[styles.composerTitle, { color: theme.semantic.textPrimary }]}>
+                {t("inbox.supportConversationClosedTitle")}
+              </Text>
+              <Text style={[styles.composerDescription, { color: theme.semantic.textSecondary }]}>
+                {t("inbox.supportConversationClosedDescription")}
+              </Text>
+            </View>
+          </View>
+
+          <Pressable
+            style={[
+              styles.reopenButton,
+              {
+                backgroundColor: reopening ? theme.semantic.divider : theme.colors.primary,
+              },
+            ]}
+            disabled={reopening}
+            onPress={handleReopenConversation}
+          >
+            {reopening ? (
+              <ActivityIndicator size="small" color={theme.colors.white} />
+            ) : (
+              <Ionicons name="refresh" size={16} color={theme.colors.white} />
+            )}
+            <Text style={[styles.reopenButtonText, { color: theme.colors.white }]}>
+              {reopening ? t("inbox.supportReopening") : t("inbox.supportReopen")}
+            </Text>
+          </Pressable>
+        </SectionCard>
+      );
+    }
+
     const isDisabled = !activeConversationId || composerMode === "unavailable" || sending;
 
     return (
-      <SectionCard style={[styles.composerCard, { backgroundColor: theme.semantic.cardBackground }]}>
+      <SectionCard style={[styles.composerCard, { backgroundColor: theme.semantic.screenSurface }]}>
         <View style={styles.composerHeaderRow}>
           <View style={[styles.composerIcon, { backgroundColor: theme.colors.primaryLight }]}>
             <Ionicons name="chatbubbles-outline" size={18} color={theme.colors.primary} />
@@ -367,52 +557,7 @@ export default function ChatScreen() {
               },
             ]}
             disabled={isDisabled || composerValue.trim().length === 0}
-            onPress={async () => {
-              if (!token) {
-                navigation.navigate("LoginScreen");
-                return;
-              }
-
-              const content = composerValue.trim();
-              if (!content || !activeConversationId) {
-                MessageBoxService.error(
-                  t("common.error"),
-                  t("inbox.supportComposerUnavailable"),
-                  t("common.ok")
-                );
-                return;
-              }
-
-              try {
-                setSending(true);
-                const clientMessageId = uuidv4();
-                const sentMessage = await ChatService.sendMessage(
-                  token,
-                  activeConversationId,
-                  content,
-                  clientMessageId
-                );
-
-                if (sentMessage) {
-                  setMessages((prev) => {
-                    const exists = prev.some((message) => message.id === sentMessage.id);
-                    return exists ? prev : [...prev, sentMessage];
-                  });
-                } else {
-                  await loadThread({ refresh: true });
-                }
-
-                setComposerValue("");
-              } catch (error: any) {
-                MessageBoxService.error(
-                  t("common.error"),
-                  error?.message || t("inbox.chatSendFailed"),
-                  t("common.ok")
-                );
-              } finally {
-                setSending(false);
-              }
-            }}
+            onPress={handleSendMessage}
           >
             {sending ? (
               <ActivityIndicator size="small" color={theme.colors.white} />
@@ -440,7 +585,7 @@ export default function ChatScreen() {
               {conversation
                 ? t("inbox.supportComposerReady")
                 : composerMode === "unavailable"
-                  ? t("inbox.supportComposerUnavailable")
+                  ? t("inbox.supportComposerConnecting")
                   : t("inbox.supportComposerPending")}
             </Text>
           </View>
@@ -529,7 +674,7 @@ export default function ChatScreen() {
                 : [
                     styles.messageBubbleOther,
                     {
-                      backgroundColor: theme.semantic.cardBackground,
+                      backgroundColor: theme.semantic.screenSurface,
                       borderColor: theme.semantic.divider,
                     },
                   ],
@@ -566,7 +711,7 @@ export default function ChatScreen() {
   };
 
   const renderEmptyMessages = () => (
-    <SectionCard style={[styles.demoNoticeCard, { backgroundColor: theme.semantic.cardBackground }]}>
+    <SectionCard style={[styles.demoNoticeCard, { backgroundColor: theme.semantic.screenSurface }]}>
       <View style={[styles.demoNoticeIcon, { backgroundColor: theme.colors.primaryLight }]}>
         <Ionicons name="chatbubble-ellipses-outline" size={18} color={theme.colors.primary} />
       </View>
@@ -617,7 +762,6 @@ export default function ChatScreen() {
         renderItem={renderTimelineItem}
         ListHeaderComponent={<View style={styles.threadHeaderWrap}>{renderSupportIntro()}</View>}
         ListEmptyComponent={renderEmptyMessages}
-        ListFooterComponent={renderComposer}
         contentContainerStyle={[
           styles.listContent,
           timeline.length === 0 && styles.listContentEmpty,
@@ -645,7 +789,10 @@ export default function ChatScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
       />
 
-      <View style={styles.container}>{renderContent()}</View>
+      <View style={styles.container}>
+        {renderContent()}
+        {token && !showInitialSkeleton ? renderComposer() : null}
+      </View>
 
       <LoadingOverlay visible={refreshing} />
     </SafeAreaView>
@@ -920,6 +1067,20 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
+  },
+  reopenButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  reopenButtonText: {
+    fontSize: 13,
+    fontWeight: "800",
   },
   composerFooterRow: {
     gap: 8,

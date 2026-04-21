@@ -560,6 +560,14 @@ const vi = {
     supportComposerSending: "Đang gửi...",
     supportSystemName: "Hệ thống HV Travel",
     supportReadOnlyTitle: "Kênh hỗ trợ trên mobile",
+    supportComposerReady: "Dang ket noi voi doi ngu ho tro",
+    supportComposerConnecting: "Dang ket noi kenh ho tro. Vui long thu lai sau.",
+    supportConversationClosedTitle: "Cuoc tro chuyen da ket thuc",
+    supportConversationClosedDescription:
+      "Ban co the mo lai cuoc tro chuyen neu can tiep tuc trao doi voi doi ngu ho tro.",
+    supportReopen: "Mo lai cuoc tro chuyen",
+    supportReopening: "Dang mo lai...",
+    supportReopenFailed: "Khong the mo lai cuoc tro chuyen ho tro.",
     supportReadOnlyDescription:
       "Hiện tại màn này ưu tiên hiển thị lịch sử hỗ trợ rõ ràng hơn. Kết nối gửi chat trực tiếp sang hệ thống ASP.NET sẽ được hoàn tất ở bước tích hợp tiếp theo.",
     supportEmptyTitle: "Chưa có cuộc trò chuyện hỗ trợ",

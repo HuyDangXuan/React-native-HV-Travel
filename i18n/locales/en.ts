@@ -558,6 +558,14 @@ const en = {
     supportComposerSending: "Sending...",
     supportSystemName: "HV Travel System",
     supportReadOnlyTitle: "Mobile support channel",
+    supportComposerReady: "Connected to the support team",
+    supportComposerConnecting: "Connecting to support. Please try again shortly.",
+    supportConversationClosedTitle: "Conversation closed",
+    supportConversationClosedDescription:
+      "You can reopen this conversation if you need more help from the support team.",
+    supportReopen: "Reopen conversation",
+    supportReopening: "Reopening...",
+    supportReopenFailed: "Unable to reopen the support conversation.",
     supportReadOnlyDescription:
       "This screen now focuses on a clearer support history experience. Direct chat delivery to the ASP.NET support system will be completed in the next integration step.",
     supportEmptyTitle: "No support conversation yet",
