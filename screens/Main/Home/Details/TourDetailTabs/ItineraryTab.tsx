@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 
 import { useAppTheme } from "../../../../../context/ThemeModeContext";
 import { useI18n } from "../../../../../context/I18nContext";
+import RichHtmlText from "../../../../../components/ui/RichHtmlText";
 
 type Tour = {
   schedule?: {
@@ -95,6 +96,7 @@ export default function ItineraryTab({ tour }: { tour: Tour | null }) {
               isLast={idx === itinerary.length - 1}
               styles={styles}
               t={t}
+              ui={ui}
             />
           ))}
         </View>
@@ -108,11 +110,13 @@ function DayCard({
   isLast,
   styles,
   t,
+  ui,
 }: {
   data: ItineraryDay;
   isLast: boolean;
   styles: ReturnType<typeof createStyles>;
   t: (key: string, params?: Record<string, string | number>) => string;
+  ui: ItineraryUi;
 }) {
   return (
     <View style={styles.dayCard}>
@@ -132,7 +136,18 @@ function DayCard({
             </View>
 
             <View style={styles.activityContent}>
-              <Text style={styles.activityDesc}>{activity.desc}</Text>
+              <RichHtmlText
+                html={activity.desc}
+                compact
+                palette={{
+                  textPrimary: ui.textPrimary,
+                  textSecondary: ui.textPrimary,
+                  link: ui.primary,
+                  border: ui.border,
+                  surface: ui.surface,
+                }}
+                textColor={ui.textPrimary}
+              />
             </View>
           </View>
         ))}

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.toCreateBookingPayload = exports.toCalculatePricePayload = exports.normalizeChatMessages = exports.normalizeChatMessage = exports.normalizeChatConversations = exports.normalizeChatConversation = exports.getChatConversationSubtitle = exports.extractFavouriteTourIds = exports.normalizeFavourites = exports.normalizeFavourite = exports.normalizeBookingQuote = exports.normalizeBookings = exports.normalizeBooking = exports.normalizeCustomer = exports.normalizeTours = exports.normalizeTour = exports.normalizeReview = void 0;
+exports.toCreateBookingPayload = exports.toCalculatePricePayload = exports.normalizeChatMessages = exports.normalizeChatMessage = exports.getPrimarySupportConversation = exports.sortSupportConversations = exports.normalizeChatConversations = exports.normalizeChatConversation = exports.getChatConversationSubtitle = exports.extractFavouriteTourIds = exports.normalizeFavourites = exports.normalizeFavourite = exports.normalizeBookingQuote = exports.normalizeBookings = exports.normalizeBooking = exports.normalizeCustomer = exports.normalizeTours = exports.normalizeTour = exports.normalizeReview = void 0;
 const asNumber = (value) => {
     if (typeof value === "number")
         return value;
@@ -273,6 +273,24 @@ const normalizeChatConversations = (payload) => {
     return data.map(exports.normalizeChatConversation);
 };
 exports.normalizeChatConversations = normalizeChatConversations;
+const getConversationTimestamp = (conversation) => {
+    if (!conversation.lastMessageAt)
+        return 0;
+    const timestamp = new Date(conversation.lastMessageAt).getTime();
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+const sortSupportConversations = (conversations) => [...conversations].sort((left, right) => {
+    if (right.unreadCount !== left.unreadCount) {
+        return right.unreadCount - left.unreadCount;
+    }
+    return getConversationTimestamp(right) - getConversationTimestamp(left);
+});
+exports.sortSupportConversations = sortSupportConversations;
+const getPrimarySupportConversation = (conversations) => {
+    const [primaryConversation] = (0, exports.sortSupportConversations)(conversations);
+    return primaryConversation ?? null;
+};
+exports.getPrimarySupportConversation = getPrimarySupportConversation;
 const normalizeChatMessage = (raw) => {
     const senderType = String(raw?.senderType ?? raw?.senderRole ?? "system").toLowerCase();
     const senderRole = senderType === "customer"
@@ -289,6 +307,7 @@ const normalizeChatMessage = (raw) => {
         text: String(raw?.content ?? raw?.text ?? ""),
         sentAt: raw?.sentAt ?? raw?.createdAt,
         isRead: Boolean(raw?.isRead),
+        clientMessageId: raw?.clientMessageId ?? raw?.client_message_id,
     };
 };
 exports.normalizeChatMessage = normalizeChatMessage;

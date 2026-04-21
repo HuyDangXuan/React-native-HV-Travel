@@ -128,7 +128,9 @@ export default function ForgetPasswordScreen() {
           onChangeText={(text) => {
             setEmail(text);
             if (errors.email) {
-              setErrors((prev) => ({ ...prev, email: undefined }));
+              const { error } = forgotPasswordSchema.validate({ email: text }, { abortEarly: true });
+              const fieldError = error?.details.find((detail) => detail.path[0] === "email");
+              setErrors((prev) => ({ ...prev, email: fieldError?.message }));
             }
           }}
           onBlur={() => validateField("email")}

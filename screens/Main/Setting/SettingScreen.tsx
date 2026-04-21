@@ -71,6 +71,12 @@ export default function SettingScreen() {
             onPress: () => navigation.navigate("SecurityScreen"),
           },
           {
+            id: "qrQuickLogin",
+            label: t("settings.quickLoginQr"),
+            icon: "qr-code-outline",
+            onPress: () => navigation.navigate("QrQuickLoginScreen"),
+          },
+          {
             id: "transactions",
             label: t("settings.transactions"),
             icon: "card-outline",
@@ -135,16 +141,21 @@ export default function SettingScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenBackground }]}>
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: theme.semantic.screenBackground }]}
+      edges={["top"]}
+    >
       <AppHeader variant="hero" title={t("settings.title")} />
 
       <FlatList
+        style={styles.list}
         data={sections}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
           {
+            flexGrow: 1,
             paddingHorizontal: theme.layout.topLevelPadding,
             paddingBottom: 24,
             gap: theme.spacing.lg,
@@ -210,6 +221,9 @@ export default function SettingScreen() {
 
 const styles = StyleSheet.create({
   safe: {
+    flex: 1,
+  },
+  list: {
     flex: 1,
   },
   content: {},

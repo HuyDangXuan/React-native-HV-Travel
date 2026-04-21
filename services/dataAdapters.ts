@@ -312,6 +312,14 @@ export type ChatMessageItem = {
   text: string;
   sentAt?: string;
   isRead: boolean;
+  clientMessageId?: string;
+};
+
+export type SupportConversationBootstrapResult = {
+  conversation: ChatConversationSummary | null;
+  messages: ChatMessageItem[];
+  created: boolean;
+  canCreate: boolean;
 };
 
 export const getChatConversationSubtitle = (status?: string): string => {
@@ -351,6 +359,30 @@ export const normalizeChatConversations = (payload: any): ChatConversationSummar
   return data.map(normalizeChatConversation);
 };
 
+const getConversationTimestamp = (conversation: ChatConversationSummary) => {
+  if (!conversation.lastMessageAt) return 0;
+  const timestamp = new Date(conversation.lastMessageAt).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+export const sortSupportConversations = (
+  conversations: ChatConversationSummary[]
+): ChatConversationSummary[] =>
+  [...conversations].sort((left, right) => {
+    if (right.unreadCount !== left.unreadCount) {
+      return right.unreadCount - left.unreadCount;
+    }
+
+    return getConversationTimestamp(right) - getConversationTimestamp(left);
+  });
+
+export const getPrimarySupportConversation = (
+  conversations: ChatConversationSummary[]
+): ChatConversationSummary | null => {
+  const [primaryConversation] = sortSupportConversations(conversations);
+  return primaryConversation ?? null;
+};
+
 export const normalizeChatMessage = (raw: any): ChatMessageItem => {
   const senderType = String(raw?.senderType ?? raw?.senderRole ?? "system").toLowerCase();
   const senderRole =
@@ -369,6 +401,7 @@ export const normalizeChatMessage = (raw: any): ChatMessageItem => {
     text: String(raw?.content ?? raw?.text ?? ""),
     sentAt: raw?.sentAt ?? raw?.createdAt,
     isRead: Boolean(raw?.isRead),
+    clientMessageId: raw?.clientMessageId ?? raw?.client_message_id,
   };
 };
 

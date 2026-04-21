@@ -243,7 +243,11 @@ export default function ChatbotModal({ visible, onClose, tour }: ChatbotModalPro
               </View>
             </View>
 
-            <Pressable onPress={onClose} style={styles.closeBtn} accessibilityLabel={t("chatbot.closeLabel")}>
+            <Pressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityLabel={t("chatbot.closeLabel")}
+            >
               <Ionicons name="close" size={20} color={ui.textPrimary} />
             </Pressable>
           </View>

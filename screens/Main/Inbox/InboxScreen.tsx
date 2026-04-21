@@ -15,13 +15,18 @@ import { useNavigation } from "@react-navigation/native";
 import AppHeader from "../../../components/ui/AppHeader";
 import IconButton from "../../../components/ui/IconButton";
 import EmptyState from "../../../components/ui/EmptyState";
+import SectionCard from "../../../components/ui/SectionCard";
 import LoadingOverlay from "../../Loading/LoadingOverlay";
 import { InboxItemSkeletonList } from "../../../components/skeleton/MainTabSkeletons";
 import { useAuth } from "../../../context/AuthContext";
 import { useI18n } from "../../../context/I18nContext";
 import { useAppTheme } from "../../../context/ThemeModeContext";
 import { ChatService } from "../../../services/ChatService";
-import { ChatConversationSummary } from "../../../services/dataAdapters";
+import {
+  ChatConversationSummary,
+  getPrimarySupportConversation,
+  sortSupportConversations,
+} from "../../../services/dataAdapters";
 import { MessageBoxService } from "../../MessageBox/MessageBoxService";
 import { shouldTriggerOverlayRefresh } from "../../../utils/pullToRefresh";
 import { getPullRefreshDisplayState } from "../../../utils/loadingState";
@@ -79,7 +84,14 @@ export default function InboxScreen() {
     () => conversations.reduce((sum, item) => sum + item.unreadCount, 0),
     [conversations]
   );
-
+  const sortedConversations = useMemo(
+    () => sortSupportConversations(conversations),
+    [conversations]
+  );
+  const primarySupportConversation = useMemo(
+    () => getPrimarySupportConversation(conversations),
+    [conversations]
+  );
   const {
     showInitialSkeleton: showInitialMessagesSkeleton,
     showRefreshSkeleton: showRefreshingMessagesSkeleton,
@@ -194,8 +206,52 @@ export default function InboxScreen() {
         unreadCount: item.unreadCount,
       });
     },
-    [navigation, token]
+    [navigation, t, token]
   );
+
+  const handleOpenSupport = useCallback(() => {
+    if (!token) {
+      navigation.navigate("LoginScreen");
+      return;
+    }
+
+    if (primarySupportConversation) {
+      handlePressConversation(primarySupportConversation);
+      return;
+    }
+
+    ChatService.bootstrapSupportConversation(token)
+      .then((result) => {
+        if (result.conversation) {
+          setConversations((prev) => {
+            const exists = prev.some((conversation) => conversation.id === result.conversation?.id);
+            if (exists || !result.conversation) return prev;
+            return [result.conversation, ...prev];
+          });
+
+          navigation.navigate("ChatScreen", {
+            conversationId: result.conversation.id,
+            title: result.conversation.title,
+            status: result.conversation.status,
+            supportEntry: true,
+          });
+          return;
+        }
+
+        navigation.navigate("ChatScreen", {
+          title: t("inbox.supportThreadTitle"),
+          status: "waitingStaff",
+          supportEntry: true,
+        });
+      })
+      .catch(() => {
+        navigation.navigate("ChatScreen", {
+          title: t("inbox.supportThreadTitle"),
+          status: "waitingStaff",
+          supportEntry: true,
+        });
+      });
+  }, [handlePressConversation, navigation, primarySupportConversation, t, token]);
 
   const renderConversation = ({ item }: { item: ChatConversationSummary }) => (
     <Pressable
@@ -304,15 +360,81 @@ export default function InboxScreen() {
 
     return (
       <FlatList
-        data={conversations}
+        data={sortedConversations}
         keyExtractor={(item) => item.id}
         renderItem={renderConversation}
         ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: theme.semantic.divider }]} />}
+        ListHeaderComponent={
+          <View style={styles.listHeaderWrap}>
+            <Pressable onPress={handleOpenSupport}>
+              <SectionCard
+                style={[styles.supportCard, { backgroundColor: theme.semantic.cardBackground }]}
+              >
+                <View
+                  style={[
+                    styles.supportCardIcon,
+                    { backgroundColor: theme.colors.primaryLight },
+                  ]}
+                >
+                  <Ionicons name="headset-outline" size={24} color={theme.colors.primary} />
+                </View>
+
+                <View style={styles.supportCardContent}>
+                  <Text
+                    style={[styles.supportCardTitle, { color: theme.semantic.textPrimary }]}
+                  >
+                    {t("inbox.supportCardTitle")}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.supportCardDescription,
+                      { color: theme.semantic.textSecondary },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {t("inbox.supportCardDescription")}
+                  </Text>
+                </View>
+
+                <View style={styles.supportCardAction}>
+                  <Text
+                    style={[styles.supportCardActionText, { color: theme.colors.primary }]}
+                  >
+                    {primarySupportConversation
+                      ? t("inbox.supportContinue")
+                      : t("inbox.supportStart")}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
+                </View>
+              </SectionCard>
+            </Pressable>
+
+            <View style={styles.historyHeader}>
+              <Text style={[styles.historyTitle, { color: theme.semantic.textPrimary }]}>
+                {t("inbox.historyTitle")}
+              </Text>
+              {unreadCount > 0 ? (
+                <View
+                  style={[
+                    styles.historyBadge,
+                    { backgroundColor: theme.colors.primaryLight },
+                  ]}
+                >
+                  <Text
+                    style={[styles.historyBadgeText, { color: theme.colors.primary }]}
+                  >
+                    {t("inbox.unreadCount", { count: unreadCount })}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        }
         ListEmptyComponent={renderMessagesEmptyState}
         contentContainerStyle={[
           styles.listContent,
           { paddingHorizontal: theme.layout.topLevelPadding },
-          conversations.length === 0 && styles.listContentEmpty,
+          sortedConversations.length === 0 && styles.listContentEmpty,
         ]}
         onScroll={handleScroll}
         onScrollBeginDrag={handleScrollBeginDrag}
@@ -330,6 +452,7 @@ export default function InboxScreen() {
           variant="hero"
           title={t("inbox.title")}
           subtitle=""
+          style={styles.headerContent}
           right={
             <IconButton
               icon="notifications-outline"
@@ -352,6 +475,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {},
+  headerContent: {
+    paddingBottom: 6,
+  },
   badge: {
     minWidth: 20,
     height: 20,
@@ -365,7 +491,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   listContent: {
-    paddingTop: 4,
+    paddingTop: 0,
     paddingBottom: 24,
     flexGrow: 1,
   },
@@ -376,6 +502,65 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 20,
     paddingBottom: 24,
+  },
+  listHeaderWrap: {
+    gap: 10,
+    marginBottom: 10,
+  },
+  supportCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  supportCardIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  supportCardContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  supportCardTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  supportCardDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  supportCardAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  supportCardActionText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  historyTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  historyBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  historyBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
   messageRow: {
     flexDirection: "row",

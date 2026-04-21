@@ -4,6 +4,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "lib": ["ES2020", "DOM"],
+    "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -20,6 +21,7 @@
     "utils/inboxNotifications.ts",
     "utils/loadingState.ts",
     "utils/chatbot.ts",
+    "utils/richText.ts",
     "utils/onboarding.ts",
     "utils/pullToRefresh.ts",
     "utils/tourSearch.ts",
@@ -30,6 +32,9 @@
     "services/AuthService.ts",
     "services/ChatbotService.ts",
     "services/dataAdapters.ts",
-    "validators/authSchema.ts"
+    "validators/authSchema.ts",
+    "components/ui/RichHtmlText.tsx",
+    "components/Chatbot/ChatbotModal.tsx",
+    "screens/Main/Home/Details/TourDetailTabs/ItineraryTab.tsx"
   ]
 }

@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleProp, StyleSheet, ViewStyle } from "react-native";
+import { useAppTheme } from "../../context/ThemeModeContext";
 
 type SkeletonBlockProps = {
   style?: StyleProp<ViewStyle>;
 };
 
 export default function SkeletonBlock({ style }: SkeletonBlockProps) {
+  const theme = useAppTheme();
   const opacity = useRef(new Animated.Value(0.45)).current;
 
   useEffect(() => {
@@ -28,12 +30,20 @@ export default function SkeletonBlock({ style }: SkeletonBlockProps) {
     return () => loop.stop();
   }, [opacity]);
 
-  return <Animated.View style={[styles.block, style, { opacity }]} />;
+  return (
+    <Animated.View
+      style={[
+        styles.block,
+        { backgroundColor: theme.semantic.divider },
+        style,
+        { opacity },
+      ]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
   block: {
-    backgroundColor: "#e2e8f0",
     borderRadius: 12,
   },
 });

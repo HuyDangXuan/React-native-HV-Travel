@@ -79,8 +79,12 @@ export default function FavouriteScreen() {
       placeholder: appTheme.colors.placeholder,
       onPrimary: appTheme.colors.white,
       error: appTheme.colors.error,
+      warning: appTheme.colors.warning,
+      softAccent: themeName === "dark" ? "rgba(34, 211, 238, 0.14)" : "rgba(16, 185, 129, 0.12)",
+      badgeSurface: themeName === "dark" ? "rgba(15, 27, 42, 0.9)" : "rgba(255,255,255,0.92)",
+      actionSurface: themeName === "dark" ? "rgba(7, 16, 24, 0.86)" : "rgba(255,255,255,0.95)",
     }),
-    [appTheme]
+    [appTheme, themeName]
   );
   const hasLoadedRef = useRef(false);
   const pullOffsetRef = useRef(0);
@@ -137,9 +141,9 @@ export default function FavouriteScreen() {
     } catch (error: any) {
       console.error("Fetch favourites error:", error);
       MessageBoxService.error(
-        "Lỗi",
+        t("common.error"),
         error?.message || t("favourites.loadFailed"),
-        "OK"
+        t("common.ok")
       );
     } finally {
       if (showLoader) setLoading(false);
@@ -231,18 +235,13 @@ export default function FavouriteScreen() {
               color={ui.textPrimary}
             />
             {hasActiveFilter ? (
-              <View style={styles.filterCountPill}>
-                <Text style={styles.filterCountText}>1</Text>
+              <View style={[styles.filterCountPill, { backgroundColor: ui.primary }]}>
+                <Text style={[styles.filterCountText, { color: ui.onPrimary }]}>1</Text>
               </View>
             ) : null}
           </Pressable>
         ) : null}
       </View>
-      <Text style={[styles.headerSubtitle, { color: ui.textSecondary }]}>
-        {favourites.length === 0
-          ? t("favourites.subtitleEmpty")
-          : t("favourites.subtitleCount", { count: favourites.length })}
-      </Text>
       <View style={[styles.headerDivider, { borderBottomColor: ui.border }]} />
     </View>
   );
@@ -319,8 +318,8 @@ export default function FavouriteScreen() {
   };
 
   const renderMainEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIconCircle, { backgroundColor: ui.mutedSurface }]}>
+    <View style={[styles.emptyContainer, { backgroundColor: ui.bg }]}>
+      <View style={[styles.emptyIconCircle, { backgroundColor: ui.softAccent }]}>
         <Ionicons name="heart-outline" size={60} color={ui.primary} />
       </View>
       <Text style={[styles.emptyTitle, { color: ui.textPrimary }]}>{t("favourites.emptyTitle")}</Text>
@@ -333,8 +332,8 @@ export default function FavouriteScreen() {
   );
 
   const renderFilterEmptyState = () => (
-    <View style={styles.filterEmptyState}>
-      <View style={[styles.filterEmptyIcon, { backgroundColor: ui.mutedSurface }]}>
+    <View style={[styles.filterEmptyState, { backgroundColor: ui.surface, borderColor: ui.border }]}>
+      <View style={[styles.filterEmptyIcon, { backgroundColor: ui.softAccent }]}>
         <Ionicons name="filter-outline" size={26} color={ui.primary} />
       </View>
       <Text style={[styles.filterEmptyTitle, { color: ui.textPrimary }]}>{t("favourites.filteredEmptyTitle")}</Text>
@@ -354,13 +353,13 @@ export default function FavouriteScreen() {
         <Image source={{ uri: item.thumbnail }} style={styles.tourImage} resizeMode="cover" />
 
         {(item.discountPercent ?? 0) > 0 ? (
-          <View style={styles.discountBadge}>
-            <Text style={styles.discountText}>-{item.discountPercent}%</Text>
+          <View style={[styles.discountBadge, { backgroundColor: ui.badgeSurface, borderColor: ui.border }]}>
+            <Text style={[styles.discountText, { color: ui.primary }]}>-{item.discountPercent}%</Text>
           </View>
         ) : null}
 
         <Pressable
-          style={[styles.removeFavouriteButton, { backgroundColor: ui.surface, borderColor: ui.border }]}
+          style={[styles.removeFavouriteButton, { backgroundColor: ui.actionSurface, borderColor: ui.border }]}
           onPress={() => handleRemoveFavourite(item.tourId)}
         >
           <Ionicons name="heart" size={18} color={ui.error} />
@@ -373,7 +372,7 @@ export default function FavouriteScreen() {
             {item.name}
           </Text>
           <View style={styles.ratingRow}>
-            <Ionicons name="star" size={12} color="#F59E0B" />
+            <Ionicons name="star" size={12} color={ui.warning} />
             <Text style={[styles.ratingText, { color: ui.textPrimary }]}>{item.rating || "4.9"}</Text>
           </View>
         </View>
@@ -395,7 +394,7 @@ export default function FavouriteScreen() {
             <Text style={[styles.oldPrice, { color: ui.placeholder }]}>{formatPrice(item.originalPrice)}</Text>
           ) : null}
           <View style={styles.priceCurrentRow}>
-            <Text style={styles.newPrice}>{formatPrice(item.displayPrice)}</Text>
+            <Text style={[styles.newPrice, { color: ui.primary }]}>{formatPrice(item.displayPrice)}</Text>
             <Text style={[styles.priceUnit, { color: ui.textSecondary }]}>{t("favourites.perPerson")}</Text>
           </View>
         </View>
@@ -511,6 +510,7 @@ const styles = StyleSheet.create({
   headerDivider: {
     borderBottomWidth: 1,
     borderBottomColor: UI.border,
+    marginHorizontal: -theme.spacing.lg,
   },
   filterSection: {
     marginTop: 10,
@@ -699,6 +699,7 @@ const styles = StyleSheet.create({
     backgroundColor: UI.successSoft,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: theme.spacing.xl,
     marginBottom: theme.spacing.lg,
   },
   emptyTitle: {

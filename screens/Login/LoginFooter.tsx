@@ -16,7 +16,8 @@ export default function LoginFooter() {
           styles.text,
           {
             fontSize: theme.fontSize.md,
-            color: theme.semantic.textPrimary,
+            fontWeight: "bold",
+            color: theme.colors.primary,
             marginTop: theme.spacing.sm,
           },
         ]}
