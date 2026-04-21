@@ -31,6 +31,7 @@ export default function UserProfileScreen() {
           title={name}
           subtitle={`${location} • Thành viên từ ${joinedDate}`}
           onBack={() => navigation.goBack()}
+          centerTitle={true}
         />
       </View>
 

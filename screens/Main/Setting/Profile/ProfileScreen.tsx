@@ -30,6 +30,7 @@ export default function ProfileScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("profile.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
         right={
           <IconButton
             icon="settings-outline"

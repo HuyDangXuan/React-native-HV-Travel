@@ -1,4 +1,4 @@
-﻿import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
@@ -607,6 +607,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
     fontWeight: "600",
+    paddingHorizontal: 40,
     marginBottom: theme.spacing.lg,
   },
   exploreButton: {
@@ -655,6 +656,7 @@ const styles = StyleSheet.create({
     color: UI.gray,
     fontWeight: "600",
     textAlign: "center",
+    paddingHorizontal: 40,
   },
   filterResetBtn: {
     marginTop: 16,

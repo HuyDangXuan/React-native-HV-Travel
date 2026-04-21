@@ -21,6 +21,7 @@ export default function HelpScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("help.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <View style={[styles.content, { paddingHorizontal: theme.layout.detailPadding }]}>

@@ -14,6 +14,7 @@ type Props = {
   left?: React.ReactNode;
   right?: React.ReactNode;
   showDivider?: boolean;
+  centerTitle?: boolean;
   style?: StyleProp<ViewStyle>;
   titleStyle?: StyleProp<TextStyle>;
   subtitleStyle?: StyleProp<TextStyle>;
@@ -27,6 +28,7 @@ export default function AppHeader({
   left,
   right,
   showDivider = variant !== "overlay",
+  centerTitle = false,
   style,
   titleStyle,
   subtitleStyle,
@@ -76,14 +78,20 @@ export default function AppHeader({
       <View style={[styles.row, isHero && styles.heroRow]}>
         {leftNode ? <View style={styles.side}>{leftNode}</View> : isHero ? null : <View style={styles.side} />}
 
-        <View style={[styles.titleWrap, isHero && styles.heroTitleWrap]}>
+        <View
+          style={[
+            styles.titleWrap,
+            isHero && styles.heroTitleWrap,
+            centerTitle && { alignItems: "center" },
+          ]}
+        >
           <Text
             style={[
               isHero ? theme.typography.heroTitle : theme.typography.pageTitle,
               {
                 color: isOverlay ? theme.colors.white : theme.semantic.textPrimary,
-                textAlign: "center",
               },
+              centerTitle && { textAlign: "center" },
               titleStyle,
             ]}
             numberOfLines={2}
@@ -96,8 +104,8 @@ export default function AppHeader({
                 isOverlay ? styles.overlaySubtitle : theme.typography.body,
                 {
                   color: isOverlay ? "rgba(255,255,255,0.9)" : theme.semantic.textSecondary,
-                  textAlign: "center",
                 },
+                centerTitle && { textAlign: "center" },
                 subtitleStyle,
               ]}
               numberOfLines={2}
@@ -136,8 +144,6 @@ const styles = StyleSheet.create({
   },
   titleWrap: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   heroTitleWrap: {
     paddingTop: 2,

@@ -131,7 +131,12 @@ export default function CodeVerificationScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
-      <AppHeader variant="compact" title={t("forgotPassword.verifyTitle")} onBack={() => navigation.goBack()} />
+      <AppHeader
+        variant="compact"
+        title={t("forgotPassword.verifyTitle")}
+        onBack={() => navigation.goBack()}
+        centerTitle={true}
+      />
 
       <ScrollView
         contentContainerStyle={[styles.container, { padding: theme.spacing.lg }]}

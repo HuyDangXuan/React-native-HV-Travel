@@ -36,6 +36,7 @@ export default function AppearanceScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("appearance.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <ScrollView

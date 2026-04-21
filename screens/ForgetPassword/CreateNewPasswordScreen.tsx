@@ -112,6 +112,7 @@ export default function CreateNewPasswordScreen() {
         variant="compact"
         title={t("forgotPassword.createPasswordTitle")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <ScrollView

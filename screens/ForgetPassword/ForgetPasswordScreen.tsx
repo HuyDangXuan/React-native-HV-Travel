@@ -100,7 +100,12 @@ export default function ForgetPasswordScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
-      <AppHeader variant="compact" title={t("forgotPassword.title")} onBack={() => navigation.goBack()} />
+      <AppHeader
+        variant="compact"
+        title={t("forgotPassword.title")}
+        onBack={() => navigation.goBack()}
+        centerTitle={true}
+      />
 
       <ScrollView
         contentContainerStyle={[styles.container, { padding: theme.spacing.lg }]}

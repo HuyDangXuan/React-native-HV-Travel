@@ -134,6 +134,7 @@ export default function EditProfileScreen() {
           //subtitle="Cập nhật thông tin hiển thị của tài khoản."
           left={<IconButton icon="close" onPress={() => navigation.goBack()} />}
           right={<IconButton icon="checkmark" onPress={handleSave} color={theme.colors.primary} />}
+          centerTitle={true}
         />
 
         <ScrollView

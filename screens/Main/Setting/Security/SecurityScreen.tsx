@@ -166,6 +166,7 @@ export default function SecurityScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("security.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <FlatList

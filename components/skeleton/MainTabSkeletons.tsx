@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
   bookingCard: {
     borderRadius: 24, // Use a fixed value or move to dynamic if needed, but 24 is xl in base theme
     padding: 16,
-    gap: 10,
+    gap: 8,
   },
   bookingHeader: {
     flexDirection: "row",
@@ -564,12 +564,12 @@ const styles = StyleSheet.create({
   },
   bookingTitle: {
     width: "54%",
-    height: 16,
+    height: 14,
   },
   bookingBadge: {
-    width: 88,
-    height: 28,
-    borderRadius: 14,
+    width: 72,
+    height: 22,
+    borderRadius: 11,
   },
   bookingMeta: {
     width: "42%",

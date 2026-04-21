@@ -35,6 +35,7 @@ export default function LanguageScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("language.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <ScrollView

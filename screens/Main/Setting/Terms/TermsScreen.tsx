@@ -39,6 +39,7 @@ export default function TermsScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("terms.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <View style={[styles.content, { paddingHorizontal: theme.layout.detailPadding }]}>

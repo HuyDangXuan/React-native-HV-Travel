@@ -10,6 +10,9 @@ import {
   NativeSyntheticEvent,
   TextInput,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
@@ -110,28 +113,41 @@ const formatDateLabel = (value?: string, localeCode = "vi-VN") => {
 
 const buildTimeline = (messages: ChatMessageItem[], localeCode = "vi-VN"): ChatTimelineItem[] => {
   const items: ChatTimelineItem[] = [];
+  // Ensure messages are sorted descending (newest first)
+  const sortedMessages = [...messages].sort((a, b) => {
+    const timeA = new Date(a.sentAt ?? 0).getTime();
+    const timeB = new Date(b.sentAt ?? 0).getTime();
+    return timeB - timeA;
+  });
+
   let currentDayKey = "";
 
-  messages.forEach((message, index) => {
+  sortedMessages.forEach((message, index) => {
+    items.push({
+      id: `message-${message.id}-${index}`,
+      type: "message",
+      message,
+    });
+
     const date = new Date(message.sentAt ?? "");
     const dayKey = Number.isNaN(date.getTime())
       ? `unknown-${index}`
       : `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 
-    if (dayKey !== currentDayKey) {
-      currentDayKey = dayKey;
+    // Peak at next message to see if date changes (we are going backwards in time)
+    const nextMessage = sortedMessages[index + 1];
+    const nextDate = nextMessage ? new Date(nextMessage.sentAt ?? "") : null;
+    const nextDayKey = nextDate && !Number.isNaN(nextDate.getTime())
+      ? `${nextDate.getFullYear()}-${nextDate.getMonth()}-${nextDate.getDate()}`
+      : null;
+
+    if (!nextDayKey || nextDayKey !== dayKey) {
       items.push({
-        id: `date-${dayKey}`,
+        id: `date-${dayKey}-${index}`,
         type: "date",
         label: formatDateLabel(message.sentAt, localeCode),
       });
     }
-
-    items.push({
-      id: `message-${message.id}`,
-      type: "message",
-      message,
-    });
   });
 
   return items;
@@ -672,12 +688,12 @@ export default function ChatScreen() {
               isMe
                 ? [styles.messageBubbleMe, { backgroundColor: theme.colors.primary }]
                 : [
-                    styles.messageBubbleOther,
-                    {
-                      backgroundColor: theme.semantic.screenSurface,
-                      borderColor: theme.semantic.divider,
-                    },
-                  ],
+                  styles.messageBubbleOther,
+                  {
+                    backgroundColor: theme.semantic.screenSurface,
+                    borderColor: theme.semantic.divider,
+                  },
+                ],
               isSystem && {
                 backgroundColor: theme.name === "dark" ? "rgba(96, 165, 250, 0.12)" : "#eff6ff",
                 borderColor: theme.name === "dark" ? "rgba(96, 165, 250, 0.24)" : "#bfdbfe",
@@ -758,9 +774,10 @@ export default function ChatScreen() {
     return (
       <FlatList
         data={timeline}
+        inverted
         keyExtractor={(item) => item.id}
         renderItem={renderTimelineItem}
-        ListHeaderComponent={<View style={styles.threadHeaderWrap}>{renderSupportIntro()}</View>}
+        ListFooterComponent={<View style={styles.threadHeaderWrap}>{renderSupportIntro()}</View>}
         ListEmptyComponent={renderEmptyMessages}
         contentContainerStyle={[
           styles.listContent,
@@ -786,13 +803,11 @@ export default function ChatScreen() {
         subtitle={subtitle}
         subtitleStyle={styles.headerSubtitle}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
         style={{ backgroundColor: theme.semantic.screenBackground }}
       />
 
-      <View style={styles.container}>
-        {renderContent()}
-        {token && !showInitialSkeleton ? renderComposer() : null}
-      </View>
+      <View style={styles.container}>{renderContent()}</View>
 
       <LoadingOverlay visible={refreshing} />
     </SafeAreaView>
@@ -816,6 +831,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingVertical: 16,
+    gap: 16,
   },
   listContent: {
     paddingHorizontal: 20,
@@ -1010,10 +1026,12 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   composerCard: {
-    marginTop: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 14,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 10 : 16, // Extra padding for bottom area
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.05)",
   },
   composerHeaderRow: {
     flexDirection: "row",

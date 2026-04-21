@@ -165,7 +165,7 @@ export default function TourDetail() {
 
     setLoading(true);
     try {
-      const data = await TourService.getTourDetail(tourId);
+      const data = await TourService.getTourDetail(tourId, token || "");
 
       const detail: TourDetailData = {
         ...data,
@@ -510,11 +510,20 @@ export default function TourDetail() {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleGalleryScrollEnd}
+            onScroll={(event) => {
+              const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+              const clamped = clampGalleryIndex(nextIndex, galleryImages.length);
+              if (clamped !== activeImageIndex) {
+                setActiveImageIndex(clamped);
+              }
+            }}
+            scrollEventThrottle={16}
             renderItem={({ item }) => (
-              <View style={styles.gallerySlide}>
-                <Image source={{ uri: item }} style={styles.galleryImage} resizeMode="contain" />
-              </View>
+              <Pressable style={styles.gallerySlide} onPress={closeGallery}>
+                <Pressable>
+                  <Image source={{ uri: item }} style={styles.galleryImage} resizeMode="contain" />
+                </Pressable>
+              </Pressable>
             )}
             getItemLayout={(_, index) => ({
               length: width,
@@ -526,7 +535,7 @@ export default function TourDetail() {
           <SafeAreaView style={styles.galleryHeaderButtons} edges={["top"]} pointerEvents="box-none">
             <View style={styles.galleryHeaderInner} pointerEvents="box-none">
               <Pressable
-                hitSlop={20}
+                hitSlop={30}
                 style={styles.galleryCloseBtn}
                 onPress={closeGallery}
                 accessibilityRole="button"
@@ -920,7 +929,7 @@ function createStyles(ui: {
       right: 0,
       zIndex: 200,
       elevation: 200,
-      paddingTop: 6,
+      paddingTop: 5,
     },
     galleryHeaderInner: {
       flexDirection: "row",

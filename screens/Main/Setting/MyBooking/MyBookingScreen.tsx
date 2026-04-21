@@ -273,12 +273,14 @@ export default function MyBookingScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("bookings.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <View
         style={[
           styles.segmentWrap,
           {
+            marginTop: 12,
             marginHorizontal: theme.layout.detailPadding,
             marginBottom: theme.spacing.md,
             padding: 4,
@@ -399,6 +401,7 @@ const styles = StyleSheet.create({
   },
   loadingContent: {
     flex: 1,
+    paddingHorizontal: 16, // theme.layout.detailPadding
   },
   errorContent: {
     flex: 1,

@@ -221,6 +221,7 @@ export default function QrQuickLoginScreen() {
         style={{ backgroundColor: theme.semantic.screenBackground }}
         title={t("qrQuickLogin.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <ScrollView

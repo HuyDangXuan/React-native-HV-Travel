@@ -163,6 +163,7 @@ export default function NotificationScreen() {
         style={styles.header}
         title={t("notifications.title")}
         onBack={() => navigation.goBack()}
+        centerTitle={true}
       />
 
       <View style={styles.tabs}>
