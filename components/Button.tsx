@@ -61,7 +61,7 @@ export default function AppButton({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 54,
+    height: 56,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -74,8 +74,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   loading: {
-    width: 100,
-    height: 80,
+    width: 200,
+    height: 120,
   },
   text: {
     fontWeight: "800",

@@ -34,7 +34,9 @@ const api = {
     get_notifications: base_url + "/notifications/list",
     mark_notification_read: (id) => `${base_url}/notifications/${id}/read`,
     get_chat_conversations: base_url + "/chat/conversations",
+    create_chat_conversation: base_url + "/chat/conversations",
     get_chat_messages: (conversationId) => `${base_url}/chat/conversations/${conversationId}/messages`,
+    send_chat_message: (conversationId) => `${base_url}/chat/conversations/${conversationId}/messages`,
     mark_chat_conversation_read: (conversationId) => `${base_url}/chat/conversations/${conversationId}/read`,
     chatbot: base_url + "/chatbot/tour",
 };

@@ -1,5 +1,5 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,13 @@ import {
   ScrollView,
   Image,
   Pressable,
-  Dimensions,
   TextInput,
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import theme from '../../../../config/theme';
+import { StatusBar } from 'expo-status-bar';
 import { TourService } from '../../../../services/TourService';
 import LoadingOverlay from '../../../Loading/LoadingOverlay';
 import { MessageBoxService } from '../../../MessageBox/MessageBoxService';
@@ -22,8 +21,9 @@ import { extractNumber } from '../../../../utils/PriceUtils';
 import { Tour } from '../../../../models/Tour';
 import { shouldTriggerOverlayRefresh } from '../../../../utils/pullToRefresh';
 import { ExploreTourSkeletonList } from '../../../../components/skeleton/MainTabSkeletons';
+import { useAppTheme, useThemeMode } from '../../../../context/ThemeModeContext';
+import AppHeader from '../../../../components/ui/AppHeader';
 
-const { width } = Dimensions.get('window');
 const PULL_REFRESH_THRESHOLD = 72;
 
 export default function ExploreScreen() {
@@ -42,6 +42,24 @@ export default function ExploreScreen() {
   const [tours, setTours] = useState<any[]>([]);
   const pullOffsetRef = useRef(0);
   const showInitialSkeleton = loading && !city && tours.length === 0;
+  const appTheme = useAppTheme();
+  const { themeName } = useThemeMode();
+  const ui = useMemo(
+    () => ({
+      bg: appTheme.semantic.screenBackground,
+      surface: appTheme.semantic.screenSurface,
+      mutedSurface: appTheme.semantic.screenMutedSurface,
+      textPrimary: appTheme.semantic.textPrimary,
+      textSecondary: appTheme.semantic.textSecondary,
+      border: appTheme.semantic.divider,
+      primary: appTheme.colors.primary,
+      onPrimary: appTheme.colors.white,
+      overlay: appTheme.colors.overlay,
+      danger: appTheme.colors.error,
+    }),
+    [appTheme]
+  );
+  const styles = useMemo(() => createStyles(appTheme, ui), [appTheme, ui]);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -147,6 +165,15 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} backgroundColor={ui.surface} />
+
+      <AppHeader
+        variant="compact"
+        style={styles.header}
+        title={location || city?.name || 'Khám phá'}
+        onBack={() => navigation.goBack()}
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
@@ -155,20 +182,6 @@ export default function ExploreScreen() {
         onScrollEndDrag={handleScrollEndDrag}
         scrollEventThrottle={16}
       >
-        {/* Header with back button */}
-        <View style={styles.header}>
-          <Pressable
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-          </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {location || city?.name || 'Khám phá'}
-          </Text>
-          <View style={{ width: 40 }} />
-        </View>
-
         {showInitialSkeleton ? (
           <View style={styles.skeletonContent}>
             <ExploreTourSkeletonList />
@@ -201,7 +214,7 @@ export default function ExploreScreen() {
             <View style={styles.highlightsList}>
               {city.highlights.map((item: string, index: number) => (
                 <View key={index} style={styles.highlightItem}>
-                  <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} />
+                  <Ionicons name="checkmark-circle" size={18} color={ui.primary} />
                   <Text style={styles.highlightText}>{item}</Text>
                 </View>
               ))}
@@ -211,17 +224,17 @@ export default function ExploreScreen() {
 
         {/* Search */}
         <View style={styles.searchBox}>
-          <Feather name="search" size={20} color={theme.colors.gray} />
+          <Feather name="search" size={20} color={ui.textSecondary} />
           <TextInput
             value={search}
             onChangeText={setSearch}
             placeholder="Tìm kiếm tour..."
-            placeholderTextColor={theme.colors.gray}
+            placeholderTextColor={ui.textSecondary}
             style={styles.searchInput}
           />
           {search.length > 0 && (
             <Pressable onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={20} color={theme.colors.gray} />
+              <Ionicons name="close-circle" size={20} color={ui.textSecondary} />
             </Pressable>
           )}
         </View>
@@ -267,7 +280,7 @@ export default function ExploreScreen() {
 
           {filteredTours.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="boat-outline" size={64} color={theme.colors.gray} />
+              <Ionicons name="boat-outline" size={64} color={ui.textSecondary} />
               <Text style={styles.emptyTitle}>Không tìm thấy tour</Text>
               <Text style={styles.emptyDesc}>
                 {search ? 'Thử tìm kiếm với từ khóa khác' : 'Chưa có tour nào tại địa điểm này'}
@@ -303,11 +316,11 @@ export default function ExploreScreen() {
 
                     <View style={styles.tourMeta}>
                       <View style={styles.metaRow}>
-                        <Ionicons name="time-outline" size={14} color={theme.colors.gray} />
+                        <Ionicons name="time-outline" size={14} color={ui.textSecondary} />
                         <Text style={styles.metaText}>{tour?.time || 'N/A'}</Text>
                       </View>
                       <View style={styles.metaRow}>
-                        <Ionicons name="car-outline" size={14} color={theme.colors.gray} />
+                        <Ionicons name="car-outline" size={14} color={ui.textSecondary} />
                         <Text style={styles.metaText}>{tour?.vehicle || 'N/A'}</Text>
                       </View>
                     </View>
@@ -346,278 +359,269 @@ export default function ExploreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: theme.colors.white,
-  },
-  container: {
-    paddingBottom: 20,
-  },
-  skeletonContent: {
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-  },
+function createStyles(
+  appTheme: ReturnType<typeof useAppTheme>,
+  ui: {
+    bg: string;
+    surface: string;
+    mutedSurface: string;
+    textPrimary: string;
+    textSecondary: string;
+    border: string;
+    primary: string;
+    onPrimary: string;
+    overlay: string;
+    danger: string;
+  }
+) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: ui.bg,
+    },
+    container: {
+      paddingBottom: 20,
+    },
+    skeletonContent: {
+      paddingHorizontal: appTheme.spacing.md,
+      paddingTop: appTheme.spacing.md,
+    },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: theme.fontSize.lg,
-    fontWeight: '800',
-    color: theme.colors.text,
-    textAlign: 'center',
-    marginHorizontal: theme.spacing.sm,
-  },
+    // Header
+    header: {
+      backgroundColor: ui.surface,
+    },
 
-  // Banner
-  banner: {
-    height: 220,
-    position: 'relative',
-    marginTop: theme.spacing.sm,
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  bannerOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: theme.spacing.md,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  bannerTitle: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: '800',
-    color: theme.colors.white,
-    marginBottom: 4,
-  },
-  bannerDesc: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.white,
-    opacity: 0.9,
-    lineHeight: 20,
-    fontWeight: '600',
-  },
+    // Banner
+    banner: {
+      height: 220,
+      position: 'relative',
+      marginTop: appTheme.spacing.sm,
+    },
+    bannerImage: {
+      width: '100%',
+      height: '100%',
+    },
+    bannerOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: appTheme.spacing.md,
+      backgroundColor: ui.overlay,
+    },
+    bannerTitle: {
+      fontSize: appTheme.fontSize.xl,
+      fontWeight: '800',
+      color: '#f8fafc',
+      marginBottom: 4,
+    },
+    bannerDesc: {
+      fontSize: appTheme.fontSize.sm,
+      color: '#e2e8f0',
+      opacity: 0.95,
+      lineHeight: 20,
+      fontWeight: '600',
+    },
 
-  // Highlights
-  highlightsContainer: {
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-  },
-  sectionTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: '800',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-  },
-  highlightsList: {
-    gap: theme.spacing.xs,
-  },
-  highlightItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  highlightText: {
-    flex: 1,
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.text,
-    fontWeight: '600',
-  },
+    // Highlights
+    highlightsContainer: {
+      padding: appTheme.spacing.md,
+      backgroundColor: ui.surface,
+    },
+    sectionTitle: {
+      ...appTheme.typography.sectionTitle,
+      color: ui.textPrimary,
+      marginBottom: appTheme.spacing.sm,
+    },
+    highlightsList: {
+      gap: appTheme.spacing.xs,
+    },
+    highlightItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: appTheme.spacing.sm,
+    },
+    highlightText: {
+      flex: 1,
+      fontSize: appTheme.fontSize.sm,
+      color: ui.textPrimary,
+      fontWeight: '600',
+    },
 
-  // Search
-  searchBox: {
-    marginHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
-    height: 52,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    fontWeight: '600',
-  },
+    // Search
+    searchBox: {
+      marginHorizontal: appTheme.spacing.md,
+      marginTop: appTheme.spacing.md,
+      height: 52,
+      borderRadius: appTheme.radius.lg,
+      backgroundColor: ui.surface,
+      paddingHorizontal: appTheme.spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: appTheme.spacing.sm,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: appTheme.fontSize.md,
+      color: ui.textPrimary,
+      fontWeight: '600',
+    },
 
-  // Sort
-  sortContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: theme.spacing.md,
-    marginTop: theme.spacing.md,
-    gap: theme.spacing.sm,
-  },
-  sortLabel: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  sortList: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    paddingRight: theme.spacing.md,
-  },
-  sortChip: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  sortChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  sortText: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  sortTextActive: {
-    color: theme.colors.white,
-  },
+    // Sort
+    sortContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingLeft: appTheme.spacing.md,
+      marginTop: appTheme.spacing.md,
+      gap: appTheme.spacing.sm,
+    },
+    sortLabel: {
+      fontSize: appTheme.fontSize.sm,
+      fontWeight: '700',
+      color: ui.textPrimary,
+    },
+    sortList: {
+      flexDirection: 'row',
+      gap: appTheme.spacing.sm,
+      paddingRight: appTheme.spacing.md,
+    },
+    sortChip: {
+      paddingHorizontal: appTheme.spacing.md,
+      paddingVertical: appTheme.spacing.sm,
+      borderRadius: appTheme.radius.md,
+      backgroundColor: ui.surface,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    sortChipActive: {
+      backgroundColor: ui.primary,
+      borderColor: ui.primary,
+    },
+    sortText: {
+      fontSize: appTheme.fontSize.sm,
+      fontWeight: '700',
+      color: ui.textPrimary,
+    },
+    sortTextActive: {
+      color: ui.onPrimary,
+    },
 
-  // Tours
-  toursSection: {
-    paddingHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.lg,
-  },
-  toursGrid: {
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.md,
-  },
-  tourCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.radius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  tourImage: {
-    width: '100%',
-    height: 200,
-    backgroundColor: theme.colors.surface,
-  },
-  discountBadge: {
-    position: 'absolute',
-    top: theme.spacing.sm,
-    right: theme.spacing.sm,
-    backgroundColor: '#DC2626',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.radius.sm,
-  },
-  discountText: {
-    color: theme.colors.white,
-    fontSize: theme.fontSize.xs,
-    fontWeight: '800',
-  },
-  tourContent: {
-    padding: theme.spacing.md,
-  },
-  tourName: {
-    fontSize: theme.fontSize.md,
-    fontWeight: '800',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-    lineHeight: 22,
-  },
-  tourMeta: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    fontWeight: '600',
-  },
-  tourFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: theme.spacing.xs,
-  },
-  oldPrice: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.gray,
-    textDecorationLine: 'line-through',
-    fontWeight: '600',
-  },
-  newPrice: {
-    fontSize: theme.fontSize.md,
-    fontWeight: '800',
-    color: theme.colors.primary,
-  },
-  ratingBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: theme.colors.surface,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.radius.sm,
-  },
-  ratingText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
+    // Tours
+    toursSection: {
+      paddingHorizontal: appTheme.spacing.md,
+      marginTop: appTheme.spacing.lg,
+    },
+    toursGrid: {
+      gap: appTheme.spacing.md,
+      marginTop: appTheme.spacing.md,
+    },
+    tourCard: {
+      backgroundColor: ui.surface,
+      borderRadius: appTheme.radius.lg,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: ui.border,
+      ...appTheme.shadow.sm,
+    },
+    tourImage: {
+      width: '100%',
+      height: 200,
+      backgroundColor: ui.mutedSurface,
+    },
+    discountBadge: {
+      position: 'absolute',
+      top: appTheme.spacing.sm,
+      right: appTheme.spacing.sm,
+      backgroundColor: ui.danger,
+      paddingHorizontal: appTheme.spacing.sm,
+      paddingVertical: 4,
+      borderRadius: appTheme.radius.sm,
+    },
+    discountText: {
+      color: '#ffffff',
+      fontSize: appTheme.fontSize.xs,
+      fontWeight: '800',
+    },
+    tourContent: {
+      padding: appTheme.spacing.md,
+    },
+    tourName: {
+      fontSize: appTheme.fontSize.md,
+      fontWeight: '800',
+      color: ui.textPrimary,
+      marginBottom: appTheme.spacing.sm,
+      lineHeight: 22,
+    },
+    tourMeta: {
+      flexDirection: 'row',
+      gap: appTheme.spacing.md,
+      marginBottom: appTheme.spacing.sm,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    metaText: {
+      fontSize: appTheme.fontSize.xs,
+      color: ui.textSecondary,
+      fontWeight: '600',
+    },
+    tourFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: appTheme.spacing.xs,
+    },
+    oldPrice: {
+      fontSize: appTheme.fontSize.xs,
+      color: ui.textSecondary,
+      textDecorationLine: 'line-through',
+      fontWeight: '600',
+    },
+    newPrice: {
+      fontSize: appTheme.fontSize.md,
+      fontWeight: '800',
+      color: ui.primary,
+    },
+    ratingBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: ui.mutedSurface,
+      paddingHorizontal: appTheme.spacing.sm,
+      paddingVertical: 4,
+      borderRadius: appTheme.radius.sm,
+      borderWidth: 1,
+      borderColor: ui.border,
+    },
+    ratingText: {
+      fontSize: appTheme.fontSize.xs,
+      fontWeight: '700',
+      color: ui.textPrimary,
+    },
 
-  // Empty State
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: theme.spacing.xl * 2,
-  },
-  emptyTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: '700',
-    color: theme.colors.text,
-    marginTop: theme.spacing.md,
-  },
-  emptyDesc: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.gray,
-    marginTop: theme.spacing.xs,
-    textAlign: 'center',
-    paddingHorizontal: theme.spacing.xl,
-    fontWeight: '600',
-  },
-});
+    // Empty State
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: appTheme.spacing.xl * 2,
+    },
+    emptyTitle: {
+      fontSize: appTheme.fontSize.lg,
+      fontWeight: '700',
+      color: ui.textPrimary,
+      marginTop: appTheme.spacing.md,
+    },
+    emptyDesc: {
+      fontSize: appTheme.fontSize.sm,
+      color: ui.textSecondary,
+      marginTop: appTheme.spacing.xs,
+      textAlign: 'center',
+      paddingHorizontal: appTheme.spacing.xl,
+      fontWeight: '600',
+    },
+  });
+}

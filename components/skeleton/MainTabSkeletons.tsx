@@ -1,10 +1,12 @@
 import React from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
+import { useAppTheme } from "../../context/ThemeModeContext";
 import theme from "../../config/theme";
 import SkeletonBlock from "./SkeletonBlock";
 
 export function TourCardSkeletonGrid({ count = 6 }: { count?: number }) {
+  const theme = useAppTheme();
   return (
     <View style={styles.grid}>
       {Array.from({ length: count }).map((_, index) => (
@@ -21,6 +23,7 @@ export function TourCardSkeletonGrid({ count = 6 }: { count?: number }) {
 }
 
 export function FavouriteCardSkeletonGrid({ count = 4 }: { count?: number }) {
+  const theme = useAppTheme();
   return (
     <View style={styles.grid}>
       {Array.from({ length: count }).map((_, index) => (
@@ -36,6 +39,7 @@ export function FavouriteCardSkeletonGrid({ count = 4 }: { count?: number }) {
 }
 
 export function InboxItemSkeletonList({ count = 6 }: { count?: number }) {
+  const theme = useAppTheme();
   return (
     <View style={styles.inboxList}>
       {Array.from({ length: count }).map((_, index) => (
@@ -56,6 +60,7 @@ export function InboxItemSkeletonList({ count = 6 }: { count?: number }) {
 }
 
 export function HomeContentSkeleton() {
+  const theme = useAppTheme();
   return (
     <View style={styles.contentSection}>
       <View style={styles.sectionHeaderRow}>
@@ -68,6 +73,7 @@ export function HomeContentSkeleton() {
 }
 
 export function FavouriteContentSkeleton() {
+  const theme = useAppTheme();
   return (
     <View style={styles.contentSection}>
       <FavouriteCardSkeletonGrid />
@@ -76,10 +82,17 @@ export function FavouriteContentSkeleton() {
 }
 
 export function ExploreTourSkeletonList({ count = 3 }: { count?: number }) {
+  const theme = useAppTheme();
   return (
     <View style={styles.exploreList}>
       {Array.from({ length: count }).map((_, index) => (
-        <View key={index} style={styles.exploreCard}>
+        <View
+          key={index}
+          style={[
+            styles.exploreCard,
+            { backgroundColor: theme.semantic.screenSurface },
+          ]}
+        >
           <SkeletonBlock style={styles.exploreImage} />
           <View style={styles.exploreContent}>
             <SkeletonBlock style={styles.exploreTitle} />
@@ -97,6 +110,7 @@ export function ExploreTourSkeletonList({ count = 3 }: { count?: number }) {
 }
 
 export function TourSearchSuggestionsSkeleton() {
+  const theme = useAppTheme();
   return (
     <View style={styles.searchSuggestionWrap}>
       <View style={styles.searchSuggestionHeader}>
@@ -114,6 +128,7 @@ export function TourSearchSuggestionsSkeleton() {
 }
 
 export function ChatTimelineSkeletonList({ count = 5 }: { count?: number }) {
+  const theme = useAppTheme();
   return (
     <View style={styles.chatList}>
       {Array.from({ length: count }).map((_, index) => (
@@ -131,10 +146,17 @@ export function ChatTimelineSkeletonList({ count = 5 }: { count?: number }) {
 }
 
 export function BookingCardSkeletonList({ count = 3 }: { count?: number }) {
+  const theme = useAppTheme();
   return (
     <View style={styles.bookingList}>
       {Array.from({ length: count }).map((_, index) => (
-        <View key={index} style={styles.bookingCard}>
+        <View
+          key={index}
+          style={[
+            styles.bookingCard,
+            { backgroundColor: theme.semantic.screenSurface },
+          ]}
+        >
           <View style={styles.bookingHeader}>
             <SkeletonBlock style={styles.bookingTitle} />
             <SkeletonBlock style={styles.bookingBadge} />
@@ -152,10 +174,19 @@ export function BookingCardSkeletonList({ count = 3 }: { count?: number }) {
 }
 
 export function TourDetailSkeleton() {
+  const theme = useAppTheme();
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScreen}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.detailScreen}
+    >
       <SkeletonBlock style={styles.detailHero} />
-      <View style={styles.detailCard}>
+      <View
+        style={[
+          styles.detailCard,
+          { backgroundColor: theme.semantic.screenSurface },
+        ]}
+      >
         <SkeletonBlock style={styles.detailMeta} />
         <View style={styles.detailRow}>
           <SkeletonBlock style={styles.detailTitle} />
@@ -176,7 +207,12 @@ export function TourDetailSkeleton() {
         <SkeletonBlock style={styles.detailParagraph} />
         <SkeletonBlock style={styles.detailParagraph} />
         <SkeletonBlock style={styles.detailParagraphShort} />
-        <View style={styles.detailInfoCard}>
+        <View
+          style={[
+            styles.detailInfoCard,
+            { backgroundColor: theme.semantic.screenSurface },
+          ]}
+        >
           <SkeletonBlock style={styles.detailLine} />
           <SkeletonBlock style={styles.detailLineShort} />
           <SkeletonBlock style={styles.detailLine} />
@@ -187,8 +223,12 @@ export function TourDetailSkeleton() {
 }
 
 export function HomeScreenSkeleton() {
+  const theme = useAppTheme();
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.homeScreen}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.homeScreen}
+    >
       <View style={styles.homeHeader}>
         <SkeletonBlock style={styles.heroTitle} />
         <SkeletonBlock style={styles.heroSubtitle} />
@@ -205,8 +245,12 @@ export function HomeScreenSkeleton() {
 }
 
 export function FavouriteScreenSkeleton() {
+  const theme = useAppTheme();
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.screen}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.screen}
+    >
       <SkeletonBlock style={styles.pageTitle} />
       <SkeletonBlock style={styles.pageSubtitle} />
       <View style={styles.categoryRow}>
@@ -220,8 +264,12 @@ export function FavouriteScreenSkeleton() {
 }
 
 export function InboxScreenSkeleton() {
+  const theme = useAppTheme();
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.screen}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.screen}
+    >
       <SkeletonBlock style={styles.pageTitle} />
       <SkeletonBlock style={styles.pageSubtitleWide} />
       <View style={styles.tabRow}>
@@ -432,7 +480,6 @@ const styles = StyleSheet.create({
   exploreCard: {
     borderRadius: 24,
     overflow: "hidden",
-    backgroundColor: theme.colors.white,
   },
   exploreImage: {
     width: "100%",
@@ -506,8 +553,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   bookingCard: {
-    borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.white,
+    borderRadius: 24, // Use a fixed value or move to dynamic if needed, but 24 is xl in base theme
     padding: 16,
     gap: 10,
   },
@@ -556,11 +602,10 @@ const styles = StyleSheet.create({
     borderRadius: 0,
   },
   detailCard: {
-    marginHorizontal: theme.spacing.md,
+    marginHorizontal: 16, // theme.spacing.md is 16
     marginTop: -40,
-    borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.white,
-    padding: theme.spacing.lg,
+    borderRadius: 24, // theme.radius.xl is 24
+    padding: 24, // theme.spacing.lg is 24
     gap: 14,
   },
   detailMeta: {
@@ -625,9 +670,8 @@ const styles = StyleSheet.create({
     height: 14,
   },
   detailInfoCard: {
-    borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.white,
-    padding: theme.spacing.lg,
+    borderRadius: 24, // theme.radius.xl is 24
+    padding: 24, // theme.spacing.lg is 24
     gap: 12,
   },
   detailLine: {

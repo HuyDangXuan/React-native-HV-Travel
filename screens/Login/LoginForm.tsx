@@ -175,7 +175,9 @@ export default function LoginForm({ forceLogin, setForceLogin }: Props) {
           onChangeText={(text) => {
             setEmail(text);
             if (errors.email) {
-              setErrors((prev) => ({ ...prev, email: undefined }));
+              const { error } = loginSchema.validate({ email: text, password }, { abortEarly: true });
+              const fieldError = error?.details.find((detail) => detail.path[0] === "email");
+              setErrors((prev) => ({ ...prev, email: fieldError?.message }));
             }
           }}
           onBlur={() => validateField("email", email)}

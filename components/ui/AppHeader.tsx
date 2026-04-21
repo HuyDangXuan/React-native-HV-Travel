@@ -80,7 +80,10 @@ export default function AppHeader({
           <Text
             style={[
               isHero ? theme.typography.heroTitle : theme.typography.pageTitle,
-              { color: isOverlay ? theme.colors.white : theme.semantic.textPrimary },
+              {
+                color: isOverlay ? theme.colors.white : theme.semantic.textPrimary,
+                textAlign: "center",
+              },
               titleStyle,
             ]}
             numberOfLines={2}
@@ -91,7 +94,10 @@ export default function AppHeader({
             <Text
               style={[
                 isOverlay ? styles.overlaySubtitle : theme.typography.body,
-                { color: isOverlay ? "rgba(255,255,255,0.9)" : theme.semantic.textSecondary },
+                {
+                  color: isOverlay ? "rgba(255,255,255,0.9)" : theme.semantic.textSecondary,
+                  textAlign: "center",
+                },
                 subtitleStyle,
               ]}
               numberOfLines={2}
@@ -130,6 +136,8 @@ const styles = StyleSheet.create({
   },
   titleWrap: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   heroTitleWrap: {
     paddingTop: 2,

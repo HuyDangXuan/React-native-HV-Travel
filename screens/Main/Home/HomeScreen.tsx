@@ -485,7 +485,8 @@ export default function HomeScreen() {
   const fetchHomeData = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const tourList = await TourService.getTours();
+      if (!token) return;
+      const tourList = await TourService.getTours(token);
 
       const mappedTours: TourCard[] = tourList.map((tour: Tour) => {
         const adultPrice = extractNumber(tour?.price?.adult);

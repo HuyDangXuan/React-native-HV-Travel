@@ -3,11 +3,12 @@ import Joi from "joi";
 /* ========= REUSABLE FIELDS ========= */
 
 export const emailField = Joi.string()
-  .email({ tlds: false })
+  .trim()
+  .pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)
   .required()
   .messages({
     "string.empty": "Vui lòng nhập email!",
-    "string.email": "Email không hợp lệ!",
+    "string.pattern.base": "Email không đúng định dạng (VD: example@gmail.com)!",
     "any.required": "Email là bắt buộc!",
   });
 

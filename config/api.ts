@@ -1,5 +1,5 @@
 const base_url = "https://hv-travel-api.vercel.app/api";
-//const base_url = "http://192.168.10.4:4000/api";
+// const base_url = "http://192.168.110.22:4000/api";
 
 const api = {
   check_connect_db: base_url + "/test",
@@ -43,7 +43,10 @@ const api = {
   mark_notification_read: (id: string) => `${base_url}/notifications/${id}/read`,
 
   get_chat_conversations: base_url + "/chat/conversations",
+  create_chat_conversation: base_url + "/chat/conversations",
   get_chat_messages: (conversationId: string) =>
+    `${base_url}/chat/conversations/${conversationId}/messages`,
+  send_chat_message: (conversationId: string) =>
     `${base_url}/chat/conversations/${conversationId}/messages`,
   mark_chat_conversation_read: (conversationId: string) =>
     `${base_url}/chat/conversations/${conversationId}/read`,

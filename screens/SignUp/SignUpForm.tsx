@@ -136,7 +136,12 @@ export default function SignUpForm() {
         onChangeText={(text) => {
           setEmail(text);
           if (errors.email) {
-            setErrors((prev) => ({ ...prev, email: undefined }));
+            const { error } = registerSchema.validate(
+              { fullName, email: text, password, rePassword },
+              { abortEarly: false }
+            );
+            const fieldError = error?.details.find((e) => e.path[0] === "email");
+            setErrors((prev) => ({ ...prev, email: fieldError?.message }));
           }
         }}
         onBlur={() => validateField("email")}

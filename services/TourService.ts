@@ -3,13 +3,21 @@ import api from "../config/api";
 import { normalizeTour, normalizeTours } from "./dataAdapters";
 
 export class TourService {
-  static getTours = async () => {
-    const response = await ApiService.fetchWithTimeout(api.get_list_tours);
+  static getTours = async (authToken: string) => {
+    const response = await ApiService.fetchWithTimeout(api.get_list_tours, {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
     return normalizeTours(response);
   };
 
-  static getTourDetail = async (id: string) => {
-    const response = await ApiService.fetchWithTimeout(api.get_tour_detail(id));
+  static getTourDetail = async (id: string, authToken: string) => {
+    const response = await ApiService.fetchWithTimeout(api.get_tour_detail(id), {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
     return normalizeTour(response?.data ?? response);
   };
 

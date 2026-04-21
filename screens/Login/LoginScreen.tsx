@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 
@@ -15,7 +15,13 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
-      <View style={[styles.container, { padding: theme.spacing.md }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { padding: theme.spacing.md }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="automatic"
+      >
         <LoginHeader
           showBack={forceLogin}
           onBack={() => setForceLogin(false)}
@@ -23,7 +29,7 @@ export default function LoginScreen() {
         />
         <LoginForm forceLogin={forceLogin} setForceLogin={setForceLogin} />
         <LoginFooter />
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

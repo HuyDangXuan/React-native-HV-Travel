@@ -1,6 +1,6 @@
 import { SafeAreaView } from "react-native-safe-area-context";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, ScrollView, View } from "react-native";
 
 import SignUpHeader from "./SignUpHeader";
 import SignUpForm from "./SignUpForm";
@@ -12,11 +12,17 @@ export default function SignUpScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.semantic.screenSurface }]}>
-      <View style={[styles.container, { padding: theme.spacing.md }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { padding: theme.spacing.md }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="automatic"
+      >
         <SignUpHeader />
         <SignUpForm />
         <SignUpFooter />
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

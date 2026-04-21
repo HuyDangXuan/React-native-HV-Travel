@@ -41,6 +41,7 @@ import MyBookingScreen from "./screens/Main/Setting/MyBooking/MyBookingScreen";
 import ProfileScreen from "./screens/Main/Setting/Profile/ProfileScreen";
 import EditProfileScreen from "./screens/Main/Setting/Profile/EditProfile/EditProfileScreen";
 import SecurityScreen from "./screens/Main/Setting/Security/SecurityScreen";
+import QrQuickLoginScreen from "./screens/Main/Setting/QrQuickLogin/QrQuickLoginScreen";
 import LanguageScreen from "./screens/Main/Setting/Language/LanguageScreen";
 import AppearanceScreen from "./screens/Main/Setting/Appearance/AppearanceScreen";
 import HelpScreen from "./screens/Main/Setting/Help/HelpScreen";
@@ -181,6 +182,7 @@ function AppShell() {
           />
           <Stack.Screen name="MyBookingScreen" component={MyBookingScreen} />
           <Stack.Screen name="SecurityScreen" component={SecurityScreen} />
+          <Stack.Screen name="QrQuickLoginScreen" component={QrQuickLoginScreen} />
           <Stack.Screen name="LanguageScreen" component={LanguageScreen} />
           <Stack.Screen name="AppearanceScreen" component={AppearanceScreen} />
           <Stack.Screen name="HelpScreen" component={HelpScreen} />

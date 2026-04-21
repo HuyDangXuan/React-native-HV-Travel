@@ -139,8 +139,18 @@ export default function CreateNewPasswordScreen() {
           value={newPassword}
           onChangeText={(text) => {
             setNewPassword(text);
-            if (errors.newPassword) {
-              setErrors((prev) => ({ ...prev, newPassword: undefined }));
+            if (errors.newPassword || errors.reNewPassword) {
+              const { error } = resetPasswordSchema.validate(
+                { newPassword: text, reNewPassword },
+                { abortEarly: false }
+              );
+              const passErr = error?.details.find((d) => d.path[0] === "newPassword");
+              const rePassErr = error?.details.find((d) => d.path[0] === "reNewPassword");
+              setErrors((prev) => ({
+                ...prev,
+                newPassword: passErr?.message,
+                reNewPassword: rePassErr?.message,
+              }));
             }
           }}
           onBlur={() => validateField("newPassword")}
@@ -154,7 +164,12 @@ export default function CreateNewPasswordScreen() {
           onChangeText={(text) => {
             setReNewPassword(text);
             if (errors.reNewPassword) {
-              setErrors((prev) => ({ ...prev, reNewPassword: undefined }));
+              const { error } = resetPasswordSchema.validate(
+                { newPassword, reNewPassword: text },
+                { abortEarly: false }
+              );
+              const fieldError = error?.details.find((d) => d.path[0] === "reNewPassword");
+              setErrors((prev) => ({ ...prev, reNewPassword: fieldError?.message }));
             }
           }}
           onBlur={() => validateField("reNewPassword")}
