@@ -18,6 +18,12 @@ import { useAuth } from "../../../../context/AuthContext";
 import { useI18n } from "../../../../context/I18nContext";
 import { useAppTheme, useThemeMode } from "../../../../context/ThemeModeContext";
 import { BookingService } from "../../../../services/BookingService";
+import { PaymentService } from "../../../../services/PaymentService";
+import {
+  buildMomoPaymentRouteParams,
+  buildPaymentResultResetState,
+  buildZaloPayPaymentRouteParams,
+} from "../../../../utils/paymentNavigation";
 import LoadingOverlay from "../../../Loading/LoadingOverlay";
 import { MessageBoxService } from "../../../MessageBox/MessageBoxService";
 
@@ -178,6 +184,21 @@ export default function PaymentMethodScreen() {
     return passengers;
   };
 
+  const buildBookingPayload = () => ({
+    tourId: tourId || "",
+    passengers: generatePassengers(),
+    contactInfo: {
+      name: params?.contactInfo?.name || "",
+      email: params?.contactInfo?.email || "",
+      phone: params?.contactInfo?.phone || "",
+      selectedDate: params?.contactInfo?.selectedDate || "",
+    },
+    adultCount: params?.adults || 0,
+    childCount: params?.children || 0,
+    infantCount: params?.infants || 0,
+    notes: params?.contactInfo?.notes || "",
+  });
+
   const processBookingAndNavigate = async (methodId: string) => {
     if (!token) {
       MessageBoxService.error(
@@ -190,22 +211,7 @@ export default function PaymentMethodScreen() {
 
     setIsLoading(true);
     try {
-      const bookingData = {
-        tourId: tourId || "",
-        passengers: generatePassengers(),
-        contactInfo: {
-          name: params?.contactInfo?.name || "",
-          email: params?.contactInfo?.email || "",
-          phone: params?.contactInfo?.phone || "",
-          selectedDate: params?.contactInfo?.selectedDate || "",
-        },
-        adultCount: params?.adults || 0,
-        childCount: params?.children || 0,
-        infantCount: params?.infants || 0,
-        notes: params?.contactInfo?.notes || "",
-      };
-
-      const booking = await BookingService.createBooking(token, bookingData);
+      const booking = await BookingService.createBooking(token, buildBookingPayload());
       if (!booking) {
         MessageBoxService.error(
           t("paymentMethod.errors.bookingTitle"),
@@ -216,15 +222,133 @@ export default function PaymentMethodScreen() {
       }
 
       const newOrderId = booking.bookingCode || orderId;
-      navigation.navigate("PaymentSuccessScreen", {
-        id: tourId,
-        total,
-        amountText,
-        orderId: newOrderId,
-        method: methodId,
-      });
+      navigation.reset(
+        buildPaymentResultResetState("PaymentSuccessScreen", {
+          id: tourId,
+          total,
+          amountText,
+          orderId: newOrderId,
+          method: methodId,
+        })
+      );
     } catch (error: any) {
       console.log("Create booking error:", error);
+      MessageBoxService.error(
+        t("paymentMethod.errors.connectionTitle"),
+        error?.message || t("paymentMethod.errors.connectionMessage"),
+        t("common.ok")
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processMoMoPayment = async () => {
+    if (!token) {
+      MessageBoxService.error(
+        t("paymentMethod.errors.authTitle"),
+        t("paymentMethod.errors.authMessage"),
+        t("common.ok")
+      );
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const booking = await BookingService.createBooking(token, buildBookingPayload());
+      if (!booking) {
+        MessageBoxService.error(
+          t("paymentMethod.errors.bookingTitle"),
+          t("paymentMethod.errors.bookingMessage"),
+          t("common.ok")
+        );
+        return;
+      }
+
+      const bookingId = booking.id || (booking as any)._id || "";
+      if (!bookingId) {
+        MessageBoxService.error(
+          t("paymentMethod.errors.bookingTitle"),
+          t("paymentMethod.errors.bookingMessage"),
+          t("common.ok")
+        );
+        return;
+      }
+
+      const bookingCode = booking.bookingCode || orderId;
+      const payment = await PaymentService.createMomoPayment(token, { bookingId });
+
+      navigation.navigate(
+        "MoMoScreen",
+        buildMomoPaymentRouteParams({
+          tourId,
+          total,
+          amountText,
+          bookingId,
+          bookingCode,
+          payment,
+        })
+      );
+    } catch (error: any) {
+      console.log("Create MoMo payment error:", error);
+      MessageBoxService.error(
+        t("paymentMethod.errors.connectionTitle"),
+        error?.message || t("paymentMethod.errors.connectionMessage"),
+        t("common.ok")
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processZaloPayPayment = async () => {
+    if (!token) {
+      MessageBoxService.error(
+        t("paymentMethod.errors.authTitle"),
+        t("paymentMethod.errors.authMessage"),
+        t("common.ok")
+      );
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const booking = await BookingService.createBooking(token, buildBookingPayload());
+      if (!booking) {
+        MessageBoxService.error(
+          t("paymentMethod.errors.bookingTitle"),
+          t("paymentMethod.errors.bookingMessage"),
+          t("common.ok")
+        );
+        return;
+      }
+
+      const bookingId = booking.id || (booking as any)._id || "";
+      if (!bookingId) {
+        MessageBoxService.error(
+          t("paymentMethod.errors.bookingTitle"),
+          t("paymentMethod.errors.bookingMessage"),
+          t("common.ok")
+        );
+        return;
+      }
+
+      const bookingCode = booking.bookingCode || orderId;
+      const payment = await PaymentService.createZaloPayPayment(token, { bookingId });
+
+      navigation.navigate(
+        "ZaloPayScreen",
+        buildZaloPayPaymentRouteParams({
+          tourId,
+          total,
+          amountText,
+          bookingId,
+          bookingCode,
+          payment,
+        })
+      );
+    } catch (error: any) {
+      console.log("Create ZaloPay payment error:", error);
       MessageBoxService.error(
         t("paymentMethod.errors.connectionTitle"),
         error?.message || t("paymentMethod.errors.connectionMessage"),
@@ -238,13 +362,13 @@ export default function PaymentMethodScreen() {
   const handleMethodPress = (method: Method) => {
     switch (method.id) {
       case "zalopay":
-        processBookingAndNavigate("ZaloPay");
+        processZaloPayPayment();
         break;
       case "vnpay":
         processBookingAndNavigate("VNPay");
         break;
       case "momo":
-        processBookingAndNavigate("MoMo");
+        processMoMoPayment();
         break;
       case "bank":
         setShowBankModal(true);

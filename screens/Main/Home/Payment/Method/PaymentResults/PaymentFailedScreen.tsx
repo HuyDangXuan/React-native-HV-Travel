@@ -5,6 +5,10 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 
 import { useI18n } from "../../../../../../context/I18nContext";
 import { useAppTheme } from "../../../../../../context/ThemeModeContext";
+import {
+  buildMainTabsResetState,
+  buildMyBookingResetState,
+} from "../../../../../../utils/paymentNavigation";
 import ResultScreenLayout, {
   ResultCard,
 } from "../../../../../../components/ui/ResultScreenLayout";
@@ -76,18 +80,12 @@ export default function PaymentFailedScreen() {
       footerActions={[
         {
           label: t("paymentResult.failed.actions.home"),
-          onPress: () => navigation.navigate("MainTabs"),
+          onPress: () => navigation.reset(buildMainTabsResetState()),
           variant: "secondary",
         },
         {
-          label: t("paymentResult.failed.actions.retry"),
-          onPress: () =>
-            navigation.navigate("PaymentMethodScreen", {
-              id: tourId,
-              total,
-              amountText,
-              orderId,
-            }),
+          label: t("paymentResult.failed.actions.viewOrder"),
+          onPress: () => navigation.reset(buildMyBookingResetState()),
         },
       ]}
     >
@@ -145,7 +143,7 @@ export default function PaymentFailedScreen() {
         />
         <Step
           icon="card-outline"
-          text={t("paymentResult.failed.solutions.alternateMethod")}
+          text={t("paymentResult.failed.solutions.bookingStatus")}
           ui={ui}
           sheet={sheet}
         />

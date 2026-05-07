@@ -7,11 +7,12 @@ exports.changePasswordSchema = exports.resetPasswordSchema = exports.verifyOtpSc
 const joi_1 = __importDefault(require("joi"));
 /* ========= REUSABLE FIELDS ========= */
 exports.emailField = joi_1.default.string()
-    .email({ tlds: false })
+    .trim()
+    .pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)
     .required()
     .messages({
     "string.empty": "Vui lòng nhập email!",
-    "string.email": "Email không hợp lệ!",
+    "string.pattern.base": "Email không đúng định dạng (VD: example@gmail.com)!",
     "any.required": "Email là bắt buộc!",
 });
 exports.fullNameField = joi_1.default.string()

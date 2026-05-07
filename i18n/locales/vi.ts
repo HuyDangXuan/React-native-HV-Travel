@@ -497,13 +497,13 @@ const vi = {
       },
       solutionTitle: "Gợi ý xử lý",
       solutions: {
-        review: "Kiểm tra lại số dư, thời gian hiệu lực hoặc kết nối mạng.",
-        alternateMethod: "Thử lại với một phương thức thanh toán khác.",
-        support: "Liên hệ bộ phận hỗ trợ nếu giao dịch đã bị trừ tiền.",
+        review: "Kiểm tra lại kết nối, thời gian xử lý và xác nhận xem giao dịch có bị trừ tiền hay chưa.",
+        bookingStatus: "Mở mục chuyến đi đã đặt để kiểm tra booking hiện có trước khi thao tác tiếp.",
+        support: "Liên hệ bộ phận hỗ trợ nếu cần xác minh trạng thái booking hoặc giao dịch.",
       },
       actions: {
         home: "Về trang chủ",
-        retry: "Thử lại",
+        viewOrder: "Xem đơn hàng",
       },
       reasons: {
         timeout: {

@@ -495,13 +495,13 @@ const en = {
       },
       solutionTitle: "Suggested next steps",
       solutions: {
-        review: "Review your balance, validity window, or network connection.",
-        alternateMethod: "Try again using another payment method.",
-        support: "Contact support if money was deducted but the order is still pending.",
+        review: "Review your connection, the processing window, and whether money was already deducted.",
+        bookingStatus: "Open Booked Trips to check the existing booking before taking any further action.",
+        support: "Contact support if you need to verify the booking or transaction status.",
       },
       actions: {
         home: "Back to home",
-        retry: "Try again",
+        viewOrder: "View order",
       },
       reasons: {
         timeout: {
