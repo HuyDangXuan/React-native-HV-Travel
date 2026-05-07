@@ -920,7 +920,7 @@ function createStyles(ui: {
       right: 0,
       zIndex: 200,
       elevation: 200,
-      paddingTop: 6,
+      paddingTop: 5,
     },
     galleryHeaderInner: {
       flexDirection: "row",

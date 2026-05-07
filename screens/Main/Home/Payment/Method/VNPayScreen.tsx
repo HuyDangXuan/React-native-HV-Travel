@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 
 import { useI18n } from "../../../../../context/I18nContext";
 import { useAppTheme, useThemeMode } from "../../../../../context/ThemeModeContext";
+import { buildPaymentResultResetState } from "../../../../../utils/paymentNavigation";
 
 type RouteParams = {
   id?: string;
@@ -90,14 +91,16 @@ export default function VNPayScreen() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigation.replace("PaymentFailedScreen", {
-            reason: "timeout",
-            method: "VNPay",
-            orderId,
-            id: tourId,
-            total,
-            amountText,
-          });
+          navigation.reset(
+            buildPaymentResultResetState("PaymentFailedScreen", {
+              reason: "timeout",
+              method: "VNPay",
+              orderId,
+              id: tourId,
+              total,
+              amountText,
+            })
+          );
           return 0;
         }
         return prev - 1;
@@ -123,14 +126,16 @@ export default function VNPayScreen() {
     setTimeout(() => {
       setIsProcessing(false);
 
-      navigation.replace("PaymentFailedScreen", {
-        reason: "failed",
-        method: "VNPay",
-        orderId,
-        id: tourId,
-        total,
-        amountText,
-      });
+      navigation.reset(
+        buildPaymentResultResetState("PaymentFailedScreen", {
+          reason: "failed",
+          method: "VNPay",
+          orderId,
+          id: tourId,
+          total,
+          amountText,
+        })
+      );
     }, 2000);
   };
 

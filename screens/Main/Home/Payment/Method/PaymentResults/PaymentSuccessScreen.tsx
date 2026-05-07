@@ -5,6 +5,10 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 
 import { useI18n } from "../../../../../../context/I18nContext";
 import { useAppTheme } from "../../../../../../context/ThemeModeContext";
+import {
+  buildMainTabsResetState,
+  buildMyBookingResetState,
+} from "../../../../../../utils/paymentNavigation";
 import ResultScreenLayout, {
   ResultCard,
 } from "../../../../../../components/ui/ResultScreenLayout";
@@ -74,15 +78,12 @@ export default function PaymentSuccessScreen() {
       footerActions={[
         {
           label: t("paymentResult.success.actions.viewOrder"),
-          onPress: () => {
-            navigation.replace("MainTabs");
-            setTimeout(() => navigation.navigate("MyBookingScreen"), 100);
-          },
+          onPress: () => navigation.reset(buildMyBookingResetState()),
           variant: "secondary",
         },
         {
           label: t("paymentResult.success.actions.home"),
-          onPress: () => navigation.replace("MainTabs"),
+          onPress: () => navigation.reset(buildMainTabsResetState()),
         },
       ]}
     >

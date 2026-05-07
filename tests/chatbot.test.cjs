@@ -1,3 +1,19 @@
+jest.mock("expo-secure-store", () => ({
+  AFTER_FIRST_UNLOCK: "after-first-unlock",
+  getItemAsync: jest.fn(async () => null),
+  setItemAsync: jest.fn(async () => undefined),
+  deleteItemAsync: jest.fn(async () => undefined),
+}));
+
+jest.mock("@react-native-async-storage/async-storage", () => ({
+  __esModule: true,
+  default: {
+    getItem: jest.fn(async () => null),
+    setItem: jest.fn(async () => undefined),
+    removeItem: jest.fn(async () => undefined),
+  },
+}));
+
 const apiModule = require("../.test-dist/config/api");
 const { ApiService } = require("../.test-dist/services/ApiService");
 const { chatWithTour } = require("../.test-dist/services/ChatbotService");

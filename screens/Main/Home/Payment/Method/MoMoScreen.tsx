@@ -1,6 +1,9 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
+  Image,
+  Linking,
   View,
   Text,
   StyleSheet,
@@ -12,14 +15,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 
+import { useAuth } from "../../../../../context/AuthContext";
 import { useI18n } from "../../../../../context/I18nContext";
 import { useAppTheme, useThemeMode } from "../../../../../context/ThemeModeContext";
+import { PaymentService } from "../../../../../services/PaymentService";
+import { buildPaymentResultResetState } from "../../../../../utils/paymentNavigation";
+import { MessageBoxService } from "../../../../MessageBox/MessageBoxService";
 
 type RouteParams = {
   id?: string;
   total?: number;
   amountText?: string;
   orderId?: string;
+  bookingId?: string;
+  paymentId?: string;
+  momoOrderId?: string;
+  requestId?: string;
+  paymentStatus?: string;
+  payUrl?: string;
+  deeplink?: string;
+  qrCodeUrl?: string;
 };
 
 type UiTokens = {
@@ -51,6 +66,7 @@ const formatVND = (locale: string, value: number) =>
 export default function MoMoScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { token } = useAuth();
   const { locale, t } = useI18n();
   const appTheme = useAppTheme();
   const { themeName } = useThemeMode();
@@ -77,27 +93,40 @@ export default function MoMoScreen() {
   const tourId = params?.id;
   const total = typeof params?.total === "number" ? params.total : 0;
   const orderId = params?.orderId || `DL${Date.now()}`;
+  const paymentId = params?.paymentId || "";
+  const momoOrderId = params?.momoOrderId || "";
+  const qrCodeUrl = params?.qrCodeUrl || "";
 
   const amountText = useMemo(() => {
     return params?.amountText || formatVND(locale, total);
   }, [locale, params?.amountText, total]);
 
+  const paymentLinks = useMemo(() => {
+    return [params?.deeplink, params?.payUrl]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .filter((value, index, list) => list.indexOf(value) === index);
+  }, [params?.deeplink, params?.payUrl]);
+
   const [timeLeft, setTimeLeft] = useState(600);
   const [isProcessing, setIsProcessing] = useState(false);
+  const hasOpenedPaymentRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigation.replace("PaymentFailedScreen", {
-            reason: "timeout",
-            method: "MoMo",
-            orderId,
-            id: tourId,
-            total,
-            amountText,
-          });
+          navigation.reset(
+            buildPaymentResultResetState("PaymentFailedScreen", {
+              reason: "timeout",
+              method: "MoMo",
+              orderId,
+              id: tourId,
+              total,
+              amountText,
+            })
+          );
           return 0;
         }
         return prev - 1;
@@ -113,24 +142,129 @@ export default function MoMoScreen() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const openMoMoPayment = useCallback(async () => {
+    for (const link of paymentLinks) {
+      try {
+        const canOpen = link.startsWith("http") || (await Linking.canOpenURL(link));
+        if (canOpen) {
+          await Linking.openURL(link);
+          return true;
+        }
+      } catch (error) {
+        console.log("Open MoMo payment link error:", error);
+      }
+    }
+
+    MessageBoxService.error(
+      t("common.error"),
+      t("paymentMethod.errors.connectionMessage"),
+      t("common.ok")
+    );
+    return false;
+  }, [paymentLinks, t]);
+
+  const navigateToFailure = useCallback(
+    (reason = "unknown") => {
+      navigation.reset(
+        buildPaymentResultResetState("PaymentFailedScreen", {
+          method: "MoMo",
+          orderId,
+          id: tourId,
+          total,
+          amountText,
+          reason,
+        })
+      );
+    },
+    [amountText, navigation, orderId, tourId, total]
+  );
+
+  const navigateToSuccess = useCallback(
+    (transactionId?: string) => {
+      navigation.reset(
+        buildPaymentResultResetState("PaymentSuccessScreen", {
+          method: "MoMo",
+          orderId,
+          id: tourId,
+          total,
+          amountText,
+          transactionId: transactionId || momoOrderId || paymentId,
+        })
+      );
+    },
+    [amountText, momoOrderId, navigation, orderId, paymentId, tourId, total]
+  );
+
+  const checkMomoPayment = useCallback(
+    async ({ sync, silent }: { sync: boolean; silent: boolean }) => {
+      if (!token || !paymentId) {
+        if (!silent) {
+          MessageBoxService.error(
+            t("common.error"),
+            t("paymentMethod.errors.authMessage"),
+            t("common.ok")
+          );
+        }
+        return;
+      }
+
+      try {
+        const payment = sync
+          ? await PaymentService.queryMomoPayment(token, { paymentId })
+          : await PaymentService.getMomoPaymentStatus(token, paymentId);
+
+        if (payment.status === "Success") {
+          navigateToSuccess(payment.transId);
+          return;
+        }
+
+        if (payment.status === "Failed") {
+          navigateToFailure("unknown");
+        }
+      } catch (error: any) {
+        console.log("Check MoMo payment error:", error);
+        if (!silent) {
+          MessageBoxService.error(
+            t("paymentMethod.errors.connectionTitle"),
+            error?.message || t("paymentMethod.errors.connectionMessage"),
+            t("common.ok")
+          );
+        }
+      }
+    },
+    [navigateToFailure, navigateToSuccess, paymentId, t, token]
+  );
+
   const handleOpenMoMoApp = () => {
-    console.log("Opening MoMo app...");
+    openMoMoPayment();
   };
 
-  const handleCheckPayment = () => {
+  const handleCheckPayment = async () => {
     setIsProcessing(true);
-
-    setTimeout(() => {
+    try {
+      await checkMomoPayment({ sync: true, silent: false });
+    } finally {
       setIsProcessing(false);
-      navigation.replace("PaymentSuccessScreen", {
-        method: "MoMo",
-        orderId,
-        id: tourId,
-        total,
-        amountText,
-      });
-    }, 2000);
+    }
   };
+
+  useEffect(() => {
+    if (hasOpenedPaymentRef.current || paymentLinks.length === 0) return;
+    hasOpenedPaymentRef.current = true;
+    openMoMoPayment();
+  }, [openMoMoPayment, paymentLinks.length]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const wasAway = appStateRef.current === "inactive" || appStateRef.current === "background";
+      if (wasAway && nextState === "active") {
+        checkMomoPayment({ sync: false, silent: true });
+      }
+      appStateRef.current = nextState;
+    });
+
+    return () => subscription.remove();
+  }, [checkMomoPayment]);
 
   const createdAt = useMemo(
     () => new Date().toLocaleString(locale === "vi" ? "vi-VN" : "en-US"),
@@ -167,9 +301,13 @@ export default function MoMoScreen() {
         <View style={styles.qrSection}>
           <Text style={styles.sectionTitle}>{t("paymentFlow.momo.qrTitle")}</Text>
           <View style={styles.qrBox}>
-            <View style={styles.qrPlaceholder}>
-              <Ionicons name="qr-code" size={120} color={ui.icon} />
-            </View>
+            {qrCodeUrl ? (
+              <Image source={{ uri: qrCodeUrl }} style={styles.qrImage} resizeMode="contain" />
+            ) : (
+              <View style={styles.qrPlaceholder}>
+                <Ionicons name="qr-code" size={120} color={ui.icon} />
+              </View>
+            )}
             <Text style={styles.qrHint}>{t("paymentFlow.momo.qrHint")}</Text>
           </View>
         </View>
@@ -435,6 +573,11 @@ const createStyles = (ui: UiTokens) =>
       borderRadius: 12,
       alignItems: "center",
       justifyContent: "center",
+      marginBottom: 16,
+    },
+    qrImage: {
+      width: 200,
+      height: 200,
       marginBottom: 16,
     },
     qrHint: { fontSize: 14, color: ui.textSecondary, textAlign: "center" },

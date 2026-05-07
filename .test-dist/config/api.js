@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const base_url = "https://hv-travel-api.vercel.app/api";
-//const base_url = "http://192.168.10.4:4000/api";
+// const base_url = "https://hv-travel-api.vercel.app/api";
+const base_url = "http://192.168.10.19:3000/api";
 const api = {
     check_connect_db: base_url + "/test",
     login: base_url + "/auth/login",
@@ -25,6 +25,12 @@ const api = {
     create_booking: base_url + "/bookings",
     get_payments: base_url + "/payments/list",
     create_payment: base_url + "/payments",
+    create_momo_payment: base_url + "/payments/momo/create",
+    query_momo_payment: base_url + "/payments/momo/query",
+    momo_payment_status: (paymentId) => `${base_url}/payments/momo/${paymentId}/status`,
+    create_zalopay_payment: base_url + "/payments/zalopay/create",
+    query_zalopay_payment: base_url + "/payments/zalopay/query",
+    zalopay_payment_status: (paymentId) => `${base_url}/payments/zalopay/${paymentId}/status`,
     get_reviews_by_tour: (tourId) => `${base_url}/reviews/tour/${tourId}`,
     create_review: base_url + "/reviews",
     get_list_favourites: base_url + "/favourites/list",
@@ -38,6 +44,7 @@ const api = {
     get_chat_messages: (conversationId) => `${base_url}/chat/conversations/${conversationId}/messages`,
     send_chat_message: (conversationId) => `${base_url}/chat/conversations/${conversationId}/messages`,
     mark_chat_conversation_read: (conversationId) => `${base_url}/chat/conversations/${conversationId}/read`,
+    reopen_chat_conversation: (conversationId) => `${base_url}/chat/conversations/${conversationId}/reopen`,
     chatbot: base_url + "/chatbot/tour",
 };
 exports.default = api;

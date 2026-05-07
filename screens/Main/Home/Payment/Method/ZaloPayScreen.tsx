@@ -1,7 +1,9 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,15 +13,29 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
+import QRCode from "react-native-qrcode-svg";
 
+import { useAuth } from "../../../../../context/AuthContext";
 import { useI18n } from "../../../../../context/I18nContext";
 import { useAppTheme, useThemeMode } from "../../../../../context/ThemeModeContext";
+import { PaymentService } from "../../../../../services/PaymentService";
+import { ZaloPayNativeResult, ZaloPayNativeService } from "../../../../../services/ZaloPayNativeService";
+import { buildPaymentResultResetState } from "../../../../../utils/paymentNavigation";
+import { resolveZaloPayPaymentLaunch } from "../../../../../utils/zalopayPaymentLaunch";
+import { MessageBoxService } from "../../../../MessageBox/MessageBoxService";
 
 type RouteParams = {
   id?: string;
   total?: number;
   amountText?: string;
   orderId?: string;
+  bookingId?: string;
+  paymentId?: string;
+  zaloPayAppTransId?: string;
+  paymentStatus?: string;
+  zpTransToken?: string;
+  orderUrl?: string;
+  qrCode?: string;
 };
 
 type UiTokens = {
@@ -51,6 +67,7 @@ const formatVND = (locale: string, value: number) =>
 export default function ZaloPayScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { token } = useAuth();
   const { locale, t } = useI18n();
   const appTheme = useAppTheme();
   const { themeName } = useThemeMode();
@@ -77,6 +94,12 @@ export default function ZaloPayScreen() {
   const tourId = params?.id;
   const total = typeof params?.total === "number" ? params.total : 0;
   const orderId = params?.orderId || `DL${Date.now()}`;
+  const paymentId = params?.paymentId || "";
+  const zaloPayAppTransId = params?.zaloPayAppTransId || "";
+  const zpTransToken = params?.zpTransToken || "";
+  const orderUrl = params?.orderUrl || "";
+  const qrCode = params?.qrCode || "";
+  const qrValue = qrCode || orderUrl;
 
   const amountText = useMemo(
     () => params?.amountText || formatVND(locale, total),
@@ -85,20 +108,25 @@ export default function ZaloPayScreen() {
 
   const [timeLeft, setTimeLeft] = useState(600);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sdkMessage, setSdkMessage] = useState("");
+  const hasOpenedPaymentRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigation.replace("PaymentFailedScreen", {
-            reason: "timeout",
-            method: "ZaloPay",
-            orderId,
-            id: tourId,
-            total,
-            amountText,
-          });
+          navigation.reset(
+            buildPaymentResultResetState("PaymentFailedScreen", {
+              reason: "timeout",
+              method: "ZaloPay",
+              orderId,
+              id: tourId,
+              total,
+              amountText,
+            })
+          );
           return 0;
         }
         return prev - 1;
@@ -119,24 +147,192 @@ export default function ZaloPayScreen() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const navigateToFailure = useCallback(
+    (reason = "unknown") => {
+      navigation.reset(
+        buildPaymentResultResetState("PaymentFailedScreen", {
+          reason,
+          method: "ZaloPay",
+          orderId,
+          id: tourId,
+          total,
+          amountText,
+        })
+      );
+    },
+    [amountText, navigation, orderId, tourId, total]
+  );
+
+  const navigateToSuccess = useCallback(
+    (transactionId?: string) => {
+      navigation.reset(
+        buildPaymentResultResetState("PaymentSuccessScreen", {
+          method: "ZaloPay",
+          orderId,
+          id: tourId,
+          total,
+          amountText,
+          transactionId: transactionId || zaloPayAppTransId || paymentId,
+        })
+      );
+    },
+    [amountText, navigation, orderId, paymentId, tourId, total, zaloPayAppTransId]
+  );
+
+  const checkZaloPayPayment = useCallback(
+    async ({ sync, silent }: { sync: boolean; silent: boolean }) => {
+      if (!token || !paymentId) {
+        if (!silent) {
+          MessageBoxService.error(
+            t("common.error"),
+            t("paymentMethod.errors.authMessage"),
+            t("common.ok")
+          );
+        }
+        return;
+      }
+
+      try {
+        const payment = sync
+          ? await PaymentService.queryZaloPayPayment(token, { paymentId })
+          : await PaymentService.getZaloPayPaymentStatus(token, paymentId);
+
+        if (payment.status === "Success") {
+          navigateToSuccess(payment.transId);
+          return;
+        }
+
+        if (payment.status === "Failed") {
+          navigateToFailure("unknown");
+          return;
+        }
+
+        if (!silent) {
+          setSdkMessage(payment.message || "Giao dich dang cho ZaloPay xac nhan.");
+        }
+      } catch (error: any) {
+        console.log("Check ZaloPay payment error:", error);
+        if (!silent) {
+          MessageBoxService.error(
+            t("paymentMethod.errors.connectionTitle"),
+            error?.message || t("paymentMethod.errors.connectionMessage"),
+            t("common.ok")
+          );
+        }
+      }
+    },
+    [navigateToFailure, navigateToSuccess, paymentId, t, token]
+  );
+
+  const handleNativePaymentResult = useCallback(
+    async (result: ZaloPayNativeResult) => {
+      if (result.returnCode === 1) {
+        setSdkMessage("SDK da tra ket qua thanh cong. Dang xac thuc voi backend.");
+        await checkZaloPayPayment({ sync: true, silent: true });
+        return;
+      }
+
+      if (result.returnCode === 4) {
+        setSdkMessage("Ban da huy giao dich ZaloPay. Payment van dang cho xac nhan.");
+        return;
+      }
+
+      if (result.returnCode < 0) {
+        const message =
+          result.message ||
+          "ZaloPay SDK chua san sang. Can custom dev build de kiem tra App-to-App.";
+        setSdkMessage(message);
+        MessageBoxService.error(t("common.error"), message, t("common.ok"));
+        return;
+      }
+
+      if (result.message) {
+        setSdkMessage(result.message);
+      }
+    },
+    [checkZaloPayPayment, t]
+  );
+
+  const openZaloPayPayment = useCallback(async () => {
+    const launch = resolveZaloPayPaymentLaunch({
+      isNativeAvailable: ZaloPayNativeService.isAvailable(),
+      zpTransToken,
+      orderUrl,
+    });
+
+    if (launch.mode === "unavailable") {
+      const message = launch.message;
+      setSdkMessage(message);
+      MessageBoxService.error(t("common.error"), message, t("common.ok"));
+      return false;
+    }
+
+    if (launch.mode === "url") {
+      setSdkMessage(launch.message);
+      try {
+        await Linking.openURL(launch.target);
+        return true;
+      } catch (error: any) {
+        const message = error?.message || "Khong the mo cong thanh toan ZaloPay.";
+        setSdkMessage(message);
+        MessageBoxService.error(t("common.error"), message, t("common.ok"));
+        return false;
+      }
+    }
+
+    const result = await ZaloPayNativeService.payOrder(launch.target);
+    if (result.returnCode === 0) {
+      setSdkMessage("Da mo ZaloPay. Hay quay lai ung dung sau khi thanh toan.");
+      return true;
+    }
+
+    await handleNativePaymentResult(result);
+    return result.returnCode >= 0;
+  }, [handleNativePaymentResult, orderUrl, t, zpTransToken]);
+
   const handleOpenZaloPayApp = () => {
-    console.log("Opening ZaloPay app...");
+    openZaloPayPayment();
   };
 
-  const handleCheckPayment = () => {
+  const handleCheckPayment = async () => {
     setIsProcessing(true);
-
-    setTimeout(() => {
+    try {
+      await checkZaloPayPayment({ sync: true, silent: false });
+    } finally {
       setIsProcessing(false);
-      navigation.replace("PaymentSuccessScreen", {
-        method: "ZaloPay",
-        orderId,
-        id: tourId,
-        total,
-        amountText,
-      });
-    }, 2000);
+    }
   };
+
+  useEffect(() => {
+    if (
+      hasOpenedPaymentRef.current ||
+      !zpTransToken ||
+      !ZaloPayNativeService.isAvailable()
+    ) {
+      return;
+    }
+
+    hasOpenedPaymentRef.current = true;
+    openZaloPayPayment();
+  }, [openZaloPayPayment, zpTransToken]);
+
+  useEffect(() => {
+    return ZaloPayNativeService.subscribe((result) => {
+      handleNativePaymentResult(result);
+    });
+  }, [handleNativePaymentResult]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const wasAway = appStateRef.current === "inactive" || appStateRef.current === "background";
+      if (wasAway && nextState === "active") {
+        checkZaloPayPayment({ sync: true, silent: true });
+      }
+      appStateRef.current = nextState;
+    });
+
+    return () => subscription.remove();
+  }, [checkZaloPayPayment]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -168,9 +364,21 @@ export default function ZaloPayScreen() {
         <View style={styles.qrSection}>
           <Text style={styles.sectionTitle}>{t("paymentFlow.zalopay.qrTitle")}</Text>
           <View style={styles.qrBox}>
-            <View style={styles.qrPlaceholder}>
-              <Ionicons name="qr-code" size={120} color={ui.icon} />
-            </View>
+            {qrValue ? (
+              <View style={styles.qrCodeFrame}>
+                <QRCode
+                  value={qrValue}
+                  size={200}
+                  color="#111827"
+                  backgroundColor="#FFFFFF"
+                  ecl="M"
+                />
+              </View>
+            ) : (
+              <View style={styles.qrPlaceholder}>
+                <Ionicons name="qr-code" size={120} color={ui.icon} />
+              </View>
+            )}
             <Text style={styles.qrHint}>{t("paymentFlow.zalopay.qrHint")}</Text>
           </View>
         </View>
@@ -192,6 +400,13 @@ export default function ZaloPayScreen() {
           <Ionicons name="chevron-forward" size={24} color={ui.icon} />
         </Pressable>
 
+        {!!sdkMessage && (
+          <View style={styles.statusBox}>
+            <Ionicons name="information-circle-outline" size={20} color={ui.accent} />
+            <Text style={styles.statusText}>{sdkMessage}</Text>
+          </View>
+        )}
+
         <View style={styles.infoBox}>
           <InfoRow
             icon="document-text-outline"
@@ -200,6 +415,18 @@ export default function ZaloPayScreen() {
             ui={ui}
             styles={styles}
           />
+          {!!zaloPayAppTransId && (
+            <>
+              <Divider styles={styles} />
+              <InfoRow
+                icon="receipt-outline"
+                label="ZaloPay app_trans_id"
+                value={zaloPayAppTransId}
+                ui={ui}
+                styles={styles}
+              />
+            </>
+          )}
           <Divider styles={styles} />
           <InfoRow
             icon="wallet-outline"
@@ -367,6 +594,17 @@ const createStyles = (ui: UiTokens) =>
       justifyContent: "center",
       marginBottom: 12,
     },
+    qrCodeFrame: {
+      width: 220,
+      height: 220,
+      borderRadius: 20,
+      backgroundColor: "#FFFFFF",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: "rgba(17, 24, 39, 0.12)",
+    },
     qrHint: { fontSize: 14, color: ui.textSecondary, textAlign: "center" },
     orDivider: {
       flexDirection: "row",
@@ -397,6 +635,18 @@ const createStyles = (ui: UiTokens) =>
     },
     quickActionTitle: { fontSize: 16, fontWeight: "700", color: ui.textPrimary },
     quickActionDesc: { fontSize: 14, color: ui.textSecondary, marginTop: 2 },
+    statusBox: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      padding: 14,
+      backgroundColor: ui.accentSoft,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: ui.border,
+      marginBottom: 16,
+    },
+    statusText: { flex: 1, fontSize: 13, lineHeight: 19, color: ui.textSecondary },
     infoBox: {
       backgroundColor: ui.screenSurface,
       borderRadius: 18,

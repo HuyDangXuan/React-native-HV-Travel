@@ -1,7 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.shouldShowTourSearchSuggestions = exports.hasActiveTourSearchFilters = exports.buildSuggestedTours = exports.buildSuggestedCategories = exports.applyTourSearchFilters = exports.formatCompactSearchPrice = exports.normalizeTourSearchFilters = exports.normalizeTourSearchPriceInput = exports.createDefaultTourSearchFilters = exports.getTourSearchPriceBounds = void 0;
+exports.shouldShowTourSearchSuggestions = exports.hasActiveTourSearchFilters = exports.buildSuggestedTours = exports.buildSuggestedCategories = exports.applyTourSearchFilters = exports.formatCompactSearchPrice = exports.normalizeTourSearchFilters = exports.normalizeTourSearchPriceInput = exports.createDefaultTourSearchFilters = exports.getTourSearchPriceBounds = exports.getTourSearchDurationDays = void 0;
 const FALLBACK_PRICE_MAX = 5000000;
+const getTourSearchDurationDays = (tour) => {
+    if (typeof tour?.duration?.days === "number")
+        return tour.duration.days;
+    const match = String(tour?.duration?.text ?? "").match(/(\d+)/);
+    return match ? Number(match[1]) : 0;
+};
+exports.getTourSearchDurationDays = getTourSearchDurationDays;
 const roundUpToStep = (value, step) => Math.ceil(value / step) * step;
 const roundUpPriceCeiling = (value) => {
     if (value <= 0)

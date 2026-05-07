@@ -1,5 +1,5 @@
-const base_url = "https://hv-travel-api.vercel.app/api";
-// const base_url = "http://192.168.110.22:4000/api";
+// const base_url = "https://hv-travel-api.vercel.app/api";
+const base_url = "http://192.168.10.19:3000/api";
 
 const api = {
   check_connect_db: base_url + "/test",
@@ -29,6 +29,12 @@ const api = {
 
   get_payments: base_url + "/payments/list",
   create_payment: base_url + "/payments",
+  create_momo_payment: base_url + "/payments/momo/create",
+  query_momo_payment: base_url + "/payments/momo/query",
+  momo_payment_status: (paymentId: string) => `${base_url}/payments/momo/${paymentId}/status`,
+  create_zalopay_payment: base_url + "/payments/zalopay/create",
+  query_zalopay_payment: base_url + "/payments/zalopay/query",
+  zalopay_payment_status: (paymentId: string) => `${base_url}/payments/zalopay/${paymentId}/status`,
 
   get_reviews_by_tour: (tourId: string) => `${base_url}/reviews/tour/${tourId}`,
   create_review: base_url + "/reviews",

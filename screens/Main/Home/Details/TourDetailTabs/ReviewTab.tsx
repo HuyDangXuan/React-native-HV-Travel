@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, FlatList } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useAppTheme } from "../../../../../context/ThemeModeContext";
@@ -156,15 +156,11 @@ export default function ReviewTab({ tour }: { tour: Tour | null }) {
             <Text style={styles.emptyDesc}>{t("tourDetail.reviewEmptyDescription")}</Text>
           </View>
         ) : (
-          <FlatList
-            data={topReviews}
-            keyExtractor={(item, idx) => item?.id || `${idx}`}
-            scrollEnabled={false}
-            ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
-            renderItem={({ item }) => (
-              <ReviewCard data={item} styles={styles} locale={locale} t={t} ui={ui} />
-            )}
-          />
+          <View style={{ gap: 16 }}>
+            {topReviews.map((item, idx) => (
+              <ReviewCard key={item?.id || `${idx}`} data={item} styles={styles} locale={locale} t={t} ui={ui} />
+            ))}
+          </View>
         )}
       </View>
 
